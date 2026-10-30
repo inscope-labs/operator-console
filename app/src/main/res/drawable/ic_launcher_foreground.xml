@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    A terminal chevron: the console replaces the Termux shell. The glyph sits inside the
+    adaptive-icon safe zone (the central 72x72 of the 108x108 viewport).
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,44 L46,54 L34,64 L38.5,68.5 L54,54 L38.5,39.5 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M58,62 L74,62 L74,68 L58,68 Z" />
+</vector>

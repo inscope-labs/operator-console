@@ -1,0 +1,6 @@
+{
+  "name": "Operator Console",
+  "description": "Operator Console for secure capability minter and build engine operations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

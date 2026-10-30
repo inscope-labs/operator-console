@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Design review §13 / ADR 0003: the channel to the gateway must be mutually
+    authenticated, not merely TLS. Cleartext is refused outright.
+
+    SCAFFOLD PLACEHOLDER: the <pin-set> below is where the deployment's pin material
+    goes. It is deliberately empty here — a scaffold must not fail a build over a
+    missing deployment secret, and a pin set that is wrong is worse than no pin set.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">gateway.invalid</domain>
+        <!--
+            <pin-set expiration="2027-01-01">
+                <pin digest="SHA-256">REPLACE_WITH_DEPLOYMENT_PIN_BASE64</pin>
+            </pin-set>
+        -->
+    </domain-config>
+</network-security-config>

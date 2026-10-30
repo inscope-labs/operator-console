@@ -1,0 +1,29 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Android / IDE
+local.properties
+*.iml
+.idea/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Signing material — NEVER commit. Release signing comes from a secret store in CI.
+# See docs/adr/0002-no-repository-credentials-on-device.md.
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+
+# Credentials
+.env
+.env.*
+local.properties
+secrets.properties
+
+# OS
+.DS_Store
+Thumbs.db

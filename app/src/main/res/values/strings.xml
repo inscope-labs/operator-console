@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Operator Console</string>
+
+    <!-- Screens -->
+    <string name="dashboard_title">Dashboard</string>
+    <string name="dashboard_placeholder">Read-only console surface. Scaffold placeholder.</string>
+    <string name="plans_title">Plans</string>
+    <string name="plan_list_placeholder">Plan list. Scaffold placeholder.</string>
+    <string name="plan_detail_title">Plan</string>
+    <string name="plan_detail_placeholder">Plan detail. Scaffold placeholder.</string>
+    <string name="task_detail_title">Task</string>
+    <string name="task_detail_placeholder">Task detail. Scaffold placeholder.</string>
+    <string name="publish_confirm_title">Publish</string>
+    <string name="publish_confirm_placeholder">Branch, exact head SHA and guard summary. Scaffold placeholder.</string>
+    <string name="publish_progress_title">Publishing</string>
+    <string name="publish_progress_placeholder">Publish progress. Scaffold placeholder.</string>
+    <string name="decision_title">Decision</string>
+    <string name="decision_placeholder">Resolve an owner decision. Scaffold placeholder.</string>
+    <string name="enrollment_title">Device enrolment</string>
+    <string name="enrollment_placeholder">Device key registration and posture. Scaffold placeholder.</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_placeholder">Console settings. Scaffold placeholder.</string>
+
+    <!-- Actions -->
+    <string name="action_confirm">Confirm</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_retry">Retry</string>
+
+    <!-- Labels -->
+    <string name="label_operation">Operation</string>
+    <string name="label_branch">Branch</string>
+    <string name="label_head_sha">Head SHA</string>
+    <string name="label_ttl">Valid for</string>
+    <string name="label_posture">Device posture</string>
+
+    <!-- Posture. Design review §13: never claim hardware backing the device lacks. -->
+    <string name="posture_hardware">Hardware-backed key</string>
+    <string name="posture_software">Software-backed key</string>
+
+    <!-- Errors -->
+    <string name="error_generic">Something went wrong.</string>
+</resources>
