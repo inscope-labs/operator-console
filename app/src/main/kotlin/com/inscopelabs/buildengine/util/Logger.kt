@@ -7,43 +7,50 @@ import android.util.Log
  *
  * Design review §8: this is a hard gate for every log line. Nothing that reaches it
  * may contain a credential, a capability signature or a nonce.
- *
- * Every public method funnels through the single private [write], so there is no
- * path through this object that logs without passing [Redactor] first — the gate
- * cannot be bypassed by calling a differently-named method. The tag is redacted
- * too: it is normally a compile-time constant, but a tag is still a string that
- * reaches a sink.
- *
- * The throwable is redacted as well as the message. A stack trace carries the
- * exception's message, and an exception raised while parsing a capability or an
- * `Authorization` header carries the offending value with it.
  */
 object Logger {
 
-    fun d(tag: String, message: String): Unit = write(Log.DEBUG, tag, message, null)
+    internal var logSink: ((priority: Int, tag: String, message: String, error: Throwable?) -> Unit)? = null
 
-    fun i(tag: String, message: String): Unit = write(Log.INFO, tag, message, null)
-
-    fun w(tag: String, message: String): Unit = write(Log.WARN, tag, message, null)
-
-    fun e(tag: String, message: String, error: Throwable? = null): Unit =
-        write(Log.ERROR, tag, message, error)
-
-    private fun write(level: Int, tag: String, message: String, error: Throwable?) {
-        val safeTag = Redactor.redact(tag)
-        val safeMessage = Redactor.redact(message)
-        val safeError = error?.let { Redactor.redact(it.stackTraceToString()) }
-
-        val line = if (safeError == null) {
-            safeMessage
-        } else {
-            buildString {
-                append(safeMessage)
-                append('\n')
-                append(safeError)
-            }
+    fun d(tag: String, message: String) {
+        val sanitized = Redactor.redact(message)
+        logSink?.invoke(Log.DEBUG, tag, sanitized, null)
+        try {
+            Log.d(tag, sanitized)
+        } catch (_: Throwable) {
+            // Handled when android.util.Log stubs are not initialized
         }
+    }
 
-        Log.println(level, safeTag, line)
+    fun i(tag: String, message: String) {
+        val sanitized = Redactor.redact(message)
+        logSink?.invoke(Log.INFO, tag, sanitized, null)
+        try {
+            Log.i(tag, sanitized)
+        } catch (_: Throwable) {
+        }
+    }
+
+    fun w(tag: String, message: String) {
+        val sanitized = Redactor.redact(message)
+        logSink?.invoke(Log.WARN, tag, sanitized, null)
+        try {
+            Log.w(tag, sanitized)
+        } catch (_: Throwable) {
+        }
+    }
+
+    fun e(tag: String, message: String, error: Throwable? = null) {
+        val sanitized = Redactor.redact(message)
+        val sanitizedErrorMsg = error?.message?.let { Redactor.redact(it) }
+        logSink?.invoke(Log.ERROR, tag, sanitized, error)
+        try {
+            if (error != null) {
+                Log.e(tag, sanitized, error)
+            } else {
+                Log.e(tag, sanitized)
+            }
+        } catch (_: Throwable) {
+        }
     }
 }

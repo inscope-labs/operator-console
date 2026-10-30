@@ -20,3 +20,18 @@ interface Clock {
 class SystemClock : Clock {
     override fun nowEpochSeconds(): Long = Instant.now().epochSecond
 }
+
+class FixedClock(
+    private var currentSeconds: Long = 1761840000L,
+) : Clock {
+
+    override fun nowEpochSeconds(): Long = currentSeconds
+
+    fun advanceSeconds(seconds: Long) {
+        currentSeconds += seconds
+    }
+
+    fun setEpochSeconds(seconds: Long) {
+        currentSeconds = seconds
+    }
+}
