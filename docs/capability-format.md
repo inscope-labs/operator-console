@@ -100,7 +100,7 @@ atlas
 10008
 PUBLISH
 task-10008-refactor-parser
-9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d2f4c6b8a0e1d3f5b7c9d1e3a5
+9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d
 7f3c9b1e5d2a7046
 ```
 
@@ -115,7 +115,7 @@ Field by field:
 | `order` / `plan` / `task` | `order-7731` / `atlas` / `10008` | Bind the capability to the work it was minted for. |
 | `op` | `PUBLISH` | The only action this capability can authorise. |
 | `branch` | `task-10008-refactor-parser` | Matches `^task-[A-Za-z0-9._-]+$` and equals the branch named in the work order. |
-| `head` | `9f2c…3e5a5` | The exact 40-character SHA the operator reviewed. A capability for a different SHA is a different capability. |
+| `head` | `9f2c…a7e9d` | The exact 40-character SHA the operator reviewed. A capability for a different SHA is a different capability. |
 | `nonce` | `7f3c9b1e5d2a7046` | Single-use. The gateway stores it until `exp` and refuses a second presentation. |
 
 ---
