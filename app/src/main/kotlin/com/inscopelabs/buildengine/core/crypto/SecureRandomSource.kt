@@ -14,9 +14,12 @@ class SecureRandomSource(
 
     fun nextBytes(size: Int): ByteArray = ByteArray(size).also(random::nextBytes)
 
-    fun nextNonce(byteCount: Int = 16): String {
-        require(byteCount >= 16) { "Nonce must have at least 16 bytes of entropy" }
+    fun nextNonce(byteCount: Int = NONCE_BYTES): String {
         val bytes = nextBytes(byteCount)
         return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    companion object {
+        const val NONCE_BYTES: Int = 16
     }
 }
