@@ -32,5 +32,5 @@ class CapabilityMinter(
     ): SignedCapability = TODO("SCAFFOLD: build, sign and return the capability.")
 
     fun buildMessage(capability: OperatorCapability): String =
-        TODO("SCAFFOLD: delegate to OperatorCapabilityCodec.encode().")
+        TODO("SCAFFOLD: delegate to OperatorCapabilityCodec.message() — the signed bytes are the message, not the transmission.")
 }
