@@ -1,0 +1,311 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "vectors": [
+    {
+      "id": "valid-publish",
+      "description": "Valid task-scoped PUBLISH",
+      "scope": "task",
+      "fields": {
+        "domain": "ctxop-v1",
+        "kid": "k2",
+        "exp": 1761840000,
+        "order": "order-7731",
+        "plan": "atlas",
+        "task": "10008",
+        "op": "PUBLISH",
+        "branch": "task-10008-refactor-parser",
+        "head": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+        "nonce": "7f3c9b1e5d2a7046"
+      },
+      "canonicalMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046"
+    },
+    {
+      "id": "valid-upload",
+      "description": "Valid task-scoped UPLOAD",
+      "scope": "task",
+      "fields": {
+        "domain": "ctxop-v1",
+        "kid": "k2",
+        "exp": 1761840000,
+        "order": "order-7731",
+        "plan": "atlas",
+        "task": "10008",
+        "op": "UPLOAD",
+        "branch": "task-10008-refactor-parser",
+        "head": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+        "nonce": "7f3c9b1e5d2a7046"
+      },
+      "canonicalMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nUPLOAD\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046"
+    },
+    {
+      "id": "valid-reconcile",
+      "description": "Valid task-scoped RECONCILE",
+      "scope": "task",
+      "fields": {
+        "domain": "ctxop-v1",
+        "kid": "k2",
+        "exp": 1761840000,
+        "order": "order-7731",
+        "plan": "atlas",
+        "task": "10008",
+        "op": "RECONCILE",
+        "branch": "task-10008-refactor-parser",
+        "head": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+        "nonce": "7f3c9b1e5d2a7046"
+      },
+      "canonicalMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nRECONCILE\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046"
+    },
+    {
+      "id": "valid-decide",
+      "description": "Valid task-scoped DECIDE",
+      "scope": "task",
+      "fields": {
+        "domain": "ctxop-v1",
+        "kid": "k2",
+        "exp": 1761840000,
+        "order": "order-7731",
+        "plan": "atlas",
+        "task": "10008",
+        "op": "DECIDE",
+        "branch": "task-10008-refactor-parser",
+        "head": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+        "nonce": "7f3c9b1e5d2a7046"
+      },
+      "canonicalMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nDECIDE\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046"
+    },
+    {
+      "id": "valid-order",
+      "description": "Valid task-scoped ORDER",
+      "scope": "task",
+      "fields": {
+        "domain": "ctxop-v1",
+        "kid": "k2",
+        "exp": 1761840000,
+        "order": "order-7731",
+        "plan": "atlas",
+        "task": "10008",
+        "op": "ORDER",
+        "branch": "task-10008-refactor-parser",
+        "head": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+        "nonce": "7f3c9b1e5d2a7046"
+      },
+      "canonicalMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nORDER\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046"
+    },
+    {
+      "id": "valid-set-in-progress",
+      "description": "Valid task-scoped SET_IN_PROGRESS",
+      "scope": "task",
+      "fields": {
+        "domain": "ctxop-v1",
+        "kid": "k2",
+        "exp": 1761840000,
+        "order": "order-7731",
+        "plan": "atlas",
+        "task": "10008",
+        "op": "SET_IN_PROGRESS",
+        "branch": "task-10008-refactor-parser",
+        "head": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+        "nonce": "7f3c9b1e5d2a7046"
+      },
+      "canonicalMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nSET_IN_PROGRESS\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046"
+    },
+    {
+      "id": "valid-set-done",
+      "description": "Valid task-scoped SET_DONE",
+      "scope": "task",
+      "fields": {
+        "domain": "ctxop-v1",
+        "kid": "k2",
+        "exp": 1761840000,
+        "order": "order-7731",
+        "plan": "atlas",
+        "task": "10008",
+        "op": "SET_DONE",
+        "branch": "task-10008-refactor-parser",
+        "head": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+        "nonce": "7f3c9b1e5d2a7046"
+      },
+      "canonicalMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nSET_DONE\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046"
+    },
+    {
+      "id": "valid-halt",
+      "description": "Valid engine-scoped HALT on branch 'engine'",
+      "scope": "engine",
+      "fields": {
+        "domain": "ctxop-v1",
+        "kid": "k2",
+        "exp": 1761840000,
+        "order": "order-7731",
+        "plan": "atlas",
+        "task": "engine",
+        "op": "HALT",
+        "branch": "engine",
+        "head": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+        "nonce": "7f3c9b1e5d2a7046"
+      },
+      "canonicalMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\nengine\nHALT\nengine\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046"
+    },
+    {
+      "id": "valid-resume",
+      "description": "Valid engine-scoped RESUME on branch 'engine'",
+      "scope": "engine",
+      "fields": {
+        "domain": "ctxop-v1",
+        "kid": "k2",
+        "exp": 1761840000,
+        "order": "order-7731",
+        "plan": "atlas",
+        "task": "engine",
+        "op": "RESUME",
+        "branch": "engine",
+        "head": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+        "nonce": "7f3c9b1e5d2a7046"
+      },
+      "canonicalMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\nengine\nRESUME\nengine\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046"
+    },
+    {
+      "id": "valid-sync",
+      "description": "Valid engine-scoped SYNC on branch 'engine'",
+      "scope": "engine",
+      "fields": {
+        "domain": "ctxop-v1",
+        "kid": "k2",
+        "exp": 1761840000,
+        "order": "order-7731",
+        "plan": "atlas",
+        "task": "engine",
+        "op": "SYNC",
+        "branch": "engine",
+        "head": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+        "nonce": "7f3c9b1e5d2a7046"
+      },
+      "canonicalMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\nengine\nSYNC\nengine\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046"
+    },
+    {
+      "id": "valid-doctor",
+      "description": "Valid engine-scoped DOCTOR on branch 'engine'",
+      "scope": "engine",
+      "fields": {
+        "domain": "ctxop-v1",
+        "kid": "k2",
+        "exp": 1761840000,
+        "order": "order-7731",
+        "plan": "atlas",
+        "task": "engine",
+        "op": "DOCTOR",
+        "branch": "engine",
+        "head": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+        "nonce": "7f3c9b1e5d2a7046"
+      },
+      "canonicalMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\nengine\nDOCTOR\nengine\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046"
+    },
+    {
+      "id": "valid-new-plan",
+      "description": "Valid engine-scoped NEW_PLAN on branch 'engine'",
+      "scope": "engine",
+      "fields": {
+        "domain": "ctxop-v1",
+        "kid": "k2",
+        "exp": 1761840000,
+        "order": "order-7731",
+        "plan": "atlas",
+        "task": "engine",
+        "op": "NEW_PLAN",
+        "branch": "engine",
+        "head": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+        "nonce": "7f3c9b1e5d2a7046"
+      },
+      "canonicalMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\nengine\nNEW_PLAN\nengine\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046"
+    },
+    {
+      "id": "valid-nonce-min-16-hex",
+      "description": "Shortest permitted nonce (16 hex)",
+      "scope": "task",
+      "fields": {
+        "domain": "ctxop-v1",
+        "kid": "k2",
+        "exp": 1761840000,
+        "order": "order-7731",
+        "plan": "atlas",
+        "task": "10008",
+        "op": "PUBLISH",
+        "branch": "task-10008-refactor-parser",
+        "head": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+        "nonce": "aaaaaaaaaaaaaaaa"
+      },
+      "canonicalMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\naaaaaaaaaaaaaaaa"
+    },
+    {
+      "id": "valid-nonce-max-64-hex",
+      "description": "Longest permitted nonce (64 hex)",
+      "scope": "task",
+      "fields": {
+        "domain": "ctxop-v1",
+        "kid": "k2",
+        "exp": 1761840000,
+        "order": "order-7731",
+        "plan": "atlas",
+        "task": "10008",
+        "op": "PUBLISH",
+        "branch": "task-10008-refactor-parser",
+        "head": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+        "nonce": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      },
+      "canonicalMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    },
+    {
+      "id": "valid-exp-max-long",
+      "description": "Largest canonical exp (Long.MAX_VALUE)",
+      "scope": "task",
+      "fields": {
+        "domain": "ctxop-v1",
+        "kid": "k2",
+        "exp": 9223372036854775807,
+        "order": "order-7731",
+        "plan": "atlas",
+        "task": "10008",
+        "op": "PUBLISH",
+        "branch": "task-10008-refactor-parser",
+        "head": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+        "nonce": "7f3c9b1e5d2a7046"
+      },
+      "canonicalMessage": "ctxop-v1\nk2\n9223372036854775807\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046"
+    },
+    {
+      "id": "valid-kid-max-16",
+      "description": "16-character kid with underscore",
+      "scope": "task",
+      "fields": {
+        "domain": "ctxop-v1",
+        "kid": "Key_0123456789ab",
+        "exp": 1761840000,
+        "order": "order-7731",
+        "plan": "atlas",
+        "task": "10008",
+        "op": "PUBLISH",
+        "branch": "task-10008-refactor-parser",
+        "head": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+        "nonce": "7f3c9b1e5d2a7046"
+      },
+      "canonicalMessage": "ctxop-v1\nKey_0123456789ab\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046"
+    },
+    {
+      "id": "valid-engine-branch-with-slash",
+      "description": "Engine branch containing a slash",
+      "scope": "engine",
+      "fields": {
+        "domain": "ctxop-v1",
+        "kid": "k2",
+        "exp": 1761840000,
+        "order": "order-7731",
+        "plan": "atlas",
+        "task": "engine",
+        "op": "SYNC",
+        "branch": "release/1.0",
+        "head": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+        "nonce": "7f3c9b1e5d2a7046"
+      },
+      "canonicalMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\nengine\nSYNC\nrelease/1.0\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046"
+    }
+  ]
+}

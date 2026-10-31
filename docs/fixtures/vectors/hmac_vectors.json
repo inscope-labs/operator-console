@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "note": "TEST SECRETS - authorise nothing.",
+  "vectors": [
+    {
+      "id": "hmac-sha256-publish",
+      "description": "Standard task-scoped PUBLISH",
+      "secretUtf8": "lab-secret-key-32-chars-minimum!!",
+      "message": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedSignatureBase64Url": "tql0gx__AYfVQxd_EbSYo7PUCC9CwkITVr6cUoGKs2k"
+    },
+    {
+      "id": "hmac-sha256-halt",
+      "description": "Engine-scoped HALT",
+      "secretUtf8": "lab-secret-key-32-chars-minimum!!",
+      "message": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\nengine\nHALT\nengine\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedSignatureBase64Url": "UJk9NvIV3sQHbIQlpr3vWx83FIPV7fbiUgdu3PUmFx0"
+    },
+    {
+      "id": "hmac-sha256-nonce-64",
+      "description": "64-character nonce",
+      "secretUtf8": "lab-secret-key-32-chars-minimum!!",
+      "message": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "expectedSignatureBase64Url": "g4x4iiJathY7CWrUfarAc9v59gJzEzEGbkHAWTxFzSc"
+    },
+    {
+      "id": "hmac-sha256-other-secret",
+      "description": "Same message, different secret gives a different signature",
+      "secretUtf8": "a-completely-different-lab-secret-!!",
+      "message": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedSignatureBase64Url": "FaDR76axo_OCLTzPKQwC6RPLkT7YyFbAR10Mva28K1Q"
+    }
+  ]
+}

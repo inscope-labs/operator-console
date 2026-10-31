@@ -31,13 +31,24 @@ object Redactor {
     private val JSON_NONCE_REGEX = Regex("""(?i)"nonce"\s*:\s*"[^"]+"""")
     private val JSON_CAPABILITY_REGEX = Regex("""(?i)"capability"\s*:\s*"[^"]+"""")
     private val GENERIC_SECRET_REGEX = Regex("""(?i)\b(secret|password|credential|apiKey)\s*[:=]\s*([^\s,;]+)""")
-    private val CTXOP_CAPABILITY_REGEX = Regex("""ctxop-v1(?:\n[^\n]+){9}""")
+    /**
+     * A capability: the domain separator, the nine fields after it, and the optional
+     * signature line that follows on the wire. The signature is matched together with
+     * the message so it can never survive as a stray line after the redaction marker.
+     */
+    private val CTXOP_CAPABILITY_REGEX =
+        Regex("""ctxop-v1(?:\r?\n[^\r\n]+){9}(?:\r?\n[A-Za-z0-9_-]{40,})?""")
+
+    /** The same capability with literal backslash-n separators, as it appears inside JSON or log text. */
+    private val CTXOP_ESCAPED_CAPABILITY_REGEX =
+        Regex("""ctxop-v1(?:\\n[^\\\s"',;]+){9}(?:\\n[A-Za-z0-9_-]{40,})?""")
 
     fun redact(text: String): String {
         var result = text
 
         // Capability block
         result = CTXOP_CAPABILITY_REGEX.replace(result, "[REDACTED_CAPABILITY]")
+        result = CTXOP_ESCAPED_CAPABILITY_REGEX.replace(result, "[REDACTED_CAPABILITY]")
         result = result.replace("ctxop-v1", "[REDACTED_DOMAIN]")
 
         // Bearer tokens & authorization headers

@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "note": "TEST KEY - authorises nothing. Signatures are RFC 6979 deterministic.",
+  "publicKeyJwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "7d7Nc07PDw6Fi_V_53fnWGL_abD2GwL2wh-VV9iRhN4",
+    "y": "_7BMtlYwSDW6CWuye4b_uL40ho748hzuzYqSgquuRgY"
+  },
+  "vectors": [
+    {
+      "id": "ecdsa-r-high-bit",
+      "kind": "derToRaw",
+      "description": "Edge case: r-high-bit",
+      "message": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\ndf594d71a145abdc3d2b8d6c6fa910dd",
+      "derSignatureBase64": "MEUCIQDy7CXUiga/1Yt2/+Vy/S46ZKsmYcPVFeFkuguAoQNFLgIgGciF9Tt8lJlqDC6vnDhmnqDWB71jGwlsxkwJ9OKJNuk=",
+      "expectedRawP1363Base64Url": "8uwl1IoGv9WLdv_lcv0uOmSrJmHD1RXhZLoLgKEDRS4ZyIX1O3yUmWoMLq-cOGaeoNYHvWMbCWzGTAn04ok26Q",
+      "derLength": 71,
+      "rByteLengthInDer": 33,
+      "sByteLengthInDer": 32,
+      "verifiesUnderPublicKey": true
+    },
+    {
+      "id": "ecdsa-s-high-bit",
+      "kind": "derToRaw",
+      "description": "Edge case: s-high-bit",
+      "message": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\nec85738f376e8fcc961365327c5a7524",
+      "derSignatureBase64": "MEUCIAT/UpLfpU3hipMatDOr0UmFiN4aJBTZoOILbevVBAQGAiEAk4VuEFwd/Vijewyi4NlfzKEUiqwazRcPDhdUp72qSW0=",
+      "expectedRawP1363Base64Url": "BP9Skt-lTeGKkxq0M6vRSYWI3hokFNmg4gtt69UEBAaThW4QXB39WKN7DKLg2V_MoRSKrBrNFw8OF1SnvapJbQ",
+      "derLength": 71,
+      "rByteLengthInDer": 32,
+      "sByteLengthInDer": 33,
+      "verifiesUnderPublicKey": true
+    },
+    {
+      "id": "ecdsa-r-short",
+      "kind": "derToRaw",
+      "description": "Edge case: r-short",
+      "message": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n1513c89f0e791e5a02f19ba18f756a7d",
+      "derSignatureBase64": "MEQCH16RzReZRWrzguzMOBNchJIpPrm1RkIoOTfAgtQFWTECIQCPz+myUCW7iNv3iFHxex99g6+N7nWfFY7D0i5c20h30A==",
+      "expectedRawP1363Base64Url": "AF6RzReZRWrzguzMOBNchJIpPrm1RkIoOTfAgtQFWTGPz-myUCW7iNv3iFHxex99g6-N7nWfFY7D0i5c20h30A",
+      "derLength": 70,
+      "rByteLengthInDer": 31,
+      "sByteLengthInDer": 33,
+      "verifiesUnderPublicKey": true
+    },
+    {
+      "id": "ecdsa-s-short",
+      "kind": "derToRaw",
+      "description": "Edge case: s-short",
+      "message": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\nc9220bfcaff8357557508925bc548532",
+      "derSignatureBase64": "MEQCIQDYop3prUKRChIF7B/vgpBX/KLna360+L7Olkr7lYD37wIfKYpiIjbv2e5K5SudnZtlYksBFg8lklh/wfmNdkWsNQ==",
+      "expectedRawP1363Base64Url": "2KKd6a1CkQoSBewf74KQV_yi52t-tPi-zpZK-5WA9-8AKYpiIjbv2e5K5SudnZtlYksBFg8lklh_wfmNdkWsNQ",
+      "derLength": 70,
+      "rByteLengthInDer": 33,
+      "sByteLengthInDer": 31,
+      "verifiesUnderPublicKey": true
+    },
+    {
+      "id": "ecdsa-r-short-der-padded",
+      "kind": "derToRaw",
+      "description": "Edge case: r-short-der-padded",
+      "message": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\nd7cf830b452806b7ac4bbc8cedcad2c9",
+      "derSignatureBase64": "MEQCIACbwZPwZiAXJUbwD3VL9z6e/uIKKOR90PC245MmMPV1AiBCxlXYUazJIlemjFyDp6plXBQevTDHEuudnrix/BfEWQ==",
+      "expectedRawP1363Base64Url": "AJvBk_BmIBclRvAPdUv3Pp7-4goo5H3Q8LbjkyYw9XVCxlXYUazJIlemjFyDp6plXBQevTDHEuudnrix_BfEWQ",
+      "derLength": 70,
+      "rByteLengthInDer": 32,
+      "sByteLengthInDer": 32,
+      "verifiesUnderPublicKey": true
+    },
+    {
+      "id": "ecdsa-s-short-der-padded",
+      "kind": "derToRaw",
+      "description": "Edge case: s-short-der-padded",
+      "message": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n64c2fff08fec8423bbd407a29544bac8",
+      "derSignatureBase64": "MEUCIQDxi2khe1Dc/+IEXQf8ka0jwvBOBGY92DBTOSy083BEwwIgANQhPpiNjGzRDfWPj7uSzdX7Wc2b3H0L/QvaU05+LEY=",
+      "expectedRawP1363Base64Url": "8YtpIXtQ3P_iBF0H_JGtI8LwTgRmPdgwUzkstPNwRMMA1CE-mI2MbNEN9Y-Pu5LN1ftZzZvcfQv9C9pTTn4sRg",
+      "derLength": 71,
+      "rByteLengthInDer": 33,
+      "sByteLengthInDer": 32,
+      "verifiesUnderPublicKey": true
+    },
+    {
+      "id": "ecdsa-r-and-s-high-bit",
+      "kind": "derToRaw",
+      "description": "Edge case: r-and-s-high-bit",
+      "message": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n76c28e671f4a8e0a88fc792bb43e0706",
+      "derSignatureBase64": "MEYCIQD8hp7NEO0g6vegz3qmz3Z+VI9Iil1h0u4L7EypHlLuEwIhAIliqgkL4W0AnMIiy2/iUHwo7lHQ0d/axxOGcs3UzPtb",
+      "expectedRawP1363Base64Url": "_IaezRDtIOr3oM96ps92flSPSIpdYdLuC-xMqR5S7hOJYqoJC-FtAJzCIstv4lB8KO5R0NHf2scThnLN1Mz7Ww",
+      "derLength": 72,
+      "rByteLengthInDer": 33,
+      "sByteLengthInDer": 33,
+      "verifiesUnderPublicKey": true
+    },
+    {
+      "id": "ecdsa-typical",
+      "kind": "derToRaw",
+      "description": "Edge case: typical",
+      "message": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\na5daf75309e66ad7df3c4d53c016403f",
+      "derSignatureBase64": "MEQCIAPS9lax5FYvu8UPDzO3IFAaj4lwsH878LVgHpQk4x45AiAcq5l/zJGuApzSOVC5oT6ohUEkR3SuXnlhfi07bG+Ebg==",
+      "expectedRawP1363Base64Url": "A9L2VrHkVi-7xQ8PM7cgUBqPiXCwfzvwtWAelCTjHjkcq5l_zJGuApzSOVC5oT6ohUEkR3SuXnlhfi07bG-Ebg",
+      "derLength": 70,
+      "rByteLengthInDer": 32,
+      "sByteLengthInDer": 32,
+      "verifiesUnderPublicKey": true
+    },
+    {
+      "id": "ecdsa-publish-verifies",
+      "kind": "verify",
+      "description": "Raw P1363 signature over the standard PUBLISH message verifies",
+      "message": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "derSignatureBase64": "MEQCIC/3t/HRSXfQQLQ8gJNeiaVoFHWnCGWXXn99rJg6zOYDAiB+kAJ50g2B9igyqxXHqBp3EBhXzJx4wdDtIqy6aBvyCA==",
+      "expectedRawP1363Base64Url": "L_e38dFJd9BAtDyAk16JpWgUdacIZZdef32smDrM5gN-kAJ50g2B9igyqxXHqBp3EBhXzJx4wdDtIqy6aBvyCA",
+      "verifiesUnderPublicKey": true
+    },
+    {
+      "id": "ecdsa-tampered-signature",
+      "kind": "verify",
+      "description": "One flipped bit in r: must NOT verify",
+      "message": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedRawP1363Base64Url": "L_e38dFJd9BAtD2Ak16JpWgUdacIZZdef32smDrM5gN-kAJ50g2B9igyqxXHqBp3EBhXzJx4wdDtIqy6aBvyCA",
+      "verifiesUnderPublicKey": false
+    },
+    {
+      "id": "ecdsa-tampered-message",
+      "kind": "verify",
+      "description": "Valid signature, message changed: must NOT verify",
+      "message": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046x",
+      "expectedRawP1363Base64Url": "L_e38dFJd9BAtDyAk16JpWgUdacIZZdef32smDrM5gN-kAJ50g2B9igyqxXHqBp3EBhXzJx4wdDtIqy6aBvyCA",
+      "verifiesUnderPublicKey": false
+    },
+    {
+      "id": "ecdsa-malformed-truncated",
+      "kind": "malformedDer",
+      "description": "DER cut short",
+      "derSignatureBase64": "MEQCIC/3t/HRSXfQQLQ8gJNeiaVoFHWnCGWXXn99rJg6zOYDAiB+kAJ50g2B9igyqxXHqBp3EBhXzJx4wdDtIqy6aA==",
+      "expectedError": "INVALID_DER"
+    },
+    {
+      "id": "ecdsa-malformed-wrong-sequence-tag",
+      "kind": "malformedDer",
+      "description": "First byte is not 0x30",
+      "derSignatureBase64": "MUQCIC/3t/HRSXfQQLQ8gJNeiaVoFHWnCGWXXn99rJg6zOYDAiB+kAJ50g2B9igyqxXHqBp3EBhXzJx4wdDtIqy6aBvyCA==",
+      "expectedError": "INVALID_DER"
+    },
+    {
+      "id": "ecdsa-malformed-trailing-bytes",
+      "kind": "malformedDer",
+      "description": "Extra bytes after the SEQUENCE",
+      "derSignatureBase64": "MEQCIC/3t/HRSXfQQLQ8gJNeiaVoFHWnCGWXXn99rJg6zOYDAiB+kAJ50g2B9igyqxXHqBp3EBhXzJx4wdDtIqy6aBvyCAA=",
+      "expectedError": "INVALID_DER"
+    },
+    {
+      "id": "ecdsa-malformed-wrong-integer-tag",
+      "kind": "malformedDer",
+      "description": "r is not tagged INTEGER (0x02)",
+      "derSignatureBase64": "MEQDIC/3t/HRSXfQQLQ8gJNeiaVoFHWnCGWXXn99rJg6zOYDAiB+kAJ50g2B9igyqxXHqBp3EBhXzJx4wdDtIqy6aBvyCA==",
+      "expectedError": "INVALID_DER"
+    },
+    {
+      "id": "ecdsa-malformed-empty",
+      "kind": "malformedDer",
+      "description": "Empty input",
+      "derSignatureBase64": "",
+      "expectedError": "INVALID_DER"
+    },
+    {
+      "id": "ecdsa-raw-wrong-length",
+      "kind": "rawWrongLength",
+      "description": "Raw signature must be exactly 64 bytes",
+      "rawBase64Url": "L_e38dFJd9BAtDyAk16JpWgUdacIZZdef32smDrM5gN-kAJ50g2B9igyqxXHqBp3EBhXzJx4wdDtIqy6aBvy",
+      "expectedError": "INVALID_RAW_LENGTH"
+    }
+  ]
+}

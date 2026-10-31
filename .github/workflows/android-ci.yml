@@ -1,0 +1,95 @@
+# CI for operator-console: JVM unit tests and a DEBUG build only. No release builds.
+# This file is a protected path for the AI Studio agent; change it out-of-band.
+name: android-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests-and-debug-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Make the Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Accept Android SDK licences
+        run: yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - name: JVM unit tests
+        shell: bash
+        run: |
+          set +e
+          ./gradlew --no-daemon --console=plain --stacktrace :app:testDebugUnitTest 2>&1 | tee gradle-unit.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            msg=$(grep -E -A8 "What went wrong|FAILED|^e: |error:" gradle-unit.log | head -40 | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error title=Gradle unit tests failed::${msg}"
+          fi
+          exit "$status"
+
+      - name: Create a throwaway debug keystore
+        # app/build.gradle.kts signs debug builds with ${rootDir}/debug.keystore, which is gitignored.
+        # This one exists only for this CI run and signs nothing that ships.
+        run: |
+          keytool -genkeypair -v -keystore debug.keystore -storepass android -keypass android \
+            -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Debug build
+        shell: bash
+        run: |
+          set +e
+          ./gradlew --no-daemon --console=plain --stacktrace :app:assembleDebug 2>&1 | tee gradle-build.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            msg=$(grep -E -A8 "What went wrong|FAILED|^e: |error:" gradle-build.log | head -40 | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error title=Gradle debug build failed::${msg}"
+          fi
+          exit "$status"
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: app/build/reports/tests/
+          if-no-files-found: ignore
+
+  vectors-are-reproducible:
+    # The conformance vectors are generated, never hand-edited: regenerating must change nothing.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the reference generator's dependency
+        run: python -m pip install "cryptography>=43"
+
+      - name: Regenerate vectors
+        run: python docs/fixtures/vectors/generate_vectors.py
+
+      - name: Fail if the committed vectors differ
+        run: git diff --exit-code -- docs/fixtures/vectors

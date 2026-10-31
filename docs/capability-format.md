@@ -56,9 +56,9 @@ The construction is the same one the build engine's write gateway already specif
 | `plan` | Plan id | The plan of record the operation applies to. |
 | `task` | Task id | The task the operation applies to. |
 | `op` | Closed enumeration; unknown values refused | Authorisation must never be inferred from an unrecognised request. |
-| `branch` | Must match `^task-[A-Za-z0-9._-]+$`; must equal the branch named in the work order | The field that carries the branch-scope constraint. A capability for `task-A` must not authorise a write to `task-B`, and never to `main`. |
+| `branch` | **Task-scoped ops** (`PUBLISH`, `UPLOAD`, `RECONCILE`, `DECIDE`, `ORDER`, `SET_IN_PROGRESS`, `SET_DONE`): must match `^task-[A-Za-z0-9._-]+$` and equal the branch named in the work order. **Engine-scoped ops** (`HALT`, `RESUME`, `SYNC`, `DOCTOR`, `NEW_PLAN`): must be the configured engine branch (e.g. `engine`) and never a `task-*` branch. See ADR 0005. | The field that carries the branch-scope constraint. A capability for `task-A` must not authorise a write to `task-B`, and never to `main`; an engine-scoped capability cannot authorise a task write, nor the reverse. |
 | `head` | 40 hex characters; the expected branch head | Makes the operation race-safe. If the branch moved after the capability was minted, the write fails and must be re-minted. |
-| `nonce` | Random, single-use, stored by the gateway until `exp` | Replay protection. The gateway must refuse a nonce it has already seen, and must store it before performing the operation. |
+| `nonce` | 16–64 lowercase hex characters (`^[0-9a-f]{16,64}$`); random, single-use, stored by the gateway until `exp` | Replay protection. The gateway must refuse a nonce it has already seen, and must store it before performing the operation. |
 
 > **`op`, `branch`, `head` and `nonce` are all bound into the signature.** A signature
 > that cannot be stretched after minting is what makes scope real. The scope *is* the
@@ -179,7 +179,7 @@ In order, and each check before the work it guards:
 3. `exp` is in the future and the TTL is within the gateway's maximum.
 4. `nonce` has not been seen. **Store it before performing the operation**, not after.
 5. `op` is in the closed enumeration.
-6. `branch` matches `^task-[A-Za-z0-9._-]+$` and equals the branch in the work order.
+6. `branch` is in scope for `op`: for task-scoped ops it matches `^task-[A-Za-z0-9._-]+$` and equals the branch in the work order; for engine-scoped ops it is the configured engine branch (ADR 0005).
 7. `head` equals the current head of that branch.
 8. The guard set G1–G13 passes.
 9. A halt marker is not active.

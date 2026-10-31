@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "vectors": [
+    {
+      "id": "mutation-extra-field",
+      "mutationClass": "extra-field",
+      "description": "11 lines instead of 10 (unsigned message)",
+      "rawMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046\nextra_field",
+      "expectedErrorCode": "BAD_FIELD_COUNT"
+    },
+    {
+      "id": "mutation-missing-field",
+      "mutationClass": "missing-field",
+      "description": "9 lines instead of 10",
+      "rawMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+      "expectedErrorCode": "BAD_FIELD_COUNT"
+    },
+    {
+      "id": "mutation-crlf-line-endings",
+      "mutationClass": "crlf-line-endings",
+      "description": "CRLF separators",
+      "rawMessage": "ctxop-v1\r\nk2\r\n1761840000\r\norder-7731\r\natlas\r\n10008\r\nPUBLISH\r\ntask-10008-refactor-parser\r\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\r\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-lone-cr",
+      "mutationClass": "crlf-line-endings",
+      "description": "CR at end of one field",
+      "rawMessage": "ctxop-v1\nk2\n1761840000\norder-7731\r\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-trailing-line-feed",
+      "mutationClass": "trailing-line-feed",
+      "description": "Trailing LF after the nonce",
+      "rawMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046\n",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-leading-line-feed",
+      "mutationClass": "trailing-line-feed",
+      "description": "Leading LF before the domain separator",
+      "rawMessage": "\nctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-invalid-domain-separator",
+      "mutationClass": "invalid-domain-separator",
+      "description": "Domain literal is not ctxop-v1",
+      "rawMessage": "ctxop-v2\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-unknown-operation",
+      "mutationClass": "unknown-operation",
+      "description": "Operation not in OperationType",
+      "rawMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nDELETE_EVERYTHING\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "UNKNOWN_OP"
+    },
+    {
+      "id": "mutation-lowercase-operation",
+      "mutationClass": "unknown-operation",
+      "description": "Operation literal is case-sensitive",
+      "rawMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\npublish\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "UNKNOWN_OP"
+    },
+    {
+      "id": "mutation-invalid-kid-space",
+      "mutationClass": "invalid-kid-regex",
+      "description": "kid contains a space",
+      "rawMessage": "ctxop-v1\nk 2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-invalid-kid-too-long",
+      "mutationClass": "invalid-kid-regex",
+      "description": "kid longer than 16 characters",
+      "rawMessage": "ctxop-v1\nkkkkkkkkkkkkkkkkk\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-invalid-kid-hyphen",
+      "mutationClass": "invalid-kid-regex",
+      "description": "kid contains a hyphen",
+      "rawMessage": "ctxop-v1\nk-2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-negative-exp",
+      "mutationClass": "negative-exp",
+      "description": "Negative exp",
+      "rawMessage": "ctxop-v1\nk2\n-1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-zero-exp",
+      "mutationClass": "negative-exp",
+      "description": "exp is zero",
+      "rawMessage": "ctxop-v1\nk2\n0\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-non-numeric-exp",
+      "mutationClass": "negative-exp",
+      "description": "exp is not a number",
+      "rawMessage": "ctxop-v1\nk2\nsoon\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-plus-sign-exp",
+      "mutationClass": "noncanonical-exp",
+      "description": "exp with a plus sign is not canonical",
+      "rawMessage": "ctxop-v1\nk2\n+1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-leading-zero-exp",
+      "mutationClass": "noncanonical-exp",
+      "description": "exp with a leading zero is not canonical",
+      "rawMessage": "ctxop-v1\nk2\n01761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-overflow-exp",
+      "mutationClass": "noncanonical-exp",
+      "description": "exp does not fit in a Long",
+      "rawMessage": "ctxop-v1\nk2\n99999999999999999999\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-branch-not-task",
+      "mutationClass": "branch-not-task",
+      "description": "Task-scoped op targeting main",
+      "rawMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\nmain\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BRANCH_NOT_TASK"
+    },
+    {
+      "id": "mutation-branch-not-task-engine-name",
+      "mutationClass": "branch-not-task",
+      "description": "Task-scoped op targeting the engine branch",
+      "rawMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\nengine\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BRANCH_NOT_TASK"
+    },
+    {
+      "id": "mutation-engine-op-task-branch",
+      "mutationClass": "engine-op-task-branch",
+      "description": "Engine-scoped op carrying a task branch",
+      "rawMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\nengine\nHALT\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BRANCH_MISMATCH"
+    },
+    {
+      "id": "mutation-engine-branch-dotdot",
+      "mutationClass": "unsafe-engine-branch",
+      "description": "Engine branch containing '..'",
+      "rawMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\nengine\nHALT\na..b\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-engine-branch-leading-dash",
+      "mutationClass": "unsafe-engine-branch",
+      "description": "Engine branch starting with '-'",
+      "rawMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\nengine\nHALT\n-engine\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-malformed-head-short",
+      "mutationClass": "malformed-head-sha",
+      "description": "head is 39 characters",
+      "rawMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-malformed-head-uppercase",
+      "mutationClass": "malformed-head-sha",
+      "description": "head is uppercase hex",
+      "rawMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9F2C1B7E4A5D6038C1B2A9E7D4F6081C3B5A7E9D\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-malformed-head-non-hex",
+      "mutationClass": "malformed-head-sha",
+      "description": "head contains a non-hex character",
+      "rawMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\ngf2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-short-nonce",
+      "mutationClass": "short-nonce",
+      "description": "nonce is 15 hex characters",
+      "rawMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a704",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-uppercase-nonce",
+      "mutationClass": "short-nonce",
+      "description": "nonce is uppercase",
+      "rawMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7F3C9B1E5D2A7046",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-overlong-nonce",
+      "mutationClass": "short-nonce",
+      "description": "nonce is 65 hex characters",
+      "rawMessage": "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expectedErrorCode": "BAD_ENCODING"
+    },
+    {
+      "id": "mutation-empty-order",
+      "mutationClass": "empty-field",
+      "description": "order is empty",
+      "rawMessage": "ctxop-v1\nk2\n1761840000\n\natlas\n10008\nPUBLISH\ntask-10008-refactor-parser\n9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d\n7f3c9b1e5d2a7046",
+      "expectedErrorCode": "BAD_ENCODING"
+    }
+  ]
+}
