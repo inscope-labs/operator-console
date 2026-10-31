@@ -1,5 +1,12 @@
 package com.inscopelabs.buildengine.di
 
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.preferencesDataStoreFile
+import com.inscopelabs.buildengine.core.crypto.SecureRandomSource
+import com.inscopelabs.buildengine.core.time.Clock
 import com.inscopelabs.buildengine.data.local.DeviceEnrollmentStore
 import com.inscopelabs.buildengine.data.local.OperatorCredentialStore
 import com.inscopelabs.buildengine.data.local.SelectionStore
@@ -15,11 +22,12 @@ import com.inscopelabs.buildengine.domain.repository.TaskRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * SCAFFOLD PLACEHOLDER — placeholder only, implementation pending.
+ * The data layer's bindings.
  *
  * Design review §4: OperatorCredentialStore holds a gateway-scoped credential only.
  * It must never hold a GitHub token of any kind.
@@ -28,13 +36,31 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object DataModule {
 
+    /**
+     * The selection store's DataStore.
+     *
+     * Provided here rather than created inside [SelectionStore], because a DataStore
+     * may only be instantiated once per file: two instances of one file is not a
+     * style question, it is an error DataStore raises.
+     */
     @Provides
     @Singleton
-    fun provideSelectionStore(): SelectionStore = SelectionStore()
+    fun provideSelectionDataStore(
+        @ApplicationContext context: Context,
+    ): DataStore<Preferences> = PreferenceDataStoreFactory.create {
+        context.preferencesDataStoreFile(SELECTION_STORE_FILE)
+    }
 
     @Provides
     @Singleton
-    fun provideOperatorCredentialStore(): OperatorCredentialStore = OperatorCredentialStore()
+    fun provideSelectionStore(dataStore: DataStore<Preferences>): SelectionStore =
+        SelectionStore(dataStore)
+
+    @Provides
+    @Singleton
+    fun provideOperatorCredentialStore(
+        @ApplicationContext context: Context,
+    ): OperatorCredentialStore = OperatorCredentialStore(context)
 
     @Provides
     @Singleton
@@ -55,7 +81,19 @@ object DataModule {
     fun provideOperationRepository(gateway: GatewayRepository): OperationRepository =
         OperationRepositoryImpl(gateway)
 
+    /**
+     * The session repository.
+     *
+     * The session is in-memory only (design review §9), so this binding holds no
+     * state that outlives the process and writes nothing to disk.
+     */
     @Provides
     @Singleton
-    fun provideSessionRepository(): SessionRepository = SessionRepositoryImpl()
+    fun provideSessionRepository(
+        clock: Clock,
+        secureRandomSource: SecureRandomSource,
+    ): SessionRepository = SessionRepositoryImpl(clock, secureRandomSource)
+
+    /** The file the selection state lives in. Plain storage — it is not secret. */
+    private const val SELECTION_STORE_FILE: String = "operator_console_selection"
 }

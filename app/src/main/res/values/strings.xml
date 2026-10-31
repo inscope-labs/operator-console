@@ -20,12 +20,36 @@
     <string name="enrollment_title">Device enrolment</string>
     <string name="enrollment_placeholder">Device key registration and posture. Scaffold placeholder.</string>
     <string name="settings_title">Settings</string>
-    <string name="settings_placeholder">Console settings. Scaffold placeholder.</string>
+
+    <!-- Settings. Design review §4: the credential is gateway-scoped and holds no repository authority. -->
+    <string name="settings_gateway_heading">Gateway</string>
+    <string name="settings_gateway_url_label">Gateway base URL</string>
+    <string name="settings_gateway_note">The console talks to this gateway and to no other. It is fixed at build time.</string>
+    <string name="settings_credential_heading">Operator credential</string>
+    <string name="settings_credential_state_label">Status</string>
+    <string name="settings_credential_configured">Configured</string>
+    <string name="settings_credential_absent">Not configured</string>
+    <string name="settings_credential_field_label">Credential</string>
+    <string name="settings_credential_help">The gateway-scoped operator credential. It authorises the gateway\'s operator surface and grants no repository access. This console holds no GitHub credential of any kind.</string>
+    <string name="settings_credential_saved">Credential stored.</string>
+    <string name="settings_credential_cleared">Credential cleared.</string>
+    <string name="settings_credential_rejected">That has the shape of a repository credential, so it was refused. Use the gateway-scoped operator credential.</string>
+    <string name="settings_credential_storage_unavailable">The encrypted credential store is unavailable on this device. A lock-screen change can invalidate the key it uses.</string>
+    <string name="settings_session_heading">Session</string>
+    <string name="settings_session_state_label">Status</string>
+    <string name="settings_session_active">Open since %1$s</string>
+    <string name="settings_session_absent">No open session</string>
+    <string name="settings_session_started">Session opened.</string>
+    <string name="settings_session_ended">Session ended.</string>
+    <string name="settings_session_start_action">Open session</string>
+    <string name="settings_session_end_action">End session</string>
 
     <!-- Actions -->
     <string name="action_confirm">Confirm</string>
     <string name="action_cancel">Cancel</string>
     <string name="action_retry">Retry</string>
+    <string name="action_save">Save</string>
+    <string name="action_clear">Clear</string>
 
     <!-- Labels -->
     <string name="label_operation">Operation</string>
