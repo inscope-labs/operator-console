@@ -1,0 +1,35 @@
+{
+  "name": "@inscope-labs/cbridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker gateway — sole enforcement point for the Build Engine Operator Console",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "npm run generate-wrangler && wrangler deploy",
+    "generate-wrangler": "tsx scripts/generate-wrangler.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:conformance": "vitest run tests/conformance",
+    "lint": "eslint src scripts tests",
+    "verify-log-hygiene": "tsx scripts/verify-log-hygiene.ts",
+    "check-repo-privacy": "tsx scripts/check-repo-privacy.ts"
+  },
+  "dependencies": {
+    "hono": "^4.6.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241022.0",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0",
+    "wrangler": "^3.80.0",
+    "eslint": "^9.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
