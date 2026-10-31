@@ -31,7 +31,7 @@ class CapabilityMinterTest {
             op = OperationType.PUBLISH,
             branch = "task-1",
             head = "a".repeat(40),
-            nonce = "n1",
+            nonce = "0123456789abcdef",
         )
         assertEquals(OperationType.PUBLISH, scope.op)
         assertTrue(scope.branch.startsWith("task-"))

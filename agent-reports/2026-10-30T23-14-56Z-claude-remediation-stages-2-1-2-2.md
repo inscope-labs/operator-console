@@ -23,6 +23,9 @@
 - `testutil/VectorLoader.kt` and `OperatorCapabilityCodecVectorsTest`: closes the T2-202 item the 2.2 report omitted ("assert against vectors").
 - **P1 CI**: `.github/workflows/android-ci.yml` runs `:app:testDebugUnitTest`, `:app:assembleDebug`, and a job that regenerates the vectors and fails on any diff. No release build.
 
+## Scope exceptions
+- **Scope exception (one line)**: the scaffold placeholder `CapabilityMinterTest` (a Stage 2.3 file) built a `CapabilityScope` with nonce `"n1"`, which the contract-conformant nonce rule rejects. First CI run caught it (64 tests, 1 failed). The literal is now a valid 16-hex nonce; nothing else in that file changed, and the Stage 2.3 agent still owns it.
+
 ## Verification performed
 - Stage 2.1/2.2 sources and tests compiled with kotlinc 2.0.21 against stub JUnit, `android.util.Log` and JSON shims, and run with a small reflection runner: **59 passed, 0 failed** (baseline on unmodified `main`: 43 passed).
 - Against the **old** sources, 10 of the 14 new regression tests fail, confirming they detect the defects.
@@ -30,7 +33,7 @@
 
 ## NOT verified
 - Gradle/AGP build, Hilt, Compose, the real `kotlinx-serialization-json` library (a stand-in with the same API surface was used for `VectorLoader`), and Android instrumentation.
-- The new CI workflow has not run yet; its first run on the pull request is the real check.
+- CI results are recorded on the pull request (first run: Gradle compiled everything and ran 64 tests; the single failure was the `CapabilityMinterTest` literal above).
 
 ## Notes for the next stage
 - `feature/stage-2.1-core-utilities` and `feature/stage-2.2-codec-and-model` hold superseded duplicate work and should be closed. `feature/stage-2.4-transport` (`ffadbc1`) is based on that superseded history and has no agent report; rebase it onto `main` after this PR (its commit touches only transport files).
