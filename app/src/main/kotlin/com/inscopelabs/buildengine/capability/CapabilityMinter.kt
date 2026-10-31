@@ -10,8 +10,6 @@ import com.inscopelabs.buildengine.core.time.Clock
 /**
  * Builds and signs an operator capability.
  *
- * SCAFFOLD PLACEHOLDER — placeholder only, implementation pending.
- *
  * Design review §5: the suggested operator TTL is five minutes — long enough for a
  * confirmation gesture, short enough that a captured capability is near-useless.
  */
@@ -29,8 +27,28 @@ class CapabilityMinter(
         order: String,
         plan: String,
         task: String,
-    ): SignedCapability = TODO("SCAFFOLD: build, sign and return the capability.")
+    ): SignedCapability {
+        val now = clock.nowEpochSeconds()
+        val exp = now + ttlSeconds
+        val kid = signer.kid()
+
+        val capability = OperatorCapability(
+            kid = kid,
+            exp = exp,
+            order = order,
+            plan = plan,
+            task = task,
+            op = scope.op,
+            branch = scope.branch,
+            head = scope.head,
+            nonce = scope.nonce,
+        )
+
+        val message = buildMessage(capability)
+        val signature = signer.sign(message.toByteArray(Charsets.UTF_8))
+        return SignedCapability(capability, signature)
+    }
 
     fun buildMessage(capability: OperatorCapability): String =
-        TODO("SCAFFOLD: delegate to OperatorCapabilityCodec.encode().")
+        OperatorCapabilityCodec.encode(capability)
 }

@@ -1,18 +1,30 @@
 package com.inscopelabs.buildengine.capability.signing
 
+import com.inscopelabs.buildengine.core.crypto.Base64Url
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
+
 /**
- * Model A — the gateway mints, the console holds the key.
+ * Signs capabilities with HMAC-SHA256 using a shared secret.
  *
- * SCAFFOLD PLACEHOLDER — placeholder only, implementation pending.
- *
- * Design review §5: kept behind the CapabilitySigner interface until decision D-a is
- * closed. A capability would then exist before the operator decides, which conflicts
- * with a confirmation-driven flow.
+ * Used by Lab Mode (ADR 0004) to exercise test gateway endpoints without
+ * requiring biometric authorization on every test scenario.
  */
-class HmacCapabilitySigner : CapabilitySigner {
+class HmacCapabilitySigner(
+    private val keyId: String = "lab-k1",
+    private val secret: ByteArray = "default-lab-secret-key-32-bytes!".toByteArray(Charsets.UTF_8),
+) : CapabilitySigner {
 
-    override fun kid(): String = TODO("SCAFFOLD: return the key selector.")
+    constructor(keyId: String, secretUtf8: String) : this(keyId, secretUtf8.toByteArray(Charsets.UTF_8))
 
-    override fun sign(message: ByteArray): ByteArray =
-        TODO("SCAFFOLD: sign with the shared HMAC key.")
+    override fun kid(): String = keyId
+
+    override fun sign(message: ByteArray): ByteArray {
+        val mac = Mac.getInstance("HmacSHA256")
+        val keySpec = SecretKeySpec(secret, "HmacSHA256")
+        mac.init(keySpec)
+        return mac.doFinal(message)
+    }
+
+    fun signBase64Url(message: ByteArray): String = Base64Url.encode(sign(message))
 }

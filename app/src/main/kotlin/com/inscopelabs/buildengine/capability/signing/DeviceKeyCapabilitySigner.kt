@@ -1,17 +1,18 @@
 package com.inscopelabs.buildengine.capability.signing
 
+import com.inscopelabs.buildengine.core.crypto.KeystoreSigner
+
 /**
  * Model B — the console signs with its device key, the gateway verifies.
- *
- * SCAFFOLD PLACEHOLDER — placeholder only, implementation pending.
  *
  * Design review §5: this is the recommended direction because it makes the capability
  * a record of a human decision rather than a pre-issued permission.
  */
-class DeviceKeyCapabilitySigner : CapabilitySigner {
+class DeviceKeyCapabilitySigner(
+    private val keystoreSigner: KeystoreSigner = KeystoreSigner(),
+) : CapabilitySigner {
 
-    override fun kid(): String = TODO("SCAFFOLD: return the enrolled key selector.")
+    override fun kid(): String = keystoreSigner.kid()
 
-    override fun sign(message: ByteArray): ByteArray =
-        TODO("SCAFFOLD: sign with the non-exportable device key.")
+    override fun sign(message: ByteArray): ByteArray = keystoreSigner.sign(message)
 }
