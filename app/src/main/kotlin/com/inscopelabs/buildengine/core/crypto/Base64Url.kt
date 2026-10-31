@@ -20,6 +20,9 @@ object Base64Url {
                 "Invalid base64url character: '$ch'"
             }
         }
-        return Base64.getUrlDecoder().decode(value)
+        val decoded = Base64.getUrlDecoder().decode(value)
+        // Reject non-canonical encodings (non-zero trailing bits): the same bytes must have exactly one text form.
+        require(encode(decoded) == value) { "base64url value is not canonically encoded" }
+        return decoded
     }
 }

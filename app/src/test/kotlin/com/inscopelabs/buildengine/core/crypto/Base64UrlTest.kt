@@ -61,4 +61,12 @@ class Base64UrlTest {
         val decoded = Base64Url.decode("")
         assertEquals(0, decoded.size)
     }
+
+    @Test
+    fun `decode rejects non canonical trailing bits`() {
+        assertEquals(1, Base64Url.decode("QQ").size)
+        assertThrows(IllegalArgumentException::class.java) {
+            Base64Url.decode("QR")
+        }
+    }
 }

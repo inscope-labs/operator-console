@@ -3,6 +3,7 @@ package com.inscopelabs.buildengine.capability
 import com.inscopelabs.buildengine.core.crypto.SecureRandomSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.security.SecureRandom
@@ -49,6 +50,20 @@ class DeviceNonceSourceTest {
         assertNotEquals(source.newNonce(), source.newNonce())
     }
 
+    @Test
+    fun `a repeated value from the random source is retried`() {
+        val source = DeviceNonceSource(SecureRandomSource(ScriptedSecureRandom(1, 1, 2)))
+        assertEquals("01".repeat(16), source.newNonce())
+        assertEquals("02".repeat(16), source.newNonce())
+    }
+
+    @Test
+    fun `a random source that only repeats is refused rather than issuing a duplicate`() {
+        val source = DeviceNonceSource(SecureRandomSource(ScriptedSecureRandom(7)))
+        assertEquals("07".repeat(16), source.newNonce())
+        assertThrows(IllegalStateException::class.java) { source.newNonce() }
+    }
+
     private companion object {
         val NONCE = Regex("^[0-9a-f]+$")
     }
@@ -67,5 +82,15 @@ private class CountingSecureRandom : SecureRandom() {
             bytes[index] = counter.toByte()
             counter = (counter + 1) and 0xFF
         }
+    }
+}
+
+/** Fills every requested buffer with the next scripted byte value, repeating the last one once the script runs out. */
+private class ScriptedSecureRandom(private vararg val fills: Int) : SecureRandom() {
+    private var call = 0
+    override fun nextBytes(bytes: ByteArray) {
+        val value = fills[minOf(call, fills.size - 1)]
+        call++
+        bytes.fill(value.toByte())
     }
 }

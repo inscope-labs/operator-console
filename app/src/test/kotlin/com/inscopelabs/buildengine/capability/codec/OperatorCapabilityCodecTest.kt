@@ -203,4 +203,55 @@ class OperatorCapabilityCodecTest {
         assertFalse(OperatorCapabilityCodec.isValidKid("k-1")) // hyphen not in [A-Za-z0-9_]
         assertFalse(OperatorCapabilityCodec.isValidKid("toolongkeynamethatexceeds16chars"))
     }
+
+    private fun decodeWithNonce(nonce: String) =
+        OperatorCapabilityCodec.decode(OperatorCapabilityCodec.encode(validTaskCapability).replace("7f3c9b1e5d2a7046", nonce))
+
+    @Test
+    fun `nonce must be 16 to 64 lowercase hex characters`() {
+        assertEquals("a".repeat(64), decodeWithNonce("a".repeat(64)).nonce)
+        assertEquals("a".repeat(16), decodeWithNonce("a".repeat(16)).nonce)
+        for (bad in listOf("7f3c9b1e5d2a704", "7F3C9B1E5D2A7046", "a".repeat(65), "nonce-with-dash", "7f3c9b1e5d2a704g")) {
+            assertThrows(IllegalArgumentException::class.java) { decodeWithNonce(bad) }
+        }
+    }
+
+    @Test
+    fun `validation errors do not echo the nonce`() {
+        val error = assertThrows(IllegalArgumentException::class.java) {
+            validTaskCapability.copy(nonce = "BADNONCE-SECRET")
+        }
+        assertFalse(error.message!!.contains("BADNONCE-SECRET"))
+    }
+
+    @Test
+    fun `engine scoped operations accept engine branches and refuse task branches and unsafe names`() {
+        for (good in listOf("engine", "main", "release/1.0", "build-engine")) {
+            assertEquals(good, validEngineCapability.copy(branch = good).branch)
+        }
+        for (bad in listOf("task-1", "task-10008-refactor-parser", "../x", "a..b", "-x", "/x", "x/", "engine.lock", "engine.", "")) {
+            assertThrows(IllegalArgumentException::class.java) { validEngineCapability.copy(branch = bad) }
+        }
+    }
+
+    @Test
+    fun `task scoped operations refuse engine branches`() {
+        for (bad in listOf("engine", "main")) {
+            assertThrows(IllegalArgumentException::class.java) { validTaskCapability.copy(branch = bad) }
+        }
+    }
+
+    @Test
+    fun `exp must be a canonical positive decimal`() {
+        for (bad in listOf("+1761840000", "01761840000", "-5", "0", "99999999999999999999", "1.5", "1e9")) {
+            val message = OperatorCapabilityCodec.encode(validTaskCapability).replace("1761840000", bad)
+            assertThrows(IllegalArgumentException::class.java) { OperatorCapabilityCodec.decode(message) }
+        }
+    }
+
+    @Test
+    fun `engine scoped capability round trips`() {
+        val decoded = OperatorCapabilityCodec.decode(OperatorCapabilityCodec.encode(validEngineCapability))
+        assertEquals(validEngineCapability, decoded)
+    }
 }

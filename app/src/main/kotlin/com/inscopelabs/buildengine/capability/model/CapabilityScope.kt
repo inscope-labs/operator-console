@@ -18,15 +18,15 @@ data class CapabilityScope(
                 "Task-scoped operation $op requires branch matching ${OperatorCapability.TASK_BRANCH_REGEX}, got '$branch'"
             }
         } else {
-            require(OperatorCapability.ENGINE_BRANCH_REGEX.matches(branch)) {
-                "Engine-scoped operation $op requires valid branch, got '$branch'"
+            require(OperatorCapability.isEngineBranch(branch)) {
+                "Engine-scoped operation $op requires an engine branch name (not a task branch), got '$branch'"
             }
         }
         require(OperatorCapability.HEAD_REGEX.matches(head)) {
             "Invalid head '$head': must be 40 lowercase hex characters"
         }
         require(OperatorCapability.NONCE_REGEX.matches(nonce)) {
-            "Invalid nonce '$nonce': must match ${OperatorCapability.NONCE_REGEX}"
+            "Invalid nonce: must match ${OperatorCapability.NONCE_REGEX}"
         }
     }
 }

@@ -86,4 +86,38 @@ class RedactorTest {
         assertTrue(Redactor.containsForbidden("signature=xyz1234567890123456789012345678901234567890"))
         assertFalse(Redactor.containsForbidden("Normal log line: plan atlas task 10008 started"))
     }
+
+    private val signature = "w_5l6-3y1nZ0X9_vM7O5-a9qD-0123456789abcdefghijk"
+    private val capabilityLines = listOf(
+        "ctxop-v1", "k2", "1761840000", "order-7731", "atlas", "10008", "PUBLISH",
+        "task-10008-refactor-parser", "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d", "7f3c9b1e5d2a7046",
+    )
+
+    @Test
+    fun `a signed wire capability is redacted including its signature line`() {
+        val wire = (capabilityLines + signature).joinToString("\n")
+        val redacted = Redactor.redact("sending:\n$wire\ndone")
+        assertFalse(redacted.contains(signature))
+        assertFalse(redacted.contains("7f3c9b1e5d2a7046"))
+        assertFalse(redacted.contains("ctxop-v1"))
+        assertTrue(redacted.contains("[REDACTED_CAPABILITY]"))
+        assertTrue(redacted.contains("done"))
+    }
+
+    @Test
+    fun `an escaped wire capability is fully redacted wherever it appears`() {
+        val escaped = (capabilityLines + signature).joinToString("\\n")
+        val redacted = Redactor.redact("""{"body":"$escaped","other":1}""")
+        assertFalse(redacted.contains(signature))
+        assertFalse(redacted.contains("7f3c9b1e5d2a7046"))
+        assertFalse(redacted.contains("task-10008-refactor-parser"))
+        assertTrue(redacted.contains("""[REDACTED_CAPABILITY]","other":1}"""))
+    }
+
+    @Test
+    fun `an unsigned capability does not swallow the following log line`() {
+        val redacted = Redactor.redact(capabilityLines.joinToString("\n") + "\nnext log line here")
+        assertTrue(redacted.contains("[REDACTED_CAPABILITY]"))
+        assertTrue(redacted.contains("next log line here"))
+    }
 }

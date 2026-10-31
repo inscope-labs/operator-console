@@ -36,15 +36,16 @@ data class OperatorCapability(
                 "Task-scoped operation $op requires branch matching $TASK_BRANCH_REGEX, got '$branch'"
             }
         } else {
-            require(ENGINE_BRANCH_REGEX.matches(branch) && !branch.contains('\n') && !branch.contains('\r')) {
-                "Engine-scoped operation $op requires branch matching $ENGINE_BRANCH_REGEX, got '$branch'"
+            require(isEngineBranch(branch)) {
+                "Engine-scoped operation $op requires an engine branch name (not a task branch), got '$branch'"
             }
         }
         require(HEAD_REGEX.matches(head)) {
             "Invalid head '$head': must be 40 lowercase hex characters"
         }
         require(NONCE_REGEX.matches(nonce)) {
-            "Invalid nonce '$nonce': must match $NONCE_REGEX"
+            // The offending value is deliberately not echoed: a nonce is single-use secret material.
+            "Invalid nonce: must match $NONCE_REGEX"
         }
     }
 
@@ -54,8 +55,21 @@ data class OperatorCapability(
     companion object {
         val KID_REGEX: Regex = Regex("^[A-Za-z0-9_]{1,16}$")
         val TASK_BRANCH_REGEX: Regex = Regex("^task-[A-Za-z0-9._-]+$")
-        val ENGINE_BRANCH_REGEX: Regex = Regex("^[A-Za-z0-9._/-]+$")
+        val ENGINE_BRANCH_REGEX: Regex = Regex("^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$")
         val HEAD_REGEX: Regex = Regex("^[0-9a-f]{40}$")
-        val NONCE_REGEX: Regex = Regex("^[A-Za-z0-9._~+/-]+$")
+        /** docs/gateway-contract.md: the nonce is at least 16 lowercase hex characters. */
+        val NONCE_REGEX: Regex = Regex("^[0-9a-f]{16,64}$")
+
+        /**
+         * True when [branch] is a plausible engine branch (ADR 0005, D-T2): a safe ref name that
+         * is not a task branch. Which engine branch is *configured* is checked by the gateway
+         * and by the scope resolver, not by this model.
+         */
+        fun isEngineBranch(branch: String): Boolean =
+            ENGINE_BRANCH_REGEX.matches(branch) &&
+                !branch.startsWith("task-") &&
+                !branch.contains("..") &&
+                !branch.endsWith(".") &&
+                !branch.endsWith(".lock")
     }
 }
