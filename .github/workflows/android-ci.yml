@@ -46,6 +46,14 @@ jobs:
           fi
           exit "$status"
 
+      - name: Create a throwaway debug keystore
+        # app/build.gradle.kts signs debug builds with ${rootDir}/debug.keystore, which is gitignored.
+        # This one exists only for this CI run and signs nothing that ships.
+        run: |
+          keytool -genkeypair -v -keystore debug.keystore -storepass android -keypass android \
+            -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
       - name: Debug build
         shell: bash
         run: |
