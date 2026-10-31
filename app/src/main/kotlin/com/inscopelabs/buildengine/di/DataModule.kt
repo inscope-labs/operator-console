@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import com.inscopelabs.buildengine.core.crypto.SecureRandomSource
+import com.inscopelabs.buildengine.core.network.ErrorMapper
 import com.inscopelabs.buildengine.core.time.Clock
 import com.inscopelabs.buildengine.data.local.DeviceEnrollmentStore
 import com.inscopelabs.buildengine.data.local.OperatorCredentialStore
@@ -68,13 +69,17 @@ object DataModule {
 
     @Provides
     @Singleton
-    fun providePlanRepository(gateway: GatewayRepository): PlanRepository =
-        PlanRepositoryImpl(gateway)
+    fun providePlanRepository(
+        gateway: GatewayRepository,
+        errorMapper: ErrorMapper,
+    ): PlanRepository = PlanRepositoryImpl(gateway, errorMapper)
 
     @Provides
     @Singleton
-    fun provideTaskRepository(gateway: GatewayRepository): TaskRepository =
-        TaskRepositoryImpl(gateway)
+    fun provideTaskRepository(
+        gateway: GatewayRepository,
+        errorMapper: ErrorMapper,
+    ): TaskRepository = TaskRepositoryImpl(gateway, errorMapper)
 
     @Provides
     @Singleton
