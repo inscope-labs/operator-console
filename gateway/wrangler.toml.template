@@ -1,0 +1,28 @@
+# GENERATED FILE — do not edit by hand.
+# Source of truth: this template + scripts/generate-wrangler.ts
+# Deploy gate refuses a hand-edited wrangler.toml.
+
+name = "cbridge"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Account and zone bindings are environment-specific and filled by the generator.
+
+[[durable_objects.bindings]]
+name = "PLAN_DO"
+class_name = "PlanDO"
+
+[[durable_objects.bindings]]
+name = "NONCE_STORE"
+class_name = "NonceStore"
+
+[[durable_objects.bindings]]
+name = "ENROLMENT_REGISTRY"
+class_name = "EnrolmentRegistry"
+
+[[durable_objects.bindings]]
+name = "AUDIT_STREAM"
+class_name = "AuditStream"
+
+# Migrations and env-specific vars are appended by the generator.
