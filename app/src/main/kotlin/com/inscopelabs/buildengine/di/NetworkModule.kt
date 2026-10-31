@@ -4,7 +4,9 @@ import com.inscopelabs.buildengine.core.network.ErrorMapper
 import com.inscopelabs.buildengine.core.network.GatewayEndpoints
 import com.inscopelabs.buildengine.core.network.GatewayHttpClient
 import com.inscopelabs.buildengine.core.network.MtlsConfig
+import com.inscopelabs.buildengine.core.network.OperatorCredentialProvider
 import com.inscopelabs.buildengine.core.security.CertificatePinning
+import com.inscopelabs.buildengine.data.local.OperatorCredentialStore
 import com.inscopelabs.buildengine.data.remote.GatewayRepository
 import dagger.Module
 import dagger.Provides
@@ -43,10 +45,27 @@ object NetworkModule {
         // go here. See docs/adr/0003-mtls-to-gateway.md.
     }
 
+    /**
+     * The transport, with the operator credential attached.
+     *
+     * The credential is gateway-scoped and holds no repository authority (ADR 0002).
+     * It is read from the encrypted store per request rather than held in a field,
+     * so that clearing it in settings takes effect on the next call and not at the
+     * next launch — and so that the credential's lifetime is the store's, not the
+     * client's.
+     *
+     * With mTLS deferred (ADR 0006), this bearer header is the console's only
+     * identity on the gateway.
+     */
     @Provides
     @Singleton
-    fun provideGatewayHttpClient(client: HttpClient): GatewayHttpClient =
-        GatewayHttpClient(client)
+    fun provideGatewayHttpClient(
+        client: HttpClient,
+        credentialStore: OperatorCredentialStore,
+    ): GatewayHttpClient = GatewayHttpClient(
+        client = client,
+        credentials = OperatorCredentialProvider { credentialStore.read() },
+    )
 
     @Provides
     @Singleton
