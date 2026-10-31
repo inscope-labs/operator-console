@@ -50,8 +50,10 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideGatewayRepository(client: GatewayHttpClient): GatewayRepository =
-        GatewayRepository(client)
+    fun provideGatewayRepository(
+        client: GatewayHttpClient,
+        errorMapper: ErrorMapper,
+    ): GatewayRepository = GatewayRepository(client, errorMapper)
 
     @Provides
     @Singleton
