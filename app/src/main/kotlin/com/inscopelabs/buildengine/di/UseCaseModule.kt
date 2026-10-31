@@ -30,10 +30,16 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * SCAFFOLD PLACEHOLDER — placeholder only, implementation pending.
+ * The use cases, one per operation.
  *
- * One use case per privileged operation (design review §12). Each write use case mints
- * its own scoped capability; none of them may widen their scope.
+ * Design review §12: one use case per privileged operation, and each write use
+ * case mints its own scoped capability — none of them may widen their scope, and
+ * none of them may mint their own (that is
+ * `domain.usecase.common.ConfirmAndMintCapabilityUseCase`'s job alone).
+ *
+ * The read use cases are here now and the write ones are bound here ahead of
+ * their implementations; the bindings are the module's, and the bodies behind
+ * them are their own stages' work.
  */
 @Module
 @InstallIn(SingletonComponent::class)
