@@ -8,6 +8,7 @@
 
 import type { Env } from '../index';
 import { errorResponse, operatorAuthResponse } from '../errors/respond';
+import { verifyOperatorToken } from '../auth/operator-token';
 
 export type RouteHandler = (
   request: Request,
@@ -23,7 +24,7 @@ interface Route {
   handler: RouteHandler;
   /** When true, require a valid capability in the body. */
   requiresCapability: boolean;
-  /** When true, require OPERATOR_TOKEN (admin surface). */
+  /** When true, require OPERATOR_TOKEN (operator surface). */
   requiresOperatorToken: boolean;
 }
 
@@ -31,7 +32,7 @@ const routes: Route[] = [];
 
 /**
  * Register a route. Patterns use :param syntax (e.g. /tasks/:id/publish).
- * Call from route modules at module load time.
+ * Call from route modules at module load time (via register*Routes helpers).
  */
 export function register(
   method: string,
@@ -59,9 +60,30 @@ export function register(
   });
 }
 
+/** Test helper — clear the route table between unit tests. */
+export function clearRoutes(): void {
+  routes.length = 0;
+}
+
+/** Test helper — inspect registered routes. */
+export function listRoutes(): ReadonlyArray<{
+  method: string;
+  pattern: string;
+  requiresOperatorToken: boolean;
+  requiresCapability: boolean;
+}> {
+  return routes.map((r) => ({
+    method: r.method,
+    pattern: r.pattern.source,
+    requiresOperatorToken: r.requiresOperatorToken,
+    requiresCapability: r.requiresCapability,
+  }));
+}
+
 /**
  * Dispatch an incoming request.
- * Order: match → OPERATOR_TOKEN (if required) → capability (if required) → handler.
+ * Order: match → OPERATOR_TOKEN (if required) → handler.
+ * Capability body checks remain in the handler until a shared body parser exists.
  */
 export async function dispatch(
   request: Request,
@@ -82,26 +104,25 @@ export async function dispatch(
       params[name] = decodeURIComponent(match[i + 1]);
     });
 
-    // Admin surface — OPERATOR_TOKEN only
     if (route.requiresOperatorToken) {
-      const auth = request.headers.get('authorization') ?? '';
-      const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-      // TODO: constant-time compare against env.OPERATOR_TOKEN
-      if (!token || token !== env.OPERATOR_TOKEN) {
+      if (!verifyOperatorToken(request, env.OPERATOR_TOKEN ?? '')) {
         return operatorAuthResponse(requestId);
       }
     }
 
-    // Confirmation-bearing routes — capability required
-    if (route.requiresCapability) {
-      // Capability is expected in the JSON body; extraction left to the handler
-      // after body parse. Router only enforces presence of the header/body contract
-      // at a higher level once body parsing is shared.
-      // TODO: optional early reject if Content-Type is missing.
-    }
-
     try {
-      return await route.handler(request, env, ctx, params);
+      const response = await route.handler(request, env, ctx, params);
+      // Ensure request id is visible on success paths too.
+      if (!response.headers.has('x-request-id')) {
+        const headers = new Headers(response.headers);
+        headers.set('x-request-id', requestId);
+        return new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers,
+        });
+      }
+      return response;
     } catch (e) {
       const message = e instanceof Error ? e.message : 'internal error';
       return errorResponse('NETWORK', message, requestId);
@@ -114,7 +135,3 @@ export async function dispatch(
     requestId
   );
 }
-
-// Route modules register themselves by importing this module and calling register().
-// Example (in routes/tasks.ts):
-//   register('POST', '/tasks/:id/publish', publishHandler, { requiresCapability: true });
