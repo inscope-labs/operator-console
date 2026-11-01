@@ -1,7 +1,7 @@
 /**
- * Capability verification — signature, TTL, kid, nonce, scope binding.
- * Spec §8. Model B (recommended under D-a): console signs, gateway verifies
- * against the enrolled device public key selected by kid.
+ * Capability verification — signature, TTL, kid, nonce-scope binding.
+ * Spec §8. Model B (recommended under D-a): console signs with the device
+ * key; gateway verifies against the enrolled public key selected by kid.
  *
  * Fail closed on every ambiguous case.
  */
@@ -42,7 +42,9 @@ export interface VerifyContext {
   /** Current time in Unix seconds (injectable for tests). */
   now: number;
   /**
-   * Resolve a public key (or HMAC secret under Model A) by kid.
+   * Resolve a public key by kid.
+   * Model B: CryptoKey (ECDSA P-256 or Ed25519) for the enrolled device.
+   * Model A (compat): ArrayBuffer HMAC secret.
    * Returns null if the kid is unknown or retired.
    */
   resolveKey: (kid: string) => Promise<CryptoKey | ArrayBuffer | null>;
@@ -68,6 +70,10 @@ export async function verifyCapability(
     ({ message, signature } = splitSignedCapability(raw));
   } catch {
     return { ok: false, code: 'MALFORMED', message: 'cannot split signature' };
+  }
+
+  if (!signature) {
+    return { ok: false, code: 'MALFORMED', message: 'empty signature' };
   }
 
   let capability: OperatorCapability;
@@ -120,9 +126,6 @@ export async function verifyCapability(
     };
   }
 
-  // Signature verification (Model B: ECDSA/Ed25519 over the message UTF-8 bytes)
-  // TODO: implement actual verify with Web Crypto against the resolved key.
-  // Until implemented, fail closed.
   const signatureValid = await verifySignature(message, signature, key);
   if (!signatureValid) {
     return {
@@ -140,15 +143,66 @@ export async function verifyCapability(
 }
 
 /**
- * Placeholder for the cryptographic verify step.
- * Must be replaced with Web Crypto (ECDSA-P256 or Ed25519) under Model B,
- * or HMAC-SHA256 under Model A.
+ * Cryptographic verification.
+ * - CryptoKey → ECDSA P-256 (SHA-256) or Ed25519 (algorithm from key).
+ * - ArrayBuffer → HMAC-SHA256 (Model A compatibility).
+ * Signature is base64url (no padding).
  */
 async function verifySignature(
-  _message: string,
-  _signature: string,
-  _key: CryptoKey | ArrayBuffer
+  message: string,
+  signatureB64url: string,
+  key: CryptoKey | ArrayBuffer
 ): Promise<boolean> {
-  // TODO: real verification. Fail closed until implemented.
-  return false;
+  try {
+    const data = new TextEncoder().encode(message);
+    const sig = base64UrlToBytes(signatureB64url);
+
+    if (key instanceof ArrayBuffer || ArrayBuffer.isView(key)) {
+      // Model A: HMAC-SHA256
+      const raw = key instanceof ArrayBuffer ? key : key.buffer;
+      const hmacKey = await crypto.subtle.importKey(
+        'raw',
+        raw as ArrayBuffer,
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['verify']
+      );
+      return crypto.subtle.verify('HMAC', hmacKey, sig, data);
+    }
+
+    // Model B: asymmetric
+    const algo = key.algorithm as KeyAlgorithm & { name: string; namedCurve?: string };
+    if (algo.name === 'ECDSA') {
+      return crypto.subtle.verify(
+        { name: 'ECDSA', hash: 'SHA-256' },
+        key,
+        sig,
+        data
+      );
+    }
+    if (algo.name === 'Ed25519') {
+      return crypto.subtle.verify('Ed25519', key, sig, data);
+    }
+
+    // Unknown key type — fail closed
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function base64UrlToBytes(s: string): Uint8Array {
+  const padded = s.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = padded.length % 4 === 0 ? '' : '='.repeat(4 - (padded.length % 4));
+  const binary = atob(padded + pad);
+  const out = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+  return out;
+}
+
+/** base64url (no padding) encoder — used by tests and by the console minter. */
+export function bytesToBase64Url(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
