@@ -2,46 +2,82 @@
  * cbridge Worker entry point.
  *
  * Sole enforcement point for the operator console.
- * All routes, capability verification, guards and GitHub interaction
- * are reached through this handler.
- *
- * Full routing, middleware and Durable Object bindings are TODO.
  */
 
-export interface Env {
-  // Secrets / bindings (names only — values never in source)
-  SIGNING_KEYS: string;          // JSON public keys
-  OPERATOR_TOKEN: string;
-  // GITHUB_TOKEN is obtained via InstallationTokenProvider, not a long-lived secret
-  REPOS: string;                 // JSON map of RepoConfig
+import { dispatch } from './routes/router';
+import { registerStatusRoutes } from './routes/status';
+import { registerPlanRoutes } from './routes/plans';
+import { registerTaskRoutes } from './routes/tasks';
+import { MultiRepoGitHubAdapter } from './adapter/multi-repo-adapter';
+import { NonceStore } from './durable-objects/nonce-store';
+import './guards/register-core';
 
-  // Durable Object bindings
+export interface Env {
+  SIGNING_KEYS: string;
+  OPERATOR_TOKEN: string;
+  REPOS: string;
+
+  GITHUB_APP_ID: string;
+  GITHUB_APP_PRIVATE_KEY: string;
+  GITHUB_APP_INSTALLATION_ID: string;
+
   PLAN_DO: DurableObjectNamespace;
   NONCE_STORE: DurableObjectNamespace;
   ENROLMENT_REGISTRY: DurableObjectNamespace;
   AUDIT_STREAM: DurableObjectNamespace;
+
+  __adapter?: MultiRepoGitHubAdapter;
+}
+
+registerStatusRoutes();
+registerPlanRoutes();
+registerTaskRoutes();
+
+export async function getAdapter(env: Env): Promise<MultiRepoGitHubAdapter> {
+  if (env.__adapter) return env.__adapter;
+  if (
+    !env.REPOS ||
+    !env.GITHUB_APP_ID ||
+    !env.GITHUB_APP_PRIVATE_KEY ||
+    !env.GITHUB_APP_INSTALLATION_ID
+  ) {
+    throw new Error(
+      'adapter credentials incomplete — set REPOS, GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_APP_INSTALLATION_ID'
+    );
+  }
+  const adapter = await MultiRepoGitHubAdapter.create({
+    reposJson: env.REPOS,
+    secrets: {
+      appId: env.GITHUB_APP_ID,
+      privateKeyPem: env.GITHUB_APP_PRIVATE_KEY,
+      installationId: env.GITHUB_APP_INSTALLATION_ID,
+    },
+  });
+  env.__adapter = adapter;
+  return adapter;
 }
 
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    // TODO: route table, OPERATOR_TOKEN check, capability verification,
-    //       guard runner, adapter construction, audit emission.
-    // Fail closed on any ambiguous case.
-    return new Response(
-      JSON.stringify({
-        error: 'NOT_IMPLEMENTED',
-        message: 'cbridge scaffold — routes not yet wired',
-        request_id: crypto.randomUUID(),
-      }),
-      {
-        status: 501,
-        headers: { 'content-type': 'application/json' },
-      }
-    );
+  async fetch(
+    request: Request,
+    env: Env,
+    ctx: ExecutionContext
+  ): Promise<Response> {
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'access-control-allow-origin': '*',
+          'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS',
+          'access-control-allow-headers':
+            'authorization, content-type, x-request-id, x-device-id',
+          'access-control-max-age': '86400',
+        },
+      });
+    }
+    return dispatch(request, env, ctx);
   },
 };
 
-// Durable Object class exports will be added here once implemented.
-// export { PlanDO } from './durable-objects/plan-do';
-// export { NonceStore } from './durable-objects/nonce-store';
-// ...
+// Durable Object bindings — required for wrangler to resolve class names.
+export { NonceStore };
