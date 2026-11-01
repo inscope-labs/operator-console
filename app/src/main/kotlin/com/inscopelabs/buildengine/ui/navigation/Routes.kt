@@ -2,8 +2,6 @@ package com.inscopelabs.buildengine.ui.navigation
 
 /**
  * The navigation graph's routes.
- *
- * SCAFFOLD PLACEHOLDER — placeholder only, implementation pending.
  */
 object Routes {
 

@@ -1,6 +1,7 @@
 package com.inscopelabs.buildengine.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -18,35 +19,68 @@ import com.inscopelabs.buildengine.ui.taskdetail.TaskDetailScreen
 
 /**
  * The console's navigation graph.
- *
- * SCAFFOLD PLACEHOLDER — placeholder only, implementation pending.
  */
 @Composable
-fun AppNavHost(navController: androidx.navigation.NavHostController = rememberNavController()) {
+fun AppNavHost(navController: NavHostController = rememberNavController()) {
     NavHost(navController = navController, startDestination = Routes.DASHBOARD) {
-        composable(Routes.DASHBOARD) { DashboardScreen() }
-        composable(Routes.PLANS) { PlanListScreen() }
+        composable(Routes.DASHBOARD) {
+            DashboardScreen(
+                onNavigateToPlan = { planId -> navController.navigate(Routes.planDetail(planId)) },
+                onNavigateToTask = { taskId -> navController.navigate(Routes.taskDetail(taskId)) },
+                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
+                onNavigateToPlans = { navController.navigate(Routes.PLANS) },
+            )
+        }
+        composable(Routes.PLANS) {
+            PlanListScreen(
+                onPlanClick = { planId -> navController.navigate(Routes.planDetail(planId)) },
+                onBack = { navController.popBackStack() },
+            )
+        }
         composable(
             route = Routes.PLAN_DETAIL,
             arguments = listOf(navArgument("planId") { type = NavType.StringType }),
-        ) { PlanDetailScreen() }
+        ) { backStackEntry ->
+            val planId = backStackEntry.arguments?.getString("planId").orEmpty()
+            PlanDetailScreen(
+                planId = planId,
+                onBack = { navController.popBackStack() },
+            )
+        }
         composable(
             route = Routes.TASK_DETAIL,
             arguments = listOf(navArgument("taskId") { type = NavType.StringType }),
-        ) { TaskDetailScreen() }
+        ) { backStackEntry ->
+            val taskId = backStackEntry.arguments?.getString("taskId").orEmpty()
+            TaskDetailScreen(
+                taskId = taskId,
+                onBack = { navController.popBackStack() },
+                onPublishClick = { id -> navController.navigate(Routes.publish(id)) },
+            )
+        }
         composable(
             route = Routes.PUBLISH,
             arguments = listOf(navArgument("taskId") { type = NavType.StringType }),
-        ) { PublishConfirmScreen() }
+        ) {
+            PublishConfirmScreen()
+        }
         composable(
             route = Routes.PUBLISH_PROGRESS,
             arguments = listOf(navArgument("taskId") { type = NavType.StringType }),
-        ) { PublishProgressScreen() }
+        ) {
+            PublishProgressScreen()
+        }
         composable(
             route = Routes.DECISION,
             arguments = listOf(navArgument("decisionId") { type = NavType.StringType }),
-        ) { DecisionScreen() }
-        composable(Routes.ENROLLMENT) { EnrollmentScreen() }
-        composable(Routes.SETTINGS) { SettingsScreen() }
+        ) {
+            DecisionScreen()
+        }
+        composable(Routes.ENROLLMENT) {
+            EnrollmentScreen()
+        }
+        composable(Routes.SETTINGS) {
+            SettingsScreen()
+        }
     }
 }

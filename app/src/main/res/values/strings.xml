@@ -50,6 +50,28 @@
     <string name="action_retry">Retry</string>
     <string name="action_save">Save</string>
     <string name="action_clear">Clear</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="action_validate">Validate plan</string>
+    <string name="action_render_check">Check render</string>
+    <string name="action_publish">Publish</string>
+
+    <!-- Dashboard & Plan Labels -->
+    <string name="halt_active_banner">HALT ACTIVE — write operations locked</string>
+    <string name="halt_active_description">The engine is currently halted. Write operations are blocked until an operator resumes the engine.</string>
+    <string name="engine_active_label">Engine active</string>
+    <string name="open_branches_heading">Open Branches</string>
+    <string name="next_tasks_heading">Next Actionable Tasks</string>
+    <string name="plans_heading">Plans of Record</string>
+    <string name="no_open_branches">No open branches currently active</string>
+    <string name="no_next_tasks">No ready tasks at this time</string>
+    <string name="no_plans">No plans found on gateway</string>
+    <string name="label_milestone">Milestone</string>
+    <string name="label_blocked_tasks">Blocked tasks</string>
+    <string name="label_validation_passed">Definitions valid</string>
+    <string name="label_validation_failed">Validation failed</string>
+    <string name="label_render_current">Views are current</string>
+    <string name="label_render_stale">Views have render issues</string>
+    <string name="copy_head_sha">Head SHA copied</string>
 
     <!-- Labels -->
     <string name="label_operation">Operation</string>
@@ -57,6 +79,7 @@
     <string name="label_head_sha">Head SHA</string>
     <string name="label_ttl">Valid for</string>
     <string name="label_posture">Device posture</string>
+    <string name="label_status">Status</string>
 
     <!-- Posture. Design review §13: never claim hardware backing the device lacks. -->
     <string name="posture_hardware">Hardware-backed key</string>

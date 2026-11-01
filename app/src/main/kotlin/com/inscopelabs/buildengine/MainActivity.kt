@@ -7,14 +7,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import com.inscopelabs.buildengine.core.security.SecureWindow
 import com.inscopelabs.buildengine.ui.navigation.AppNavHost
 import com.inscopelabs.buildengine.ui.theme.OperatorConsoleTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
  * The single Activity hosting the Compose navigation graph.
- *
- * SCAFFOLD PLACEHOLDER — placeholder only, implementation pending.
  *
  * Design review §13: FLAG_SECURE must be applied to this window so the console is
  * not observable in screenshots or the recent-apps thumbnail. See core/security/SecureWindow.kt.
@@ -23,6 +22,7 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        SecureWindow.apply(window)
         enableEdgeToEdge()
         setContent {
             OperatorConsoleTheme {

@@ -1,8 +1,7 @@
 package com.inscopelabs.buildengine.data.local
 
-import android.content.Context
+import android.content.ContextWrapper
 import com.inscopelabs.buildengine.data.local.prefs.PreferencesKeys
-import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -22,7 +21,7 @@ import org.junit.Test
  */
 class OperatorCredentialStoreTest {
 
-    private val store = OperatorCredentialStore(mockk<Context>(relaxed = true))
+    private val store = OperatorCredentialStore(ContextWrapper(null))
 
     // --- The refusal ------------------------------------------------------------
 
