@@ -9,24 +9,54 @@
 import { dispatch } from './routes/router';
 import { registerStatusRoutes } from './routes/status';
 import { registerPlanRoutes } from './routes/plans';
+import { MultiRepoGitHubAdapter } from './adapter/multi-repo-adapter';
 
 export interface Env {
   // Secrets / bindings (names only — values never in source)
-  SIGNING_KEYS: string; // JSON public keys
+  SIGNING_KEYS: string;
   OPERATOR_TOKEN: string;
-  // GITHUB_TOKEN is obtained via InstallationTokenProvider, not a long-lived secret
-  REPOS: string; // JSON map of RepoConfig
+  REPOS: string;
+
+  /** GitHub App credentials for InstallationTokenProvider */
+  GITHUB_APP_ID: string;
+  GITHUB_APP_PRIVATE_KEY: string;
+  GITHUB_APP_INSTALLATION_ID: string;
 
   // Durable Object bindings
   PLAN_DO: DurableObjectNamespace;
   NONCE_STORE: DurableObjectNamespace;
   ENROLMENT_REGISTRY: DurableObjectNamespace;
   AUDIT_STREAM: DurableObjectNamespace;
+
+  /** Optional: cached adapter on the isolate (set after first successful create). */
+  __adapter?: MultiRepoGitHubAdapter;
 }
 
-// Register read-only surfaces once at isolate startup.
 registerStatusRoutes();
 registerPlanRoutes();
+
+/**
+ * Lazily construct the MultiRepoGitHubAdapter once per isolate.
+ * Failures surface as structured errors from routes that need it.
+ */
+export async function getAdapter(env: Env): Promise<MultiRepoGitHubAdapter> {
+  if (env.__adapter) return env.__adapter;
+  if (!env.REPOS || !env.GITHUB_APP_ID || !env.GITHUB_APP_PRIVATE_KEY || !env.GITHUB_APP_INSTALLATION_ID) {
+    throw new Error(
+      'adapter credentials incomplete — set REPOS, GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_APP_INSTALLATION_ID'
+    );
+  }
+  const adapter = await MultiRepoGitHubAdapter.create({
+    reposJson: env.REPOS,
+    secrets: {
+      appId: env.GITHUB_APP_ID,
+      privateKeyPem: env.GITHUB_APP_PRIVATE_KEY,
+      installationId: env.GITHUB_APP_INSTALLATION_ID,
+    },
+  });
+  env.__adapter = adapter;
+  return adapter;
+}
 
 export default {
   async fetch(
@@ -34,7 +64,6 @@ export default {
     env: Env,
     ctx: ExecutionContext
   ): Promise<Response> {
-    // CORS preflight for local console development (tightened later).
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         status: 204,
@@ -51,9 +80,3 @@ export default {
     return dispatch(request, env, ctx);
   },
 };
-
-// Durable Object class exports will be added once implemented.
-// export { PlanDO } from './durable-objects/plan-do';
-// export { NonceStore } from './durable-objects/nonce-store';
-// export { EnrolmentRegistry } from './durable-objects/enrolment-registry';
-// export { AuditStream } from './durable-objects/audit-stream';

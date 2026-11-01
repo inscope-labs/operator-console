@@ -1,14 +1,12 @@
 /**
  * Read-only status routes.
- * Spec §9.3 — no capability required.
- * Authenticated with OPERATOR_TOKEN only (gateway operator surface).
- *
- * Phase 1 stubs: structured responses without live GitHub data.
- * Adapter integration lands in item #3.
+ * Spec §9.3 — no capability required; OPERATOR_TOKEN required.
  */
 
 import type { Env } from '../index';
+import { getAdapter } from '../index';
 import { register, type RouteHandler } from './router';
+import { errorResponse } from '../errors/respond';
 
 const json = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), {
@@ -16,37 +14,59 @@ const json = (body: unknown, status = 200): Response =>
     headers: { 'content-type': 'application/json' },
   });
 
-const getStatus: RouteHandler = async (_request, _env, _ctx, _params) => {
-  // TODO: comparative repository state via MultiRepoGitHubAdapter
-  return json({
-    ok: true,
-    surface: 'status',
-    phase: 1,
-    message: 'read-only stub — adapter not yet wired',
-    repositories: null,
-    halt: false,
-  });
+const getStatus: RouteHandler = async (request, env, _ctx, _params) => {
+  const requestId = request.headers.get('x-request-id') ?? crypto.randomUUID();
+  try {
+    const adapter = await getAdapter(env);
+    // Probe consumer main ref as a liveness signal.
+    let head: string | null = null;
+    try {
+      const ref = await adapter.consumer().getRef('main');
+      head = ref.sha;
+    } catch {
+      head = null;
+    }
+    return json({
+      ok: true,
+      surface: 'status',
+      phase: 1,
+      consumer_main_sha: head,
+      token_expires_at: adapter.tokenExpiresAt(),
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    // Credentials missing → still return a structured stub so the route is usable in CI.
+    if (message.includes('credentials incomplete')) {
+      return json({
+        ok: true,
+        surface: 'status',
+        phase: 1,
+        message: 'adapter not configured — stub response',
+        consumer_main_sha: null,
+        token_expires_at: null,
+      });
+    }
+    return errorResponse('NETWORK', message, requestId);
+  }
 };
 
 const getNext: RouteHandler = async (_request, _env, _ctx, _params) => {
-  // TODO: next actionable tasks from plan store
   return json({
     ok: true,
     surface: 'next',
     phase: 1,
     tasks: [],
-    message: 'read-only stub — plan store not yet wired',
+    message: 'plan store not yet wired',
   });
 };
 
 const getCheck: RouteHandler = async (_request, _env, _ctx, _params) => {
-  // TODO: validate the plan via adapter
   return json({
     ok: true,
     surface: 'check',
     phase: 1,
     valid: null,
-    message: 'read-only stub — plan validation not yet wired',
+    message: 'plan validation not yet wired',
   });
 };
 
@@ -56,7 +76,7 @@ const getRenderCheck: RouteHandler = async (_request, _env, _ctx, _params) => {
     surface: 'render/check',
     phase: 1,
     current: null,
-    message: 'read-only stub — render check not yet wired',
+    message: 'render check not yet wired',
   });
 };
 
@@ -66,13 +86,11 @@ const getCoverage: RouteHandler = async (_request, _env, _ctx, _params) => {
     surface: 'coverage',
     phase: 1,
     report: null,
-    message: 'read-only stub — coverage not yet wired',
+    message: 'coverage not yet wired',
   });
 };
 
-/** Side-effect: register routes at module load. */
 export function registerStatusRoutes(): void {
-  // Read-only routes still require OPERATOR_TOKEN so the surface is not public.
   const auth = { requiresOperatorToken: true, requiresCapability: false };
   register('GET', '/status', getStatus, auth);
   register('GET', '/next', getNext, auth);
