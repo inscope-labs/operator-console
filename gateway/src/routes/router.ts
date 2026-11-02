@@ -1,14 +1,13 @@
 /**
  * Path matching + auth middleware order.
- * Spec §9 — authentication headers checked first; capability required on
- * mutating / privileged routes; /admin/* uses OPERATOR_TOKEN only.
- *
- * Fail closed: unknown routes and missing credentials yield structured errors.
+ * Spec §9. Config validation runs first (GW-2): invalid config → 503 CONFIG_INVALID
+ * for every path except GET /health.
  */
 
 import type { Env } from '../index';
 import { errorResponse, operatorAuthResponse } from '../errors/respond';
 import { verifyOperatorToken } from '../auth/operator-token';
+import { parseGatewayConfig } from '../config/env';
 
 export type RouteHandler = (
   request: Request,
@@ -22,18 +21,12 @@ interface Route {
   pattern: RegExp;
   paramNames: string[];
   handler: RouteHandler;
-  /** When true, require a valid capability in the body. */
   requiresCapability: boolean;
-  /** When true, require OPERATOR_TOKEN (operator surface). */
   requiresOperatorToken: boolean;
 }
 
 const routes: Route[] = [];
 
-/**
- * Register a route. Patterns use :param syntax (e.g. /tasks/:id/publish).
- * Call from route modules at module load time (via register*Routes helpers).
- */
 export function register(
   method: string,
   path: string,
@@ -60,12 +53,10 @@ export function register(
   });
 }
 
-/** Test helper — clear the route table between unit tests. */
 export function clearRoutes(): void {
   routes.length = 0;
 }
 
-/** Test helper — inspect registered routes. */
 export function listRoutes(): ReadonlyArray<{
   method: string;
   pattern: string;
@@ -80,11 +71,6 @@ export function listRoutes(): ReadonlyArray<{
   }));
 }
 
-/**
- * Dispatch an incoming request.
- * Order: match → OPERATOR_TOKEN (if required) → handler.
- * Capability body checks remain in the handler until a shared body parser exists.
- */
 export async function dispatch(
   request: Request,
   env: Env,
@@ -93,6 +79,19 @@ export async function dispatch(
   const url = new URL(request.url);
   const method = request.method.toUpperCase();
   const requestId = request.headers.get('x-request-id') ?? crypto.randomUUID();
+  const isHealth = method === 'GET' && url.pathname === '/health';
+
+  // GW-2: fail closed on invalid config except /health
+  if (!isHealth) {
+    const cfg = parseGatewayConfig(env as unknown as Record<string, unknown>);
+    if (!cfg.ok) {
+      return errorResponse(
+        'CONFIG_INVALID',
+        'Gateway configuration is invalid or incomplete',
+        requestId
+      );
+    }
+  }
 
   for (const route of routes) {
     if (route.method !== method) continue;
@@ -112,7 +111,6 @@ export async function dispatch(
 
     try {
       const response = await route.handler(request, env, ctx, params);
-      // Ensure request id is visible on success paths too.
       if (!response.headers.has('x-request-id')) {
         const headers = new Headers(response.headers);
         headers.set('x-request-id', requestId);

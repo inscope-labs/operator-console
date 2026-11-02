@@ -1,5 +1,5 @@
 /**
- * Stable error catalogue — §15.
+ * Stable error catalogue — §15 + GW-A addendum.
  * Codes are part of the public contract.
  * Adding a code is backwards-compatible; changing meaning requires an ADR.
  */
@@ -35,7 +35,13 @@ export type ErrorCode =
   | 'RATE_BUDGET_LOW'
   | 'RULESET_REJECTED'
   | 'RECONCILE_REQUIRED'
-  | 'NETWORK';
+  | 'NETWORK'
+  // Config
+  | 'CONFIG_INVALID'
+  // Enrolment / attestation (GW-A addendum)
+  | 'ENROLL_CHALLENGE_INVALID'
+  | 'ENROLL_ATTESTATION_INVALID'
+  | 'AUTH_TIER_NOT_ALLOWED';
 
 export interface GatewayErrorBody {
   error: ErrorCode;
@@ -71,4 +77,17 @@ export const HTTP_STATUS: Record<ErrorCode, number> = {
   RULESET_REJECTED: 403,
   RECONCILE_REQUIRED: 409,
   NETWORK: 502,
+  CONFIG_INVALID: 503,
+  ENROLL_CHALLENGE_INVALID: 400,
+  ENROLL_ATTESTATION_INVALID: 400,
+  AUTH_TIER_NOT_ALLOWED: 403,
+};
+
+/** Human-readable defaults (no secrets). */
+export const ERROR_MESSAGE: Partial<Record<ErrorCode, string>> = {
+  CONFIG_INVALID: 'Gateway configuration is invalid or incomplete',
+  ENROLL_CHALLENGE_INVALID: 'Enrolment challenge unknown, expired, or already used',
+  ENROLL_ATTESTATION_INVALID:
+    'Attestation chain, challenge binding, key, or tier mismatch',
+  AUTH_TIER_NOT_ALLOWED: 'Derived auth tier is not permitted in this environment',
 };

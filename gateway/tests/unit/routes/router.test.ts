@@ -8,6 +8,7 @@ import {
 import type { Env } from '../../../src/index';
 
 const env = {
+  ENVIRONMENT: 'test',
   OPERATOR_TOKEN: 'test-operator-token',
   SIGNING_KEYS: '[]',
   REPOS: '{}',
