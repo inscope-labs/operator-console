@@ -8,6 +8,11 @@
  * - Never logged; never exposed to the console.
  */
 
+import {
+  fetchInstallationToken,
+  type GitHubAppCredentials,
+} from './github-app-auth';
+
 export interface TokenSnapshot {
   token: string;
   expiresAt: number; // Unix seconds
@@ -63,7 +68,6 @@ export class InstallationTokenProvider {
         return snap;
       })
       .catch((err) => {
-        // Fail closed — clear any stale token so subsequent calls also fail.
         this.current = null;
         throw err;
       })
@@ -77,4 +81,17 @@ export class InstallationTokenProvider {
   peekExpiresAt(): number | null {
     return this.current?.expiresAt ?? null;
   }
+}
+
+/** Build a provider from GitHub App credentials (production path). */
+export function createInstallationTokenProvider(
+  creds: GitHubAppCredentials,
+  fetchImpl: typeof fetch = fetch
+): InstallationTokenProvider {
+  return new InstallationTokenProvider({
+    fetchNewToken: async () => {
+      const { token, expiresAt } = await fetchInstallationToken(creds, fetchImpl);
+      return { token, expiresAt };
+    },
+  });
 }
