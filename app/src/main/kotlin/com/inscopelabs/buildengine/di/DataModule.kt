@@ -8,7 +8,7 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import com.inscopelabs.buildengine.core.crypto.SecureRandomSource
 import com.inscopelabs.buildengine.core.network.ErrorMapper
 import com.inscopelabs.buildengine.core.time.Clock
-import com.inscopelabs.buildengine.data.local.DeviceEnrollmentStore
+import com.inscopelabs.buildengine.data.enrollment.DeviceEnrollmentStore
 import com.inscopelabs.buildengine.data.local.OperatorCredentialStore
 import com.inscopelabs.buildengine.data.local.SelectionStore
 import com.inscopelabs.buildengine.data.remote.GatewayRepository
@@ -65,7 +65,9 @@ object DataModule {
 
     @Provides
     @Singleton
-    fun provideDeviceEnrollmentStore(): DeviceEnrollmentStore = DeviceEnrollmentStore()
+    fun provideDeviceEnrollmentStore(
+        @ApplicationContext context: Context,
+    ): DeviceEnrollmentStore = DeviceEnrollmentStore(context)
 
     @Provides
     @Singleton

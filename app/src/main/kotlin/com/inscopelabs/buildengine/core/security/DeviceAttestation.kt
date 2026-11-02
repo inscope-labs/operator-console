@@ -1,18 +1,44 @@
 package com.inscopelabs.buildengine.core.security
 
+import android.security.keystore.KeyInfo
+import com.inscopelabs.buildengine.core.crypto.DeviceKeyManager
+import java.security.GeneralSecurityException
+import java.security.KeyStore
+import java.util.Base64
+
 /**
- * Produces a device attestation statement for the gateway.
+ * Reads the Android Keystore key-attestation certificate chain.
  *
- * SCAFFOLD PLACEHOLDER — placeholder only, implementation pending.
- *
- * Design review §13: attestation is what makes the transport mutually authenticated
- * rather than merely TLS.
+ * requestAttestation remains deferred exactly as required by the Stage 4.1 manifest.
+ * This class never fabricates an attestation or substitutes a self-asserted device
+ * property for a certificate chain.
  */
-class DeviceAttestation {
+open class DeviceAttestation(
+    private val deviceKeyManager: DeviceKeyManager,
+    private val keyStoreProvider: () -> KeyStore = { KeyStore.getInstance("AndroidKeyStore").apply { load(null) } },
+) {
+    /** Deferred Play Integrity / server challenge request. Fail closed, never fake it. */
+    @Suppress("UNUSED_PARAMETER")
+    open suspend fun requestAttestation(nonce: String): ByteArray =
+        throw UnsupportedOperationException(
+            "Play Integrity attestation is deferred (D-T4); no attestation was produced"
+        )
 
-    suspend fun requestAttestation(nonce: String): ByteArray =
-        TODO("SCAFFOLD: request a Play Integrity / key-attestation statement.")
+    /**
+     * Returns DER certificates in the alias's Android Keystore attestation chain,
+     * each standard-Base64 encoded as expected by the existing gateway DTO.
+     */
+    open fun keyAttestationChain(alias: String): List<String> {
+        val store = keyStoreProvider()
+        val chain = store.getCertificateChain(alias)
+            ?: throw GeneralSecurityException("No key-attestation certificate chain is available")
+        if (chain.isEmpty()) throw GeneralSecurityException("Key-attestation chain is empty")
+        return chain.map { Base64.getEncoder().encodeToString(it.encoded) }
+    }
 
-    suspend fun keyAttestationChain(alias: String): ByteArray =
-        TODO("SCAFFOLD: export the device key attestation chain.")
+    open fun hasKeyAttestation(alias: String): Boolean = try {
+        keyAttestationChain(alias).isNotEmpty()
+    } catch (_: Exception) {
+        false
+    }
 }

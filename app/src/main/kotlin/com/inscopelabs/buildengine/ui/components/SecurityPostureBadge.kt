@@ -1,7 +1,10 @@
 package com.inscopelabs.buildengine.ui.components
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -11,33 +14,36 @@ import androidx.compose.ui.unit.dp
 import com.inscopelabs.buildengine.R
 import com.inscopelabs.buildengine.domain.model.SecurityPosture
 
-/**
- * States the device's real security posture.
- *
- * SCAFFOLD PLACEHOLDER — placeholder only, implementation pending.
- *
- * Design review §13: the badge must distinguish a hardware-backed key from a
- * software-backed one. Claiming hardware backing that the device does not have is a
- * misrepresentation.
- */
+/** Displays measured device security properties without implying gateway verification. */
 @Composable
-fun SecurityPostureBadge(
-    posture: SecurityPosture,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier.padding(16.dp)) {
+fun SecurityPostureBadge(posture: SecurityPosture, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(stringResource(R.string.label_posture), style = MaterialTheme.typography.labelLarge)
         Text(
-            text = stringResource(R.string.label_posture),
-            style = MaterialTheme.typography.labelMedium,
+            text = if (posture.hardwareBacked) stringResource(R.string.posture_hardware)
+            else stringResource(R.string.posture_software),
+            style = MaterialTheme.typography.titleSmall,
         )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AssistChip(
+                onClick = {},
+                label = { Text(posture.securityLevel) },
+                enabled = false,
+            )
+            AssistChip(
+                onClick = {},
+                label = { Text(if (posture.attested) "Key attestation present" else "No key attestation") },
+                enabled = false,
+            )
+        }
+        Text(posture.summary, style = MaterialTheme.typography.bodySmall)
         Text(
-            text = if (posture.hardwareBacked) {
-                stringResource(R.string.posture_hardware)
-            } else {
-                stringResource(R.string.posture_software)
-            },
-            style = MaterialTheme.typography.bodyMedium,
+            text = "Local measurement only; the gateway makes the enrolment decision.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text(text = posture.summary, style = MaterialTheme.typography.bodySmall)
     }
 }

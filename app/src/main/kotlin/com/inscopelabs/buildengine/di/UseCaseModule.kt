@@ -7,6 +7,11 @@ import com.inscopelabs.buildengine.domain.repository.PlanRepository
 import com.inscopelabs.buildengine.domain.repository.TaskRepository
 import com.inscopelabs.buildengine.domain.usecase.common.ConfirmAndMintCapabilityUseCase
 import com.inscopelabs.buildengine.domain.usecase.common.VerifyBranchHeadUseCase
+import com.inscopelabs.buildengine.core.crypto.DeviceKeyManager
+import com.inscopelabs.buildengine.core.crypto.StrongBoxSupport
+import com.inscopelabs.buildengine.core.security.DeviceAttestation
+import com.inscopelabs.buildengine.data.enrollment.DeviceEnrollmentStore
+import com.inscopelabs.buildengine.data.remote.GatewayApi
 import com.inscopelabs.buildengine.domain.usecase.enrollment.EnrollDeviceUseCase
 import com.inscopelabs.buildengine.domain.usecase.enrollment.ReportDevicePostureUseCase
 import com.inscopelabs.buildengine.domain.usecase.enrollment.RotateDeviceKeyUseCase
@@ -143,20 +148,28 @@ object UseCaseModule {
     @Provides
     @Singleton
     fun provideEnrollDeviceUseCase(
-        deviceKeyManager: com.inscopelabs.buildengine.core.crypto.DeviceKeyManager,
-    ): EnrollDeviceUseCase = EnrollDeviceUseCase(deviceKeyManager)
+        deviceKeyManager: DeviceKeyManager,
+        deviceAttestation: DeviceAttestation,
+        gatewayApi: GatewayApi,
+        enrollmentStore: DeviceEnrollmentStore,
+    ): EnrollDeviceUseCase =
+        EnrollDeviceUseCase(deviceKeyManager, deviceAttestation, gatewayApi, enrollmentStore)
 
     @Provides
     @Singleton
     fun provideRotateDeviceKeyUseCase(
-        deviceKeyManager: com.inscopelabs.buildengine.core.crypto.DeviceKeyManager,
-    ): RotateDeviceKeyUseCase = RotateDeviceKeyUseCase(deviceKeyManager)
+        deviceKeyManager: DeviceKeyManager,
+        deviceAttestation: DeviceAttestation,
+        gatewayApi: GatewayApi,
+        enrollmentStore: DeviceEnrollmentStore,
+    ): RotateDeviceKeyUseCase =
+        RotateDeviceKeyUseCase(deviceKeyManager, deviceAttestation, gatewayApi, enrollmentStore)
 
     @Provides
     @Singleton
     fun provideReportDevicePostureUseCase(
-        strongBoxSupport: com.inscopelabs.buildengine.core.crypto.StrongBoxSupport,
-        deviceAttestation: com.inscopelabs.buildengine.core.security.DeviceAttestation,
+        strongBoxSupport: StrongBoxSupport,
+        deviceAttestation: DeviceAttestation,
     ): ReportDevicePostureUseCase =
         ReportDevicePostureUseCase(strongBoxSupport, deviceAttestation)
 }

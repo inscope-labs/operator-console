@@ -1,16 +1,13 @@
 package com.inscopelabs.buildengine.core.security
 
-/**
- * The honest security posture of this device.
- *
- * SCAFFOLD PLACEHOLDER — placeholder only, implementation pending.
- *
- * Design review §13: these flags must reflect what was actually measured, never what
- * the app would like to claim.
- */
+/** Facts measured from the current device/key; null means not measured or unavailable. */
 data class DevicePosture(
-    val hardwareBackedKey: Boolean = false,
-    val strongBoxAvailable: Boolean = false,
-    val attested: Boolean = false,
-    val certificatePinned: Boolean = false,
-)
+    val hardwareBackedKey: Boolean,
+    val strongBoxAvailable: Boolean,
+    val securityLevel: String,
+    val keyAttestationAvailable: Boolean,
+    /** Play Integrity is intentionally deferred under D-T4. */
+    val playIntegrityAvailable: Boolean = false,
+) {
+    val isStrongBoxBacked: Boolean get() = securityLevel == "STRONGBOX"
+}

@@ -7,6 +7,7 @@ import com.inscopelabs.buildengine.core.network.MtlsConfig
 import com.inscopelabs.buildengine.core.network.OperatorCredentialProvider
 import com.inscopelabs.buildengine.core.security.CertificatePinning
 import com.inscopelabs.buildengine.data.local.OperatorCredentialStore
+import com.inscopelabs.buildengine.data.remote.GatewayApi
 import com.inscopelabs.buildengine.data.remote.GatewayRepository
 import dagger.Module
 import dagger.Provides
@@ -73,6 +74,12 @@ object NetworkModule {
         client: GatewayHttpClient,
         errorMapper: ErrorMapper,
     ): GatewayRepository = GatewayRepository(client, errorMapper)
+
+    @Provides
+    @Singleton
+    fun provideGatewayApi(
+        repository: GatewayRepository,
+    ): GatewayApi = repository
 
     @Provides
     @Singleton
