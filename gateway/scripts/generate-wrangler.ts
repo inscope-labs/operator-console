@@ -47,7 +47,7 @@ function main(): void {
  * Check mode: exit non-zero if the on-disk wrangler.toml does not match
  * a fresh generation. Used as a deploy gate.
  */
-export function assertGeneratedMatches(env: string = 'staging'): void {
+export function assertGeneratedMatches(_env: string = 'staging'): void {
   // TODO: re-generate into a temp buffer and diff against OUTPUT.
   // For now only ensure the file declares itself as generated.
   if (!existsSync(OUTPUT)) {

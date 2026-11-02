@@ -7,7 +7,6 @@
  */
 
 import { parseRepos, assertConsumerPrivacy } from '../config/repos';
-import type { ParsedRepos } from '../config/repos';
 import {
   createInstallationTokenProvider,
   type InstallationTokenProvider,
@@ -62,22 +61,16 @@ export interface AdapterOptions {
 }
 
 export class MultiRepoGitHubAdapter {
-  private readonly parsed: ParsedRepos;
-  private readonly client: GitHubClient;
   private readonly tokenProvider: InstallationTokenProvider;
   private readonly consumerHandle: ConsumerHandle;
   private readonly productHandle: ProductHandle;
   private readonly readOnlyHandles = new Map<string, ReadOnlyHandle>();
 
   private constructor(
-    parsed: ParsedRepos,
-    client: GitHubClient,
     tokenProvider: InstallationTokenProvider,
     consumerHandle: ConsumerHandle,
     productHandle: ProductHandle
   ) {
-    this.parsed = parsed;
-    this.client = client;
     this.tokenProvider = tokenProvider;
     this.consumerHandle = consumerHandle;
     this.productHandle = productHandle;
@@ -121,8 +114,6 @@ export class MultiRepoGitHubAdapter {
     const productHandle = new ProductHandle(client, productCfg);
 
     const adapter = new MultiRepoGitHubAdapter(
-      parsed,
-      client,
       tokenProvider,
       consumerHandle,
       productHandle

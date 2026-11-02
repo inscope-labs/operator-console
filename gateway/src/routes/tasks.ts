@@ -4,7 +4,6 @@
  * Full publish transaction remains Phase 2.
  */
 
-import type { Env } from '../index';
 import { getAdapter } from '../index';
 import { register, type RouteHandler } from './router';
 import { errorResponse } from '../errors/respond';

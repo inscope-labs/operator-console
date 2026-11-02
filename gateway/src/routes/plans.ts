@@ -3,7 +3,6 @@
  * Spec §9.3.
  */
 
-import type { Env } from '../index';
 import { getAdapter } from '../index';
 import { register, type RouteHandler } from './router';
 import { errorResponse } from '../errors/respond';

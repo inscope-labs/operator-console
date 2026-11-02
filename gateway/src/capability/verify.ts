@@ -171,7 +171,7 @@ async function verifySignature(
     }
 
     // Model B: asymmetric
-    const algo = key.algorithm as KeyAlgorithm & { name: string; namedCurve?: string };
+    const algo = key.algorithm as { name: string; namedCurve?: string };
     if (algo.name === 'ECDSA') {
       return crypto.subtle.verify(
         { name: 'ECDSA', hash: 'SHA-256' },
