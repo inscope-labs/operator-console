@@ -1,10 +1,10 @@
 /**
  * cbridge Worker entry point.
- *
  * Sole enforcement point for the operator console.
  */
 
 import { dispatch } from './routes/router';
+import { registerHealthRoutes } from './routes/health';
 import { registerStatusRoutes } from './routes/status';
 import { registerPlanRoutes } from './routes/plans';
 import { registerTaskRoutes } from './routes/tasks';
@@ -13,6 +13,11 @@ import { NonceStore } from './durable-objects/nonce-store';
 import './guards/register-core';
 
 export interface Env {
+  ENVIRONMENT?: string;
+  ALLOWED_AUTH_TIERS?: string;
+  ATTESTATION_MODE?: string;
+  ATTESTATION_ROOT_SHA256?: string;
+
   SIGNING_KEYS: string;
   OPERATOR_TOKEN: string;
   REPOS: string;
@@ -29,6 +34,7 @@ export interface Env {
   __adapter?: MultiRepoGitHubAdapter;
 }
 
+registerHealthRoutes();
 registerStatusRoutes();
 registerPlanRoutes();
 registerTaskRoutes();
@@ -79,5 +85,4 @@ export default {
   },
 };
 
-// Durable Object bindings — required for wrangler to resolve class names.
 export { NonceStore };

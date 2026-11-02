@@ -8,6 +8,18 @@ compatibility_date = "2026-10-01"
 compatibility_flags = ["nodejs_compat"]
 
 # Account and zone bindings are environment-specific and filled by the generator.
+#
+# Required vars (set via wrangler secret / dashboard — never commit values):
+#   ENVIRONMENT                  = "test" | "production"
+#   ALLOWED_AUTH_TIERS           = JSON array, optional (defaults by ENVIRONMENT)
+#   ATTESTATION_MODE             = "strict" | "lenient" (lenient refused in production)
+#   ATTESTATION_ROOT_SHA256      = JSON array of 64-char hex root fingerprints
+#   OPERATOR_TOKEN
+#   SIGNING_KEYS
+#   REPOS
+#   GITHUB_APP_ID
+#   GITHUB_APP_PRIVATE_KEY
+#   GITHUB_APP_INSTALLATION_ID
 
 [[durable_objects.bindings]]
 name = "PLAN_DO"
