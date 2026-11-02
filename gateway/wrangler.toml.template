@@ -7,19 +7,10 @@ main = "src/index.ts"
 compatibility_date = "2026-10-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Account and zone bindings are environment-specific and filled by the generator.
-#
-# Required vars (set via wrangler secret / dashboard — never commit values):
-#   ENVIRONMENT                  = "test" | "production"
-#   ALLOWED_AUTH_TIERS           = JSON array, optional (defaults by ENVIRONMENT)
-#   ATTESTATION_MODE             = "strict" | "lenient" (lenient refused in production)
-#   ATTESTATION_ROOT_SHA256      = JSON array of 64-char hex root fingerprints
-#   OPERATOR_TOKEN
-#   SIGNING_KEYS
-#   REPOS
-#   GITHUB_APP_ID
-#   GITHUB_APP_PRIVATE_KEY
-#   GITHUB_APP_INSTALLATION_ID
+# Required vars (secrets/dashboard — never commit values):
+#   ENVIRONMENT, ALLOWED_AUTH_TIERS, ATTESTATION_MODE, ATTESTATION_ROOT_SHA256,
+#   OPERATOR_TOKEN, SIGNING_KEYS, REPOS,
+#   GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_APP_INSTALLATION_ID
 
 [[durable_objects.bindings]]
 name = "PLAN_DO"
@@ -41,4 +32,6 @@ class_name = "AuditStream"
 tag = "v1-nonce-store"
 new_classes = ["NonceStore"]
 
-# PlanDO, EnrolmentRegistry, AuditStream migrations added when those classes export.
+[[migrations]]
+tag = "v2-enrolment-registry"
+new_classes = ["EnrolmentRegistry"]

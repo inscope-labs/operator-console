@@ -10,6 +10,7 @@ import { registerPlanRoutes } from './routes/plans';
 import { registerTaskRoutes } from './routes/tasks';
 import { MultiRepoGitHubAdapter } from './adapter/multi-repo-adapter';
 import { NonceStore } from './durable-objects/nonce-store';
+import { EnrolmentRegistry } from './durable-objects/enrolment-registry';
 import './guards/register-core';
 
 export interface Env {
@@ -85,4 +86,4 @@ export default {
   },
 };
 
-export { NonceStore };
+export { NonceStore, EnrolmentRegistry };
