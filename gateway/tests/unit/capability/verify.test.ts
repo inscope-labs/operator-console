@@ -38,11 +38,11 @@ let publicKey: CryptoKey;
 let privateKey: CryptoKey;
 
 beforeAll(async () => {
-  const pair = await crypto.subtle.generateKey(
+  const pair = (await crypto.subtle.generateKey(
     { name: 'ECDSA', namedCurve: 'P-256' },
     true,
     ['sign', 'verify']
-  );
+  )) as CryptoKeyPair;
   publicKey = pair.publicKey;
   privateKey = pair.privateKey;
 });
@@ -130,11 +130,11 @@ describe('verifyCapability — kid and signature', () => {
   });
 
   it('rejects BAD_SIGNATURE with wrong key', async () => {
-    const other = await crypto.subtle.generateKey(
+    const other = (await crypto.subtle.generateKey(
       { name: 'ECDSA', namedCurve: 'P-256' },
       true,
       ['sign', 'verify']
-    );
+    )) as CryptoKeyPair;
     const message = encodeCapability(baseCap());
     const sig = await crypto.subtle.sign(
       { name: 'ECDSA', hash: 'SHA-256' },
