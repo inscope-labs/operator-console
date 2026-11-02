@@ -25,4 +25,8 @@ class_name = "EnrolmentRegistry"
 name = "AUDIT_STREAM"
 class_name = "AuditStream"
 
-# Migrations and env-specific vars are appended by the generator.
+[[migrations]]
+tag = "v1-nonce-store"
+new_classes = ["NonceStore"]
+
+# PlanDO, EnrolmentRegistry, AuditStream migrations added when those classes export.
