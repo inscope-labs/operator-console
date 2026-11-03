@@ -65,6 +65,7 @@
     <string name="no_open_branches">No open branches currently active</string>
     <string name="no_next_tasks">No ready tasks at this time</string>
     <string name="no_plans">No plans found on gateway</string>
+    <string name="data_not_loaded">Data has not been loaded yet. Tap Retry or Refresh when a gateway is available.</string>
     <string name="label_milestone">Milestone</string>
     <string name="label_blocked_tasks">Blocked tasks</string>
     <string name="label_validation_passed">Definitions valid</string>
