@@ -8,6 +8,7 @@ import { getAdapter } from '../index';
 import { register, type RouteHandler } from './router';
 import { errorResponse } from '../errors/respond';
 import { gateCapability } from '../capability/gate';
+import { createResolveKey } from '../auth/device';
 import { runGuards } from '../guards/index';
 import '../guards/register-core';
 
@@ -39,16 +40,7 @@ const publishHandler: RouteHandler = async (request, env, _ctx, params) => {
     );
   }
 
-  // resolveKey: Model B looks up enrolled device keys from SIGNING_KEYS / enrolment DO.
-  // Until enrolment is wired, attempt JSON map of kid → (not supported for real verify).
-  // Fail closed via UNKNOWN_KID unless a test injects keys later.
-  const resolveKey = async (kid: string): Promise<CryptoKey | ArrayBuffer | null> => {
-    // Placeholder: enrolment registry integration is a later item.
-    // SIGNING_KEYS holds public keys only (JSON); parsing left for enrolment work.
-    void kid;
-    void env.SIGNING_KEYS;
-    return null;
-  };
+  const resolveKey = createResolveKey(env);
 
   const expectedBranch = `task-${taskId}`;
   const gated = await gateCapability(env, {
