@@ -32,6 +32,14 @@
     <string name="settings_gateway_url_saved">Gateway base URL saved.</string>
     <string name="settings_gateway_url_cleared">Gateway base URL cleared.</string>
     <string name="settings_gateway_url_invalid">That URL is empty or uses a reserved placeholder host. Enter a real gateway base URL.</string>
+
+    <string name="settings_test_connection">Test connection</string>
+    <string name="settings_health_heading">Last successful health</string>
+    <string name="settings_health_environment">Environment</string>
+    <string name="settings_health_version">Version</string>
+    <string name="settings_health_timestamp">Gateway timestamp</string>
+    <string name="settings_health_ok">Connection succeeded.</string>
+    <string name="settings_health_non_test_warning">This gateway is not a test environment. Lab Mode will refuse to run against it (ADR 0004).</string>
     <string name="settings_credential_heading">Operator credential</string>
     <string name="settings_credential_state_label">Status</string>
     <string name="settings_credential_configured">Configured</string>
