@@ -44,6 +44,29 @@ class PlanViewModelTest {
     }
 
     @Test
+    fun `init leaves planListState Idle and performs zero repository calls`() = runTest {
+        val viewModel = PlanViewModel(
+            getPlansUseCase = getPlansUseCase,
+            planRepository = planRepository,
+            getStatusUseCase = getStatusUseCase,
+            validatePlanUseCase = validatePlanUseCase,
+            renderCheckUseCase = renderCheckUseCase,
+        )
+
+        viewModel.planListState.test {
+            assertEquals(UiState.Idle, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        viewModel.planDetailState.test {
+            assertEquals(UiState.Idle, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertEquals(0, planRepository.getPlansCallCount)
+        assertEquals(0, planRepository.getPlanCallCount)
+        assertEquals(0, planRepository.getStatusCallCount)
+    }
+
+    @Test
     fun `planListState transitions to Success when plans load`() = runTest {
         val testPlans = listOf(
             Plan(id = "p1", title = "Plan 1", taskCount = 3, completedTaskCount = 1, status = "active"),
@@ -59,10 +82,13 @@ class PlanViewModelTest {
         )
 
         viewModel.planListState.test {
+            assertEquals(UiState.Idle, awaitItem())
+            viewModel.loadPlans()
             val state = awaitItem()
-            assertTrue(state is UiState.Success)
-            assertEquals(1, (state as UiState.Success).data.size)
-            assertEquals("p1", state.data[0].id)
+            val success = if (state is UiState.Loading) awaitItem() else state
+            assertTrue(success is UiState.Success)
+            assertEquals(1, (success as UiState.Success).data.size)
+            assertEquals("p1", success.data[0].id)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -80,9 +106,12 @@ class PlanViewModelTest {
         )
 
         viewModel.planListState.test {
+            assertEquals(UiState.Idle, awaitItem())
+            viewModel.loadPlans()
             val state = awaitItem()
-            assertTrue(state is UiState.Error)
-            assertEquals("Network error", (state as UiState.Error).message)
+            val error = if (state is UiState.Loading) awaitItem() else state
+            assertTrue(error is UiState.Error)
+            assertEquals("Network error", (error as UiState.Error).message)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -109,8 +138,9 @@ class PlanViewModelTest {
             viewModel.loadPlanDetail("atlas")
 
             val state = awaitItem()
-            assertTrue(state is UiState.Success)
-            val data = (state as UiState.Success).data
+            val success = if (state is UiState.Loading) awaitItem() else state
+            assertTrue(success is UiState.Success)
+            val data = (success as UiState.Success).data
             assertEquals("atlas", data.plan.id)
             assertEquals("Project Atlas", data.plan.title)
             assertNotNull(data.status)
@@ -137,8 +167,9 @@ class PlanViewModelTest {
             viewModel.loadPlanDetail("missing")
 
             val state = awaitItem()
-            assertTrue(state is UiState.Error)
-            assertEquals("Plan not found: missing", (state as UiState.Error).message)
+            val error = if (state is UiState.Loading) awaitItem() else state
+            assertTrue(error is UiState.Error)
+            assertEquals("Plan not found: missing", (error as UiState.Error).message)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -163,7 +194,8 @@ class PlanViewModelTest {
             assertEquals(UiState.Idle, awaitItem())
 
             viewModel.loadPlanDetail("atlas")
-            val state = awaitItem()
+            val loaded = awaitItem()
+            val state = if (loaded is UiState.Loading) awaitItem() else loaded
             assertTrue(state is UiState.Success)
 
             // Trigger validate
