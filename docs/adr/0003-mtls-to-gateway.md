@@ -5,6 +5,7 @@
 | **Status** | Accepted |
 | **Date** | 2026-10-30 |
 | **Related** | Design review §13, §15 (R10); `docs/device-enrollment.md`; `docs/threat-model.md` |
+| **Amended by** | ADR 0007 (production transport posture), 2026-11-02 |
 
 ---
 
