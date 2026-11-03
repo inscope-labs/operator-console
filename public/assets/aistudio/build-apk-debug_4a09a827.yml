@@ -1,0 +1,141 @@
+name: Build Debug APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build & Test Debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.1"
+
+      - name: Verify Toolchain
+        run: |
+          java -version
+          gradle --version
+
+      - name: Ensure debug keystore exists
+        run: |
+          if [ ! -f debug.keystore ]; then
+            keytool -genkeypair \
+              -keystore debug.keystore \
+              -storepass android \
+              -keypass android \
+              -alias androiddebugkey \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+
+            echo "Generated debug.keystore"
+          else
+            echo "Using existing debug.keystore"
+          fi
+
+      - name: Read version info
+        id: read_version
+        run: |
+          PROP_FILE="version.properties"
+          if [ -f "$PROP_FILE" ]; then
+            VERSION_CODE=$(grep '^versionCode=' "$PROP_FILE" | cut -d'=' -f2 | tr -d '\r')
+            VERSION_NAME=$(grep '^versionName=' "$PROP_FILE" | cut -d'=' -f2 | tr -d '\r')
+            DEBUG_CODE=$(grep '^debugCode=' "$PROP_FILE" | cut -d'=' -f2 | tr -d '\r')
+          fi
+
+          VERSION_CODE=${VERSION_CODE:-1}
+          VERSION_NAME=${VERSION_NAME:-1.0}
+          DEBUG_CODE=${DEBUG_CODE:-0001}
+
+          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
+          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "debug_code=$DEBUG_CODE" >> $GITHUB_OUTPUT
+
+      - name: Fetch launcher icon assets
+        run: |
+          set -e
+          git fetch origin assets/launcher-icons
+          git worktree add /tmp/icon-assets origin/assets/launcher-icons
+
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            src_dir="/tmp/icon-assets/res/mipmap-${density}"
+            dest_dir="app/src/main/res/mipmap-${density}"
+            test -d "$src_dir" || { echo "FAIL: missing $src_dir"; exit 1; }
+            mkdir -p "$dest_dir"
+            cp "$src_dir"/*.png "$dest_dir"/
+          done
+
+          mkdir -p app/src/main/res/mipmap-anydpi-v26
+          cp /tmp/icon-assets/res/mipmap-anydpi-v26/ic_launcher.xml \
+             app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          cp /tmp/icon-assets/res/mipmap-anydpi-v26/ic_launcher_round.xml \
+             app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+
+          mkdir -p store-assets
+          cp /tmp/icon-assets/play_store_512.png \
+             store-assets/ic_launcher-playstore.png
+          cp /tmp/icon-assets/1024.png \
+             store-assets/ic_launcher-1024.png
+
+          git worktree remove /tmp/icon-assets --force
+
+      - name: Verify launcher icons were placed
+        run: |
+          set -e
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            test -f "app/src/main/res/mipmap-${density}/ic_launcher.png"
+            test -f "app/src/main/res/mipmap-${density}/ic_launcher_adaptive_back.png"
+            test -f "app/src/main/res/mipmap-${density}/ic_launcher_adaptive_fore.png"
+          done
+          test -f "app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml"
+          test -f "app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml"
+          test -f "store-assets/ic_launcher-playstore.png"
+          test -f "store-assets/ic_launcher-1024.png"
+
+      - name: Assemble Debug APK
+        run: |
+          gradle --no-daemon assembleDebug \
+            -PversionCode=${{ steps.read_version.outputs.version_code }} \
+            -PversionName="${{ steps.read_version.outputs.version_name }}.${{ steps.read_version.outputs.debug_code }}"
+
+      - name: Run Debug Unit Tests
+        run: gradle --no-daemon testDebugUnitTest
+
+      - name: Run Android Lint
+        continue-on-error: true
+        run: gradle --no-daemon lint
+
+      - name: Upload Debug APK
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload Lint Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: |
+            app/build/reports/lint-results*.html
+            app/build/intermediates/lint_intermediate_text_report/**
+          if-no-files-found: ignore
