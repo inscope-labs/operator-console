@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -28,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.compose.runtime.collectAsState
 import com.inscopelabs.buildengine.R
+import com.inscopelabs.buildengine.domain.model.GatewayHealthSnapshot
 import com.inscopelabs.buildengine.domain.model.OperatorSession
 import com.inscopelabs.buildengine.ui.common.UiState
 import com.inscopelabs.buildengine.ui.components.ErrorBanner
@@ -36,10 +39,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
-/**
- * The console's settings: the gateway it talks to, the credential it presents, and
- * the session it is in.
- */
 @Composable
 fun SettingsScreen(modifier: Modifier = Modifier) {
     val viewModel: SettingsViewModel = hiltViewModel()
@@ -84,6 +83,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 onDraftChange = { gatewayDraft = it },
                 onSave = { viewModel.saveGatewayBaseUrl(gatewayDraft) },
                 onClear = { viewModel.clearGatewayBaseUrl() },
+                onTestConnection = { viewModel.testConnection() },
             )
             CredentialSection(
                 state = current,
@@ -101,6 +101,9 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             state.error?.let { error ->
                 ErrorBanner(message = stringResource(error.messageRes))
             }
+            state.healthError?.let { message ->
+                ErrorBanner(message = message)
+            }
             state.notice?.let { notice ->
                 Text(
                     text = stringResource(notice.messageRes),
@@ -112,7 +115,6 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     }
 }
 
-/** Editable gateway base URL. */
 @Composable
 private fun GatewaySection(
     state: SettingsState,
@@ -120,6 +122,7 @@ private fun GatewaySection(
     onDraftChange: (String) -> Unit,
     onSave: () -> Unit,
     onClear: () -> Unit,
+    onTestConnection: () -> Unit,
 ) {
     SettingsCard(title = stringResource(R.string.settings_gateway_heading)) {
         LabelAndValue(
@@ -160,6 +163,54 @@ private fun GatewaySection(
             ) {
                 Text(stringResource(R.string.action_clear))
             }
+        }
+
+        OutlinedButton(
+            onClick = onTestConnection,
+            enabled = state.gatewayConfigured && !state.healthTesting,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            if (state.healthTesting) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Text(stringResource(R.string.settings_test_connection))
+            }
+        }
+
+        state.healthSnapshot?.let { snapshot ->
+            HealthSnapshotBlock(snapshot = snapshot)
+        }
+    }
+}
+
+@Composable
+private fun HealthSnapshotBlock(snapshot: GatewayHealthSnapshot) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = stringResource(R.string.settings_health_heading),
+            style = MaterialTheme.typography.titleSmall,
+        )
+        LabelAndValue(
+            label = stringResource(R.string.settings_health_environment),
+            value = snapshot.environment.ifEmpty { "—" },
+        )
+        LabelAndValue(
+            label = stringResource(R.string.settings_health_version),
+            value = snapshot.version.ifEmpty { "—" },
+        )
+        LabelAndValue(
+            label = stringResource(R.string.settings_health_timestamp),
+            value = formatHealthTimestamp(snapshot.timestampMillis),
+        )
+        if (!snapshot.isTestEnvironment) {
+            Text(
+                text = stringResource(R.string.settings_health_non_test_warning),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
         }
     }
 }
@@ -279,12 +330,21 @@ private fun formatSessionStart(session: OperatorSession): String =
         .toLocalDateTime()
         .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT))
 
+private fun formatHealthTimestamp(epochMillis: Long): String {
+    if (epochMillis <= 0L) return "—"
+    return Instant.ofEpochMilli(epochMillis)
+        .atZone(ZoneId.systemDefault())
+        .toLocalDateTime()
+        .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM))
+}
+
 private val SettingsNotice.messageRes: Int
     get() = when (this) {
         SettingsNotice.CREDENTIAL_SAVED -> R.string.settings_credential_saved
         SettingsNotice.CREDENTIAL_CLEARED -> R.string.settings_credential_cleared
         SettingsNotice.GATEWAY_URL_SAVED -> R.string.settings_gateway_url_saved
         SettingsNotice.GATEWAY_URL_CLEARED -> R.string.settings_gateway_url_cleared
+        SettingsNotice.HEALTH_OK -> R.string.settings_health_ok
         SettingsNotice.SESSION_STARTED -> R.string.settings_session_started
         SettingsNotice.SESSION_ENDED -> R.string.settings_session_ended
     }

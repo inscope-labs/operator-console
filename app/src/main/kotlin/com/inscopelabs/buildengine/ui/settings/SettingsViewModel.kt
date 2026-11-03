@@ -3,8 +3,13 @@ package com.inscopelabs.buildengine.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.inscopelabs.buildengine.core.network.GatewayEndpoints
+import com.inscopelabs.buildengine.core.result.AppResult
+import com.inscopelabs.buildengine.core.time.Clock
 import com.inscopelabs.buildengine.data.local.GatewayBaseUrlStore
+import com.inscopelabs.buildengine.data.local.HealthSnapshotStore
 import com.inscopelabs.buildengine.data.local.OperatorCredentialStore
+import com.inscopelabs.buildengine.data.remote.GatewayRepository
+import com.inscopelabs.buildengine.domain.model.GatewayHealthSnapshot
 import com.inscopelabs.buildengine.domain.model.OperatorSession
 import com.inscopelabs.buildengine.domain.repository.SessionRepository
 import com.inscopelabs.buildengine.ui.common.UiState
@@ -22,55 +27,48 @@ import kotlinx.coroutines.launch
 /**
  * Console settings state.
  *
- * The settings screen is where the operator's credential and gateway base URL live.
- * [SettingsState] carries a *flag* for the credential, not its value. The gateway URL
- * is shown and edited here so operators can point at a real host without rebuilding.
+ * Includes the gateway base URL, last health snapshot from **Test connection**,
+ * credential presence, and session.
  */
 data class SettingsState(
-    /** The effective gateway base URL (stored, debug default, or empty). */
     val gatewayBaseUrl: String,
-    /** Whether the effective URL is considered configured for transport. */
     val gatewayConfigured: Boolean,
-    /** Whether an operator credential is stored. Never the credential itself. */
+    /** Last successful health probe, or null if none / cleared after failure. */
+    val healthSnapshot: GatewayHealthSnapshot? = null,
+    /** True while a health probe is in flight. */
+    val healthTesting: Boolean = false,
+    /** Failure message from the last Test connection attempt. */
+    val healthError: String? = null,
     val credentialConfigured: Boolean,
-    /** The live session, or `null` when none is open. */
     val session: OperatorSession?,
-    /** The last successful action, for the screen to report. */
     val notice: SettingsNotice? = null,
-    /** The last failed action, for the screen to report. */
     val error: SettingsError? = null,
 )
 
-/** Something the operator did that worked. */
 enum class SettingsNotice {
     CREDENTIAL_SAVED,
     CREDENTIAL_CLEARED,
     GATEWAY_URL_SAVED,
     GATEWAY_URL_CLEARED,
+    HEALTH_OK,
     SESSION_STARTED,
     SESSION_ENDED,
 }
 
-/** Something the operator tried that did not work. */
 enum class SettingsError {
-    /** The value offered has the shape of a repository credential. See ADR 0002. */
     CREDENTIAL_REJECTED,
-
-    /** The encrypted store could not be reached — a Keystore problem, not a mistake. */
     CREDENTIAL_STORAGE_UNAVAILABLE,
-
-    /** The gateway URL was refused as empty or a scaffold placeholder when saving was required. */
     GATEWAY_URL_INVALID,
 }
 
-/**
- * The settings screen's state holder.
- */
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val credentialStore: OperatorCredentialStore,
     private val gatewayBaseUrlStore: GatewayBaseUrlStore,
+    private val healthSnapshotStore: HealthSnapshotStore,
+    private val gatewayRepository: GatewayRepository,
     private val sessionRepository: SessionRepository,
+    private val clock: Clock,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<UiState<SettingsState>>(UiState.Idle)
@@ -80,27 +78,22 @@ class SettingsViewModel @Inject constructor(
         refresh()
     }
 
-    /** Re-reads gateway URL, credential presence, and the live session. */
     fun refresh() {
         viewModelScope.launch(Dispatchers.IO) {
             val baseUrl = gatewayBaseUrlStore.read()
             val configured = credentialStore.read() != null
+            val snapshot = healthSnapshotStore.read()
             publish {
                 it.copy(
                     gatewayBaseUrl = baseUrl,
                     gatewayConfigured = GatewayEndpoints.isConfigured(baseUrl),
+                    healthSnapshot = snapshot,
                     credentialConfigured = configured,
                 )
             }
         }
     }
 
-    /**
-     * Persists the gateway base URL.
-     *
-     * Blank [url] clears the stored override. Placeholder hosts are rejected so the
-     * operator does not believe the scaffold is a live endpoint.
-     */
     fun saveGatewayBaseUrl(url: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val trimmed = url.trim().trimEnd('/')
@@ -121,15 +114,17 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** Clears the stored gateway base URL (debug default may still apply). */
     fun clearGatewayBaseUrl() {
         viewModelScope.launch(Dispatchers.IO) {
             gatewayBaseUrlStore.clear()
+            healthSnapshotStore.clear()
             val effective = gatewayBaseUrlStore.read()
             publish {
                 it.copy(
                     gatewayBaseUrl = effective,
                     gatewayConfigured = GatewayEndpoints.isConfigured(effective),
+                    healthSnapshot = null,
+                    healthError = null,
                     notice = SettingsNotice.GATEWAY_URL_CLEARED,
                     error = null,
                 )
@@ -138,11 +133,50 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
-     * Stores the operator credential.
+     * Explicit connect: `GET /health`.
      *
-     * @param credential the value the operator typed. It is validated and written
-     *   here and is not retained.
+     * On success, persists the snapshot (environment, version, timestamp) for the
+     * status banner. On failure, clears any prior snapshot so the shell does not
+     * claim connectivity it no longer has.
      */
+    fun testConnection() {
+        viewModelScope.launch(Dispatchers.IO) {
+            publish { it.copy(healthTesting = true, healthError = null, notice = null, error = null) }
+            when (val result = gatewayRepository.health()) {
+                is AppResult.Success -> {
+                    val dto = result.value
+                    val snapshot = GatewayHealthSnapshot(
+                        status = dto.status,
+                        environment = dto.environment,
+                        version = dto.version,
+                        timestampMillis = dto.timestamp,
+                        probedAtEpochSeconds = clock.nowEpochSeconds(),
+                    )
+                    healthSnapshotStore.save(snapshot)
+                    publish {
+                        it.copy(
+                            healthTesting = false,
+                            healthSnapshot = snapshot,
+                            healthError = null,
+                            notice = SettingsNotice.HEALTH_OK,
+                        )
+                    }
+                }
+                is AppResult.Failure -> {
+                    healthSnapshotStore.clear()
+                    publish {
+                        it.copy(
+                            healthTesting = false,
+                            healthSnapshot = null,
+                            healthError = result.message,
+                            notice = null,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     fun saveCredential(credential: String) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -168,7 +202,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** Deletes the stored operator credential. */
     fun clearCredential() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -192,7 +225,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** Opens a session. */
     fun startSession() {
         viewModelScope.launch(Dispatchers.IO) {
             val session = sessionRepository.start()
@@ -206,7 +238,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** Ends the session. */
     fun endSession() {
         viewModelScope.launch(Dispatchers.IO) {
             sessionRepository.end()

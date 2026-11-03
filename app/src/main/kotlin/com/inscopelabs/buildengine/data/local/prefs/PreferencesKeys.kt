@@ -45,6 +45,22 @@ object PreferencesKeys {
      */
     const val GATEWAY_BASE_URL: String = "gateway_base_url"
 
+    /** Last successful health status string (plain). */
+    const val HEALTH_STATUS: String = "health_status"
+
+    /** Last successful health environment (test|production). */
+    const val HEALTH_ENVIRONMENT: String = "health_environment"
+
+    /** Last successful health gateway version. */
+    const val HEALTH_VERSION: String = "health_version"
+
+    /** Gateway-reported health timestamp (epoch millis). */
+    const val HEALTH_TIMESTAMP_MILLIS: String = "health_timestamp_millis"
+
+    /** Device epoch seconds when health was last probed successfully. */
+    const val HEALTH_PROBED_AT_EPOCH: String = "health_probed_at_epoch"
+
+
     /** The device key's selector. A selector, never a secret — the gateway resolves it. */
     const val DEVICE_KID: String = "device_kid"
 
@@ -80,6 +96,11 @@ object PreferencesKeys {
             SELECTED_REPOSITORY,
             SELECTED_PLAN,
             GATEWAY_BASE_URL,
+            HEALTH_STATUS,
+            HEALTH_ENVIRONMENT,
+            HEALTH_VERSION,
+            HEALTH_TIMESTAMP_MILLIS,
+            HEALTH_PROBED_AT_EPOCH,
             DEVICE_KID,
             DEVICE_KEY_ALIAS,
             DEVICE_PUBLIC_KEY,

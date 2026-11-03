@@ -11,6 +11,7 @@ import com.inscopelabs.buildengine.core.network.ErrorMapper
 import com.inscopelabs.buildengine.core.time.Clock
 import com.inscopelabs.buildengine.data.enrollment.DeviceEnrollmentStore
 import com.inscopelabs.buildengine.data.local.GatewayBaseUrlStore
+import com.inscopelabs.buildengine.data.local.HealthSnapshotStore
 import com.inscopelabs.buildengine.data.local.OperatorCredentialStore
 import com.inscopelabs.buildengine.data.local.SelectionStore
 import com.inscopelabs.buildengine.data.remote.GatewayRepository
@@ -83,6 +84,13 @@ object DataModule {
         val debugDefault = BuildConfig.DEBUG_GATEWAY_BASE_URL.trim().takeIf { it.isNotEmpty() }
         return GatewayBaseUrlStore(dataStore = dataStore, debugDefault = debugDefault)
     }
+
+    @Provides
+    @Singleton
+    fun provideHealthSnapshotStore(
+        @Named(GATEWAY_URL_STORE_FILE) dataStore: DataStore<Preferences>,
+    ): HealthSnapshotStore = HealthSnapshotStore(dataStore)
+
 
     @Provides
     @Singleton
