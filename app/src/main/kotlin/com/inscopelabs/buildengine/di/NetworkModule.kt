@@ -1,11 +1,13 @@
 package com.inscopelabs.buildengine.di
 
 import com.inscopelabs.buildengine.core.network.ErrorMapper
+import com.inscopelabs.buildengine.core.network.GatewayBaseUrlProvider
 import com.inscopelabs.buildengine.core.network.GatewayEndpoints
 import com.inscopelabs.buildengine.core.network.GatewayHttpClient
 import com.inscopelabs.buildengine.core.network.MtlsConfig
 import com.inscopelabs.buildengine.core.network.OperatorCredentialProvider
 import com.inscopelabs.buildengine.core.security.CertificatePinning
+import com.inscopelabs.buildengine.data.local.GatewayBaseUrlStore
 import com.inscopelabs.buildengine.data.local.OperatorCredentialStore
 import com.inscopelabs.buildengine.data.remote.GatewayApi
 import com.inscopelabs.buildengine.data.remote.GatewayRepository
@@ -18,10 +20,11 @@ import io.ktor.client.engine.okhttp.OkHttp
 import javax.inject.Singleton
 
 /**
- * SCAFFOLD PLACEHOLDER — placeholder only, implementation pending.
+ * Network bindings.
  *
  * Design review §13 / ADR 0003: the transport to the gateway must be mutually
  * authenticated, not merely TLS. The client certificate and the pin set belong here.
+ * mTLS remains deferred (ADR 0006); the bearer credential is the console's identity.
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -33,8 +36,8 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideMtlsConfig(): MtlsConfig = MtlsConfig(
-        host = GatewayEndpoints.BASE_URL,
+    fun provideMtlsConfig(baseUrlStore: GatewayBaseUrlStore): MtlsConfig = MtlsConfig(
+        host = baseUrlStore.current().ifEmpty { GatewayEndpoints.BASE_URL },
         pins = emptyList(),
     )
 
@@ -47,24 +50,22 @@ object NetworkModule {
     }
 
     /**
-     * The transport, with the operator credential attached.
+     * The transport, with base URL and operator credential resolved per request.
      *
-     * The credential is gateway-scoped and holds no repository authority (ADR 0002).
-     * It is read from the encrypted store per request rather than held in a field,
-     * so that clearing it in settings takes effect on the next call and not at the
-     * next launch — and so that the credential's lifetime is the store's, not the
-     * client's.
-     *
-     * With mTLS deferred (ADR 0006), this bearer header is the console's only
-     * identity on the gateway.
+     * The base URL is read from [GatewayBaseUrlStore] so Settings changes take effect
+     * without process restart. The credential is gateway-scoped and holds no
+     * repository authority (ADR 0002). With mTLS deferred (ADR 0006), the bearer
+     * header is the console's only identity on the gateway.
      */
     @Provides
     @Singleton
     fun provideGatewayHttpClient(
         client: HttpClient,
+        baseUrlStore: GatewayBaseUrlStore,
         credentialStore: OperatorCredentialStore,
     ): GatewayHttpClient = GatewayHttpClient(
         client = client,
+        baseUrlProvider = GatewayBaseUrlProvider { baseUrlStore.current() },
         credentials = OperatorCredentialProvider { credentialStore.read() },
     )
 
