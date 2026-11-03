@@ -42,7 +42,7 @@ class GatewayRepositoryTest {
         server.start()
         httpClient = HttpClient(OkHttp) { expectSuccess = false }
         repository = GatewayRepository(
-            httpClient = GatewayHttpClient(httpClient, server.url("/").toString()),
+            httpClient = GatewayHttpClient(httpClient, baseUrlProvider = { server.url("/").toString() }),
             errorMapper = ErrorMapper(),
         )
     }

@@ -39,17 +39,6 @@ import java.time.format.FormatStyle
 /**
  * The console's settings: the gateway it talks to, the credential it presents, and
  * the session it is in.
- *
- * ### The credential field
- *
- * The operator credential is the only secret this app holds (ADR 0002), so the field
- * is masked, and the value is dropped as soon as it is stored — it is never held in
- * the screen's state, and it is never written anywhere but the encrypted store.
- *
- * The field does not "validate" a credential. The store does, and it refuses
- * anything shaped like a repository credential with a reason the operator can act
- * on. A screen that quietly accepted the wrong paste and failed later at the
- * gateway would be the worse design.
  */
 @Composable
 fun SettingsScreen(modifier: Modifier = Modifier) {
@@ -57,18 +46,22 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     val uiState by viewModel.uiState.collectAsState()
     val state = (uiState as? UiState.Success)?.data
 
-    // The typed credential lives here, in the composition, and not in the
-    // ViewModel: a StateFlow is observable, loggable and restorable, and a
-    // credential should be in as few of those as possible.
     var credentialDraft by remember { mutableStateOf("") }
+    var gatewayDraft by remember { mutableStateOf("") }
 
-    // The typed value is dropped once it has been stored, and once the stored
-    // credential has been deleted. Leaving it in the field afterwards would leave
-    // the secret sitting on screen for no reason.
     LaunchedEffect(state?.notice) {
         when (state?.notice) {
             SettingsNotice.CREDENTIAL_SAVED, SettingsNotice.CREDENTIAL_CLEARED -> credentialDraft = ""
+            SettingsNotice.GATEWAY_URL_SAVED, SettingsNotice.GATEWAY_URL_CLEARED -> {
+                gatewayDraft = state.gatewayBaseUrl
+            }
             else -> Unit
+        }
+    }
+
+    LaunchedEffect(state?.gatewayBaseUrl) {
+        if (gatewayDraft.isEmpty() && !state?.gatewayBaseUrl.isNullOrEmpty()) {
+            gatewayDraft = state?.gatewayBaseUrl.orEmpty()
         }
     }
 
@@ -85,7 +78,13 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         )
 
         state?.let { current ->
-            GatewaySection(current)
+            GatewaySection(
+                state = current,
+                draft = gatewayDraft,
+                onDraftChange = { gatewayDraft = it },
+                onSave = { viewModel.saveGatewayBaseUrl(gatewayDraft) },
+                onClear = { viewModel.clearGatewayBaseUrl() },
+            )
             CredentialSection(
                 state = current,
                 draft = credentialDraft,
@@ -113,29 +112,58 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     }
 }
 
-/** The gateway the console talks to, and the fact that it is not configurable. */
+/** Editable gateway base URL. */
 @Composable
-private fun GatewaySection(state: SettingsState) {
+private fun GatewaySection(
+    state: SettingsState,
+    draft: String,
+    onDraftChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onClear: () -> Unit,
+) {
     SettingsCard(title = stringResource(R.string.settings_gateway_heading)) {
         LabelAndValue(
-            label = stringResource(R.string.settings_gateway_url_label),
-            value = state.gatewayBaseUrl,
-            monospace = true,
+            label = stringResource(R.string.settings_gateway_status_label),
+            value = stringResource(
+                if (state.gatewayConfigured) {
+                    R.string.settings_gateway_configured
+                } else {
+                    R.string.settings_gateway_not_configured
+                },
+            ),
+        )
+        OutlinedTextField(
+            value = draft,
+            onValueChange = onDraftChange,
+            label = { Text(stringResource(R.string.settings_gateway_url_label)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+            placeholder = {
+                Text(stringResource(R.string.settings_gateway_url_placeholder))
+            },
         )
         Text(
             text = stringResource(R.string.settings_gateway_note),
             style = MaterialTheme.typography.bodySmall,
         )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            OutlinedButton(onClick = onSave) {
+                Text(stringResource(R.string.action_save))
+            }
+            TextButton(
+                onClick = onClear,
+                enabled = state.gatewayBaseUrl.isNotEmpty(),
+            ) {
+                Text(stringResource(R.string.action_clear))
+            }
+        }
     }
 }
 
-/**
- * The operator credential: its presence, and the one field that can set it.
- *
- * The field is present whether or not a credential is stored, because replacing a
- * credential is the same act as setting one. The Clear action is offered only when
- * there is something to clear.
- */
 @Composable
 private fun CredentialSection(
     state: SettingsState,
@@ -187,13 +215,6 @@ private fun CredentialSection(
     }
 }
 
-/**
- * The session.
- *
- * The session is in-memory only and is convenience, not the security control
- * (design review §9), so this section reports it honestly: when it opened, and
- * that ending it is one tap.
- */
 @Composable
 private fun SessionSection(
     state: SettingsState,
@@ -224,7 +245,6 @@ private fun SessionSection(
     }
 }
 
-/** A titled card. The settings screen is a list of them. */
 @Composable
 private fun SettingsCard(title: String, content: @Composable () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -238,7 +258,6 @@ private fun SettingsCard(title: String, content: @Composable () -> Unit) {
     }
 }
 
-/** A label above a value. */
 @Composable
 private fun LabelAndValue(label: String, value: String, monospace: Boolean = false) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -254,25 +273,25 @@ private fun LabelAndValue(label: String, value: String, monospace: Boolean = fal
     }
 }
 
-/** The session's start time, in the device's locale and time zone. */
 private fun formatSessionStart(session: OperatorSession): String =
     Instant.ofEpochSecond(session.startedAtEpochSeconds)
         .atZone(ZoneId.systemDefault())
         .toLocalDateTime()
         .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT))
 
-/** The copy for a successful action. */
 private val SettingsNotice.messageRes: Int
     get() = when (this) {
         SettingsNotice.CREDENTIAL_SAVED -> R.string.settings_credential_saved
         SettingsNotice.CREDENTIAL_CLEARED -> R.string.settings_credential_cleared
+        SettingsNotice.GATEWAY_URL_SAVED -> R.string.settings_gateway_url_saved
+        SettingsNotice.GATEWAY_URL_CLEARED -> R.string.settings_gateway_url_cleared
         SettingsNotice.SESSION_STARTED -> R.string.settings_session_started
         SettingsNotice.SESSION_ENDED -> R.string.settings_session_ended
     }
 
-/** The copy for a failed action. */
 private val SettingsError.messageRes: Int
     get() = when (this) {
         SettingsError.CREDENTIAL_REJECTED -> R.string.settings_credential_rejected
         SettingsError.CREDENTIAL_STORAGE_UNAVAILABLE -> R.string.settings_credential_storage_unavailable
+        SettingsError.GATEWAY_URL_INVALID -> R.string.settings_gateway_url_invalid
     }

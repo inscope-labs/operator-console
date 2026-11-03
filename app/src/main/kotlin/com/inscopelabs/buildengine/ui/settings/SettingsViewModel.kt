@@ -3,6 +3,7 @@ package com.inscopelabs.buildengine.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.inscopelabs.buildengine.core.network.GatewayEndpoints
+import com.inscopelabs.buildengine.data.local.GatewayBaseUrlStore
 import com.inscopelabs.buildengine.data.local.OperatorCredentialStore
 import com.inscopelabs.buildengine.domain.model.OperatorSession
 import com.inscopelabs.buildengine.domain.repository.SessionRepository
@@ -21,16 +22,15 @@ import kotlinx.coroutines.launch
 /**
  * Console settings state.
  *
- * The settings screen is where the operator's credential lives, so it is the screen
- * that has to be honest about whether a credential is present and never about what it
- * contains. [SettingsState] therefore carries a *flag*, not a value: the credential
- * itself is read on demand by the transport, and the one time the screen handles it
- * is the moment it is typed, which is why the typed value lives in the composable
- * and not here.
+ * The settings screen is where the operator's credential and gateway base URL live.
+ * [SettingsState] carries a *flag* for the credential, not its value. The gateway URL
+ * is shown and edited here so operators can point at a real host without rebuilding.
  */
 data class SettingsState(
-    /** The gateway this console talks to. */
+    /** The effective gateway base URL (stored, debug default, or empty). */
     val gatewayBaseUrl: String,
+    /** Whether the effective URL is considered configured for transport. */
+    val gatewayConfigured: Boolean,
     /** Whether an operator credential is stored. Never the credential itself. */
     val credentialConfigured: Boolean,
     /** The live session, or `null` when none is open. */
@@ -45,6 +45,8 @@ data class SettingsState(
 enum class SettingsNotice {
     CREDENTIAL_SAVED,
     CREDENTIAL_CLEARED,
+    GATEWAY_URL_SAVED,
+    GATEWAY_URL_CLEARED,
     SESSION_STARTED,
     SESSION_ENDED,
 }
@@ -56,30 +58,18 @@ enum class SettingsError {
 
     /** The encrypted store could not be reached — a Keystore problem, not a mistake. */
     CREDENTIAL_STORAGE_UNAVAILABLE,
+
+    /** The gateway URL was refused as empty or a scaffold placeholder when saving was required. */
+    GATEWAY_URL_INVALID,
 }
 
 /**
  * The settings screen's state holder.
- *
- * ### What this screen is
- *
- * It is the console's one credential surface. The operator credential is the only
- * secret the app holds (ADR 0002), it authorises the gateway's operator surface and
- * nothing else, and until it is set every endpoint except `/health` answers `401
- * OPERATOR_AUTH`. So this screen has to be able to set it, replace it and clear it,
- * and it has to refuse a repository credential with a clear reason rather than
- * storing it and failing later at the gateway.
- *
- * ### What it deliberately does not hold
- *
- * The credential value does not pass through this class's state. The typed value
- * lives in the composable, is handed over once to be written, and is dropped. A
- * `StateFlow` is a thing that can be observed, logged and restored; a credential
- * should be in as few of those as possible.
  */
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val credentialStore: OperatorCredentialStore,
+    private val gatewayBaseUrlStore: GatewayBaseUrlStore,
     private val sessionRepository: SessionRepository,
 ) : ViewModel() {
 
@@ -90,13 +80,60 @@ class SettingsViewModel @Inject constructor(
         refresh()
     }
 
-    /** Re-reads the stored credential's presence and the live session. */
+    /** Re-reads gateway URL, credential presence, and the live session. */
     fun refresh() {
         viewModelScope.launch(Dispatchers.IO) {
-            // The first read of the encrypted store touches the Keystore, so it is
-            // not done on the main thread.
+            val baseUrl = gatewayBaseUrlStore.read()
             val configured = credentialStore.read() != null
-            publish { it.copy(credentialConfigured = configured) }
+            publish {
+                it.copy(
+                    gatewayBaseUrl = baseUrl,
+                    gatewayConfigured = GatewayEndpoints.isConfigured(baseUrl),
+                    credentialConfigured = configured,
+                )
+            }
+        }
+    }
+
+    /**
+     * Persists the gateway base URL.
+     *
+     * Blank [url] clears the stored override. Placeholder hosts are rejected so the
+     * operator does not believe the scaffold is a live endpoint.
+     */
+    fun saveGatewayBaseUrl(url: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val trimmed = url.trim().trimEnd('/')
+            if (trimmed.isNotEmpty() && !GatewayEndpoints.isConfigured(trimmed)) {
+                publish { it.copy(notice = null, error = SettingsError.GATEWAY_URL_INVALID) }
+                return@launch
+            }
+            gatewayBaseUrlStore.save(trimmed)
+            val effective = gatewayBaseUrlStore.read()
+            publish {
+                it.copy(
+                    gatewayBaseUrl = effective,
+                    gatewayConfigured = GatewayEndpoints.isConfigured(effective),
+                    notice = SettingsNotice.GATEWAY_URL_SAVED,
+                    error = null,
+                )
+            }
+        }
+    }
+
+    /** Clears the stored gateway base URL (debug default may still apply). */
+    fun clearGatewayBaseUrl() {
+        viewModelScope.launch(Dispatchers.IO) {
+            gatewayBaseUrlStore.clear()
+            val effective = gatewayBaseUrlStore.read()
+            publish {
+                it.copy(
+                    gatewayBaseUrl = effective,
+                    gatewayConfigured = GatewayEndpoints.isConfigured(effective),
+                    notice = SettingsNotice.GATEWAY_URL_CLEARED,
+                    error = null,
+                )
+            }
         }
     }
 
@@ -118,7 +155,6 @@ class SettingsViewModel @Inject constructor(
                     )
                 }
             } catch (_: IllegalArgumentException) {
-                // The refusal: this value has the shape of a repository credential.
                 publish { it.copy(notice = null, error = SettingsError.CREDENTIAL_REJECTED) }
             } catch (_: GeneralSecurityException) {
                 publish {
@@ -184,16 +220,11 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Publishes a new state.
-     *
-     * The update is atomic, so two rapid actions cannot interleave and leave the
-     * state describing neither of them.
-     */
     private fun publish(transform: (SettingsState) -> SettingsState) {
         _uiState.update { current ->
             val base = (current as? UiState.Success)?.data ?: SettingsState(
-                gatewayBaseUrl = GatewayEndpoints.BASE_URL,
+                gatewayBaseUrl = "",
+                gatewayConfigured = false,
                 credentialConfigured = false,
                 session = null,
             )

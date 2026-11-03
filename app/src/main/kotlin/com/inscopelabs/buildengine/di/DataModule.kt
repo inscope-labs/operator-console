@@ -5,10 +5,12 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
+import com.inscopelabs.buildengine.BuildConfig
 import com.inscopelabs.buildengine.core.crypto.SecureRandomSource
 import com.inscopelabs.buildengine.core.network.ErrorMapper
 import com.inscopelabs.buildengine.core.time.Clock
 import com.inscopelabs.buildengine.data.enrollment.DeviceEnrollmentStore
+import com.inscopelabs.buildengine.data.local.GatewayBaseUrlStore
 import com.inscopelabs.buildengine.data.local.OperatorCredentialStore
 import com.inscopelabs.buildengine.data.local.SelectionStore
 import com.inscopelabs.buildengine.data.remote.GatewayRepository
@@ -25,6 +27,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import javax.inject.Named
 import javax.inject.Singleton
 
 /**
@@ -46,6 +49,7 @@ object DataModule {
      */
     @Provides
     @Singleton
+    @Named(SELECTION_STORE_FILE)
     fun provideSelectionDataStore(
         @ApplicationContext context: Context,
     ): DataStore<Preferences> = PreferenceDataStoreFactory.create {
@@ -54,8 +58,31 @@ object DataModule {
 
     @Provides
     @Singleton
-    fun provideSelectionStore(dataStore: DataStore<Preferences>): SelectionStore =
-        SelectionStore(dataStore)
+    fun provideSelectionStore(
+        @Named(SELECTION_STORE_FILE) dataStore: DataStore<Preferences>,
+    ): SelectionStore = SelectionStore(dataStore)
+
+    /**
+     * Gateway base URL preferences (plain storage). Separate file from selection so
+     * the two concerns can evolve independently.
+     */
+    @Provides
+    @Singleton
+    @Named(GATEWAY_URL_STORE_FILE)
+    fun provideGatewayUrlDataStore(
+        @ApplicationContext context: Context,
+    ): DataStore<Preferences> = PreferenceDataStoreFactory.create {
+        context.preferencesDataStoreFile(GATEWAY_URL_STORE_FILE)
+    }
+
+    @Provides
+    @Singleton
+    fun provideGatewayBaseUrlStore(
+        @Named(GATEWAY_URL_STORE_FILE) dataStore: DataStore<Preferences>,
+    ): GatewayBaseUrlStore {
+        val debugDefault = BuildConfig.DEBUG_GATEWAY_BASE_URL.trim().takeIf { it.isNotEmpty() }
+        return GatewayBaseUrlStore(dataStore = dataStore, debugDefault = debugDefault)
+    }
 
     @Provides
     @Singleton
@@ -103,4 +130,7 @@ object DataModule {
 
     /** The file the selection state lives in. Plain storage — it is not secret. */
     private const val SELECTION_STORE_FILE: String = "operator_console_selection"
+
+    /** The file the gateway base URL lives in. Plain storage — it is not secret. */
+    private const val GATEWAY_URL_STORE_FILE: String = "operator_console_gateway"
 }

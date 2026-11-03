@@ -24,7 +24,14 @@
     <!-- Settings. Design review §4: the credential is gateway-scoped and holds no repository authority. -->
     <string name="settings_gateway_heading">Gateway</string>
     <string name="settings_gateway_url_label">Gateway base URL</string>
-    <string name="settings_gateway_note">The console talks to this gateway and to no other. It is fixed at build time.</string>
+    <string name="settings_gateway_note">The console talks to this gateway and to no other. Set the base URL here so a real host can be used without rebuilding.</string>
+    <string name="settings_gateway_status_label">Status</string>
+    <string name="settings_gateway_configured">Configured</string>
+    <string name="settings_gateway_not_configured">Not configured</string>
+    <string name="settings_gateway_url_placeholder">https://gateway.example.com</string>
+    <string name="settings_gateway_url_saved">Gateway base URL saved.</string>
+    <string name="settings_gateway_url_cleared">Gateway base URL cleared.</string>
+    <string name="settings_gateway_url_invalid">That URL is empty or uses a reserved placeholder host. Enter a real gateway base URL.</string>
     <string name="settings_credential_heading">Operator credential</string>
     <string name="settings_credential_state_label">Status</string>
     <string name="settings_credential_configured">Configured</string>

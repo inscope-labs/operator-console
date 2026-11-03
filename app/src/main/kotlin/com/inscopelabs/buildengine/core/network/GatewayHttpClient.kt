@@ -35,6 +35,13 @@ import io.ktor.http.isSuccess
  * request inherits it. A per-request header set in the client would be a second
  * place to forget.
  *
+ * ### Base URL
+ *
+ * The host is resolved per request via [baseUrlProvider] so a Settings change takes
+ * effect without rebuilding or restarting the process. There is no hard dependency
+ * on [GatewayEndpoints.BASE_URL] alone; that constant remains the scaffold default
+ * only when nothing is configured.
+ *
  * ### Failures
  *
  * A non-2xx response is a refusal, and a refusal is not an exception in the
@@ -44,7 +51,9 @@ import io.ktor.http.isSuccess
  */
 class GatewayHttpClient(
     private val client: HttpClient,
-    private val baseUrl: String = GatewayEndpoints.BASE_URL,
+    private val baseUrlProvider: GatewayBaseUrlProvider = GatewayBaseUrlProvider {
+        GatewayEndpoints.BASE_URL
+    },
     private val credentials: OperatorCredentialProvider = OperatorCredentialProvider { null },
 ) {
 
@@ -56,8 +65,10 @@ class GatewayHttpClient(
      * Performs a request against the gateway and returns the response body.
      *
      * @throws GatewayHttpException if the gateway refused with a non-2xx status.
+     * @throws GatewayNotConfiguredException if the base URL is unset or a placeholder.
      */
     suspend fun request(method: String, path: String, body: String?): String {
+        val baseUrl = baseUrlProvider.baseUrl()
         if (!GatewayEndpoints.isConfigured(baseUrl)) {
             throw GatewayNotConfiguredException(
                 "the gateway base URL is not configured (host must not be a .invalid placeholder)",
@@ -84,6 +95,15 @@ class GatewayHttpClient(
         }
         return payload
     }
+}
+
+/**
+ * Supplies the gateway base URL for each request.
+ *
+ * Resolved per call so Settings changes apply without process restart.
+ */
+fun interface GatewayBaseUrlProvider {
+    fun baseUrl(): String
 }
 
 /**
