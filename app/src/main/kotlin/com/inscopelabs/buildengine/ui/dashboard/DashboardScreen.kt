@@ -107,7 +107,13 @@ fun DashboardScreen(
                 .padding(innerPadding),
         ) {
             when (val currentState = state) {
-                is UiState.Idle, is UiState.Loading -> {
+                is UiState.Idle -> {
+                    ErrorBanner(
+                        message = stringResource(R.string.data_not_loaded),
+                        onRetry = { viewModel.refresh() },
+                    )
+                }
+                is UiState.Loading -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
