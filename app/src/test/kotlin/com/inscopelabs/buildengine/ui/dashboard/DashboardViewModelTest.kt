@@ -44,6 +44,23 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun `init leaves state Idle and performs zero repository calls`() = runTest {
+        val viewModel = DashboardViewModel(
+            getPlansUseCase = getPlansUseCase,
+            getNextTasksUseCase = getNextTasksUseCase,
+            getStatusUseCase = getStatusUseCase,
+        )
+
+        viewModel.uiState.test {
+            assertEquals(UiState.Idle, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertEquals(0, planRepository.getPlansCallCount)
+        assertEquals(0, planRepository.getStatusCallCount)
+        assertEquals(0, taskRepository.getNextTasksCallCount)
+    }
+
+    @Test
     fun `dashboard loads plans, tasks, and plan status successfully`() = runTest {
         val testPlans = listOf(
             Plan(id = "atlas", title = "Project Atlas", taskCount = 10, completedTaskCount = 4, status = "in_progress"),
@@ -71,9 +88,14 @@ class DashboardViewModelTest {
         )
 
         viewModel.uiState.test {
+            assertEquals(UiState.Idle, awaitItem())
+
+            viewModel.refresh()
+
             val state = awaitItem()
-            assertTrue(state is UiState.Success)
-            val data = (state as UiState.Success).data
+            val success = if (state is UiState.Loading) awaitItem() else state
+            assertTrue(success is UiState.Success)
+            val data = (success as UiState.Success).data
             assertEquals(1, data.plans.size)
             assertEquals("atlas", data.plans[0].id)
             assertEquals(1, data.nextTasks.size)
@@ -96,9 +118,12 @@ class DashboardViewModelTest {
         )
 
         viewModel.uiState.test {
+            assertEquals(UiState.Idle, awaitItem())
+            viewModel.refresh()
             val state = awaitItem()
-            assertTrue(state is UiState.Error)
-            assertEquals("Gateway offline", (state as UiState.Error).message)
+            val error = if (state is UiState.Loading) awaitItem() else state
+            assertTrue(error is UiState.Error)
+            assertEquals("Gateway offline", (error as UiState.Error).message)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -119,9 +144,12 @@ class DashboardViewModelTest {
         )
 
         viewModel.uiState.test {
+            assertEquals(UiState.Idle, awaitItem())
+            viewModel.refresh()
             val state = awaitItem()
-            assertTrue(state is UiState.Success)
-            val data = (state as UiState.Success).data
+            val success = if (state is UiState.Loading) awaitItem() else state
+            assertTrue(success is UiState.Success)
+            val data = (success as UiState.Success).data
             assertEquals(1, data.plans.size)
             assertFalse(data.isHalted)
             assertTrue(data.openBranches.isEmpty())
@@ -140,17 +168,21 @@ class DashboardViewModelTest {
         )
 
         viewModel.uiState.test {
-            val initial = awaitItem()
-            assertTrue(initial is UiState.Error)
+            assertEquals(UiState.Idle, awaitItem())
 
-            // Now recover
+            viewModel.refresh()
+            val initial = awaitItem()
+            val error = if (initial is UiState.Loading) awaitItem() else initial
+            assertTrue(error is UiState.Error)
+
             planRepository.plansResult = AppResult.Success(listOf(Plan("plan-2", "Plan 2", 1, 0, "active")))
             taskRepository.nextTasksResult = AppResult.Success(emptyList())
             planRepository.statusResult = { AppResult.Success(PlanStatus("plan-2", "active", false, emptyList(), emptyList(), "M1")) }
 
             viewModel.refresh()
 
-            val updated = awaitItem()
+            val mid = awaitItem()
+            val updated = if (mid is UiState.Loading) awaitItem() else mid
             assertTrue(updated is UiState.Success)
             assertEquals("plan-2", (updated as UiState.Success).data.plans[0].id)
             cancelAndIgnoreRemainingEvents()
