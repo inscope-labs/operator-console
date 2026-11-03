@@ -21,6 +21,33 @@ object GatewayEndpoints {
 
     const val BASE_URL: String = "https://gateway.invalid"
 
+    /**
+     * Hostnames that must never be dialled. RFC 2606 `.invalid` and empty mean
+     * "not configured", not "try DNS".
+     */
+    private val UNCONFIGURED_HOST_MARKERS = listOf(
+        "gateway.invalid",
+        "example.invalid",
+        "invalid",
+    )
+
+    /**
+     * Whether [baseUrl] is a host the console is allowed to open a socket to.
+     * Placeholder / blank URLs are treated as not configured.
+     */
+    fun isConfigured(baseUrl: String = BASE_URL): Boolean {
+        val trimmed = baseUrl.trim()
+        if (trimmed.isEmpty()) return false
+        val host = try {
+            java.net.URI(trimmed).host?.lowercase()
+        } catch (_: Exception) {
+            null
+        } ?: return false
+        if (host.isBlank()) return false
+        if (UNCONFIGURED_HOST_MARKERS.any { host == it || host.endsWith(".$it") }) return false
+        return true
+    }
+
     const val HEALTH: String = "/health"
     const val PLANS: String = "/plans"
     const val PLAN_STATUS: String = "/plans/{planId}/status"

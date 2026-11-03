@@ -4,6 +4,7 @@ import com.inscopelabs.buildengine.core.network.ErrorMapper
 import com.inscopelabs.buildengine.core.network.GatewayEndpoints
 import com.inscopelabs.buildengine.core.network.GatewayHttpClient
 import com.inscopelabs.buildengine.core.network.GatewayHttpException
+import com.inscopelabs.buildengine.core.network.GatewayNotConfiguredException
 import com.inscopelabs.buildengine.core.network.GatewayProtocolException
 import com.inscopelabs.buildengine.core.network.dto.BranchHeadDto
 import com.inscopelabs.buildengine.core.network.dto.DoctorReportDto
@@ -25,6 +26,8 @@ import com.inscopelabs.buildengine.core.network.dto.SyncStatusDto
 import com.inscopelabs.buildengine.core.network.dto.TaskSummaryDto
 import com.inscopelabs.buildengine.core.network.dto.UploadRequestDto
 import com.inscopelabs.buildengine.core.result.AppResult
+import java.io.IOException
+import java.net.UnknownHostException
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -133,6 +136,18 @@ class GatewayRepository(
      */
     suspend fun health(): AppResult<GatewayHealthDto> = try {
         AppResult.Success(decode(httpClient.get(GatewayEndpoints.health())))
+    } catch (error: GatewayNotConfiguredException) {
+        errorMapper.mapNotConfigured(error.message)
+    } catch (error: UnknownHostException) {
+        errorMapper.mapUnreachable(
+            error.message?.let { "the gateway host could not be resolved: $it" }
+                ?: "the gateway host could not be resolved",
+        )
+    } catch (error: IOException) {
+        errorMapper.mapUnreachable(
+            error.message?.let { "the gateway could not be reached: $it" }
+                ?: "the gateway could not be reached",
+        )
     } catch (error: GatewayHttpException) {
         errorMapper.map(error.statusCode, error.body)
     } catch (error: GatewayProtocolException) {

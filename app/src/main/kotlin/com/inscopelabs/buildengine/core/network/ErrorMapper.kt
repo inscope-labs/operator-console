@@ -36,6 +36,10 @@ enum class GatewayFailureState(val code: String) {
     CONFLICT("conflict"),
     RATE_LIMITED("rate_limited"),
     GATEWAY_ERROR("gateway_error"),
+    /** Base URL is a placeholder or empty — no socket was opened. */
+    NOT_CONFIGURED("not_configured"),
+    /** DNS, TCP, or other transport failure before an HTTP status. */
+    UNREACHABLE("unreachable"),
     UNKNOWN("unknown"),
 }
 
@@ -156,8 +160,27 @@ class ErrorMapper {
         GatewayFailureState.CONFLICT -> "the operation conflicts with the gateway's current state"
         GatewayFailureState.RATE_LIMITED -> "the gateway is rate limiting the console"
         GatewayFailureState.GATEWAY_ERROR -> "the gateway failed to handle the request"
+        GatewayFailureState.NOT_CONFIGURED ->
+            "the gateway is not configured — set a base URL in Settings before connecting"
+        GatewayFailureState.UNREACHABLE ->
+            "the gateway could not be reached — check the host, network, and DNS"
         GatewayFailureState.UNKNOWN -> "the gateway refused the operation"
     }
+
+
+    /** Failure when the console has no real gateway URL configured. */
+    fun mapNotConfigured(message: String? = null): AppResult.Failure =
+        AppResult.Failure(
+            code = GatewayFailureState.NOT_CONFIGURED.code,
+            message = message ?: defaultMessage(GatewayFailureState.NOT_CONFIGURED),
+        )
+
+    /** Failure when the transport cannot reach the host (DNS, TCP, TLS handshake). */
+    fun mapUnreachable(message: String? = null): AppResult.Failure =
+        AppResult.Failure(
+            code = GatewayFailureState.UNREACHABLE.code,
+            message = message ?: defaultMessage(GatewayFailureState.UNREACHABLE),
+        )
 
     companion object {
         // -- the gateway's error registry (docs/gateway-contract.md §4.1) --

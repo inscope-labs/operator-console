@@ -3,8 +3,11 @@ package com.inscopelabs.buildengine.data.repository
 import com.inscopelabs.buildengine.core.network.ErrorMapper
 import com.inscopelabs.buildengine.core.network.GatewayFailureState
 import com.inscopelabs.buildengine.core.network.GatewayHttpException
+import com.inscopelabs.buildengine.core.network.GatewayNotConfiguredException
 import com.inscopelabs.buildengine.core.network.GatewayProtocolException
 import com.inscopelabs.buildengine.core.result.AppResult
+import java.io.IOException
+import java.net.UnknownHostException
 
 /**
  * Calls the gateway and turns its refusals into the failure the domain sees.
@@ -14,6 +17,10 @@ import com.inscopelabs.buildengine.core.result.AppResult
  * could not read, and both are outcomes rather than accidents — so they become an
  * [AppResult.Failure] here, where the error catalogue is known, rather than
  * exceptions the domain has to catch and interpret.
+ *
+ * Transport failures (DNS, TCP, "not configured") are also outcomes: the operator
+ * must see an inline error, never an uncaught exception routed through the global
+ * crash handler.
  *
  * The mapping is the [ErrorMapper]'s, so a refusal that arrives here arrives with
  * the same state code it would have had anywhere else in the app: a drifted head
@@ -30,6 +37,18 @@ internal suspend fun <T> callGateway(
     AppResult.Success(block())
 } catch (error: NotFoundException) {
     notFound(error.message ?: "the gateway has no such resource")
+} catch (error: GatewayNotConfiguredException) {
+    errorMapper.mapNotConfigured(error.message)
+} catch (error: UnknownHostException) {
+    errorMapper.mapUnreachable(
+        error.message?.let { "the gateway host could not be resolved: $it" }
+            ?: "the gateway host could not be resolved",
+    )
+} catch (error: IOException) {
+    errorMapper.mapUnreachable(
+        error.message?.let { "the gateway could not be reached: $it" }
+            ?: "the gateway could not be reached",
+    )
 } catch (error: GatewayHttpException) {
     errorMapper.map(error.statusCode, error.body)
 } catch (error: GatewayProtocolException) {
