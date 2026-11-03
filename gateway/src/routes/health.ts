@@ -1,12 +1,12 @@
 /**
- * GET /health — unauthenticated (optional bearer accepted, never gated).
- * Contract 3.1 + GW-2: reports environment and contract version;
- * on config problems, reports problem classes only (no secret values).
+ * GET /health — contract 3.1.
+ * Unauthenticated; optional bearer accepted, never gated.
  */
 
 import { register, type RouteHandler } from './router';
 import { CONTRACT_VERSION } from '../config/constants';
 import { parseGatewayConfig } from '../config/env';
+import { now as clockNow } from '../util/clock';
 
 const json = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), {
@@ -16,34 +16,21 @@ const json = (body: unknown, status = 200): Response =>
 
 const getHealth: RouteHandler = async (_request, env) => {
   const parsed = parseGatewayConfig(env as unknown as Record<string, unknown>);
+  const timestamp = clockNow();
   if (!parsed.ok) {
-    return json(
-      {
-        ok: false,
-        contractVersion: CONTRACT_VERSION,
-        config: {
-          valid: false,
-          problems: parsed.problems,
-        },
-      },
-      200
-    );
+    return json({
+      status: 'degraded',
+      environment: null,
+      version: CONTRACT_VERSION,
+      timestamp,
+      config: { valid: false, problems: parsed.problems },
+    });
   }
-  const { config } = parsed;
   return json({
-    ok: true,
-    contractVersion: CONTRACT_VERSION,
-    environment: config.environment,
-    attestationMode: config.attestationMode,
-    config: {
-      valid: true,
-      bindings: {
-        operatorToken: config.bindings.hasOperatorToken,
-        repos: config.bindings.hasRepos,
-        signingKeys: config.bindings.hasSigningKeys,
-        githubApp: config.bindings.hasGithubApp,
-      },
-    },
+    status: 'ok',
+    environment: parsed.config.environment,
+    version: CONTRACT_VERSION,
+    timestamp,
   });
 };
 

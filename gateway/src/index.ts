@@ -8,6 +8,8 @@ import { registerHealthRoutes } from './routes/health';
 import { registerStatusRoutes } from './routes/status';
 import { registerPlanRoutes } from './routes/plans';
 import { registerTaskRoutes } from './routes/tasks';
+import { registerEnrollRoutes } from './routes/enroll';
+import { registerBranchRoutes } from './routes/branches';
 import { MultiRepoGitHubAdapter } from './adapter/multi-repo-adapter';
 import { NonceStore } from './durable-objects/nonce-store';
 import { EnrolmentRegistry } from './durable-objects/enrolment-registry';
@@ -39,6 +41,8 @@ registerHealthRoutes();
 registerStatusRoutes();
 registerPlanRoutes();
 registerTaskRoutes();
+registerEnrollRoutes();
+registerBranchRoutes();
 
 export async function getAdapter(env: Env): Promise<MultiRepoGitHubAdapter> {
   if (env.__adapter) return env.__adapter;
