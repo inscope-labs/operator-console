@@ -29,6 +29,7 @@ data class DashboardData(
  * Dashboard state holder.
  *
  * Reads plans, next actionable tasks, and system status.
+ * Does not load in [init]: network access is deliberate (refresh / retry / after connect).
  */
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
@@ -39,10 +40,6 @@ class DashboardViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow<UiState<DashboardData>>(UiState.Idle)
     val uiState: StateFlow<UiState<DashboardData>> = _uiState.asStateFlow()
-
-    init {
-        loadDashboard()
-    }
 
     fun refresh() {
         loadDashboard()

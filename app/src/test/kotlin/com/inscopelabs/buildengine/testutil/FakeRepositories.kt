@@ -12,6 +12,9 @@ import com.inscopelabs.buildengine.domain.repository.PlanRepository
 import com.inscopelabs.buildengine.domain.repository.TaskRepository
 
 class FakePlanRepository : PlanRepository {
+    var getPlansCallCount: Int = 0
+    var getPlanCallCount: Int = 0
+    var getStatusCallCount: Int = 0
     var plansResult: AppResult<List<Plan>> = AppResult.Success(emptyList())
     var singlePlanResult: (String) -> AppResult<Plan> = { id ->
         AppResult.Failure(code = "not_found", message = "Plan not found: $id")
@@ -26,14 +29,24 @@ class FakePlanRepository : PlanRepository {
         AppResult.Success(RenderCheck(ok = true, planId = id, renderIssues = emptyList()))
     }
 
-    override suspend fun getPlans(): AppResult<List<Plan>> = plansResult
-    override suspend fun getPlan(planId: String): AppResult<Plan> = singlePlanResult(planId)
-    override suspend fun getStatus(planId: String): AppResult<PlanStatus> = statusResult(planId)
+    override suspend fun getPlans(): AppResult<List<Plan>> {
+        getPlansCallCount++
+        return plansResult
+    }
+    override suspend fun getPlan(planId: String): AppResult<Plan> {
+        getPlanCallCount++
+        return singlePlanResult(planId)
+    }
+    override suspend fun getStatus(planId: String): AppResult<PlanStatus> {
+        getStatusCallCount++
+        return statusResult(planId)
+    }
     override suspend fun validate(planId: String): AppResult<PlanValidation> = validateResult(planId)
     override suspend fun renderCheck(planId: String): AppResult<RenderCheck> = renderCheckResult(planId)
 }
 
 class FakeTaskRepository : TaskRepository {
+    var getNextTasksCallCount: Int = 0
     var nextTasksResult: AppResult<List<Task>> = AppResult.Success(emptyList())
     var singleTaskResult: (String) -> AppResult<Task> = { id ->
         AppResult.Failure(code = "not_found", message = "Task not found: $id")
@@ -48,7 +61,10 @@ class FakeTaskRepository : TaskRepository {
         AppResult.Failure(code = "not_implemented", message = "Not implemented")
     }
 
-    override suspend fun getNextTasks(): AppResult<List<Task>> = nextTasksResult
+    override suspend fun getNextTasks(): AppResult<List<Task>> {
+        getNextTasksCallCount++
+        return nextTasksResult
+    }
     override suspend fun getTask(taskId: String): AppResult<Task> = singleTaskResult(taskId)
     override suspend fun branchFor(taskId: String): AppResult<TaskBranch> = branchResult(taskId)
     override suspend fun liveHead(branch: String): AppResult<String> = liveHeadResult(branch)

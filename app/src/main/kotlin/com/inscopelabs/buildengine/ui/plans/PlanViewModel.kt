@@ -31,6 +31,9 @@ data class PlanDetailData(
 
 /**
  * Plan list and plan detail state holder.
+ *
+ * Does not load the plan list in [init]: network access is deliberate
+ * (explicit [loadPlans] / refresh / after connect).
  */
 @HiltViewModel
 class PlanViewModel @Inject constructor(
@@ -46,10 +49,6 @@ class PlanViewModel @Inject constructor(
 
     private val _planDetailState = MutableStateFlow<UiState<PlanDetailData>>(UiState.Idle)
     val planDetailState: StateFlow<UiState<PlanDetailData>> = _planDetailState.asStateFlow()
-
-    init {
-        loadPlans()
-    }
 
     fun loadPlans() {
         viewModelScope.launch {
