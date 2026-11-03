@@ -1,6 +1,15 @@
 package com.inscopelabs.buildengine
 
+import android.app.Activity
 import android.app.Application
+import android.os.Bundle
+import com.inscopelabs.buildengine.boot.BootGuard
+import com.inscopelabs.buildengine.boot.BootRoute
+import com.inscopelabs.buildengine.boot.RecoveryActivity
+import com.inscopelabs.buildengine.diagnostics.CrashActivity
+import com.inscopelabs.buildengine.diagnostics.CrashReporterManager
+import com.inscopelabs.buildengine.diagnostics.GlobalExceptionHandler
+import com.inscopelabs.buildengine.diagnostics.UserFacingErrorActivity
 import com.inscopelabs.buildengine.domain.repository.SessionRepository
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -36,8 +45,35 @@ class BuildEngineApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        applicationScope.launch {
-            sessionRepository.start()
+
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
+                if (activity !is RecoveryActivity &&
+                    activity !is CrashActivity &&
+                    activity !is UserFacingErrorActivity
+                ) {
+                    BootRoute.redirectIfNeeded(activity)
+                }
+            }
+            override fun onActivityStarted(activity: Activity) {}
+            override fun onActivityResumed(activity: Activity) {}
+            override fun onActivityPaused(activity: Activity) {}
+            override fun onActivityStopped(activity: Activity) {}
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+            override fun onActivityDestroyed(activity: Activity) {}
+        })
+
+        BootGuard.stageStart("app_init")
+        try {
+            CrashReporterManager.initialize(this)
+            Thread.setDefaultUncaughtExceptionHandler(GlobalExceptionHandler(this))
+
+            applicationScope.launch {
+                sessionRepository.start()
+            }
+            BootGuard.stageSuccess("app_init")
+        } catch (t: Throwable) {
+            BootGuard.recordFailure(this, "app_init", t)
         }
     }
 }

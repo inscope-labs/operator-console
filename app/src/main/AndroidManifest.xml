@@ -31,6 +31,21 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".boot.RecoveryActivity"
+            android:exported="false"
+            android:theme="@style/Theme.OperatorConsole" />
+
+        <activity
+            android:name=".diagnostics.CrashActivity"
+            android:exported="false"
+            android:theme="@style/Theme.OperatorConsole" />
+
+        <activity
+            android:name=".diagnostics.UserFacingErrorActivity"
+            android:exported="false"
+            android:theme="@style/Theme.OperatorConsole" />
     </application>
 
 </manifest>

@@ -87,4 +87,50 @@
 
     <!-- Errors -->
     <string name="error_generic">Something went wrong.</string>
+
+    <!-- User-facing Error Screen -->
+    <string name="error_title">Something Went Wrong</string>
+    <string name="error_message">An unexpected error occurred. You can restart the app or share the reference code with support.</string>
+    <string name="error_restart_button">Restart Application</string>
+    <string name="error_share_button">Share Error Details</string>
+    <string name="error_fallback_toast">An unexpected error occurred. Please restart the app.</string>
+    <string name="error_unknown_reference">UNKNOWN</string>
+    <string name="error_reference_format">Reference: %1$s</string>
+    <string name="error_restart_failed">Failed to restart application.</string>
+    <string name="error_share_body">Error Reference: %1$s\n\nFull Diagnostic Report:\n%2$s</string>
+    <string name="error_share_subject">Error Report [%1$s]</string>
+    <string name="error_share_chooser_title">Share Error Report</string>
+    <string name="error_share_failed">Failed to share error report.</string>
+
+    <!-- Crash Screen (Debug) -->
+    <string name="crash_title">Application Crash</string>
+    <string name="crash_subtitle">An uncaught exception occurred in the application.</string>
+    <string name="crash_type_label">Exception Type</string>
+    <string name="crash_message_label">Message</string>
+    <string name="crash_device_label">Device Info</string>
+    <string name="crash_stack_label">Stack Trace</string>
+    <string name="crash_copy_button">Copy Report</string>
+    <string name="crash_restart_button">Restart</string>
+    <string name="crash_fallback_toast">Application crashed. Restarting...</string>
+    <string name="crash_unknown_type">Unknown Exception</string>
+    <string name="crash_unknown_message">No error message provided</string>
+    <string name="crash_copied">Crash report copied to clipboard</string>
+    <string name="crash_copy_failed">Failed to copy crash report</string>
+    <string name="crash_restart_failed">Failed to restart application</string>
+
+    <!-- Recovery Screen (Startup Failures) -->
+    <string name="recovery_title">Startup Recovery</string>
+    <string name="recovery_subtitle">The application encountered a fatal error during boot.</string>
+    <string name="recovery_stage_label">Failure Stage</string>
+    <string name="recovery_message_label">Failure Message</string>
+    <string name="recovery_device_label">Device Metadata</string>
+    <string name="recovery_stack_label">Stack Trace</string>
+    <string name="recovery_copy_button">Copy Details</string>
+    <string name="recovery_retry_button">Clear &amp; Retry</string>
+    <string name="recovery_fallback_toast">Failed to start application.</string>
+    <string name="recovery_unknown_stage">unknown_stage</string>
+    <string name="recovery_unknown_message">No error message</string>
+    <string name="recovery_copied">Diagnostic details copied to clipboard</string>
+    <string name="recovery_copy_failed">Failed to copy diagnostic report</string>
+    <string name="recovery_restart_failed">Failed to restart application</string>
 </resources>
