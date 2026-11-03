@@ -8,9 +8,9 @@ package com.inscopelabs.buildengine.data.local.prefs
  *
  * The keys fall into two groups, and the difference matters:
  *
- * - **Selection state** — which repository and which plan the operator is looking at.
- *   This is not security state (design review §1), so it lives in plain application
- *   storage. Losing it costs nothing.
+ * - **Selection state** — which repository and which plan the operator is looking at,
+ *   and the gateway base URL. This is not security state (design review §1), so it
+ *   lives in plain application storage. Losing it costs nothing.
  * - **Security state** — the operator credential, and the device's enrolment record.
  *   This is written to Keystore-backed encrypted storage, because losing it is not
  *   nothing and because a leaked credential is a leaked credential.
@@ -36,6 +36,14 @@ object PreferencesKeys {
 
     /** The selected plan. Plain storage: it is an identifier, not a secret. */
     const val SELECTED_PLAN: String = "selected_plan"
+
+    /**
+     * The gateway base URL the console dials.
+     *
+     * Plain storage: a host is not a secret. Unset means not configured; the transport
+     * refuses to open a socket until a non-placeholder URL is present.
+     */
+    const val GATEWAY_BASE_URL: String = "gateway_base_url"
 
     /** The device key's selector. A selector, never a secret — the gateway resolves it. */
     const val DEVICE_KID: String = "device_kid"
@@ -68,5 +76,12 @@ object PreferencesKeys {
      * are not secret.
      */
     val PLAIN_KEYS: Set<String> =
-        setOf(SELECTED_REPOSITORY, SELECTED_PLAN, DEVICE_KID, DEVICE_KEY_ALIAS, DEVICE_PUBLIC_KEY)
+        setOf(
+            SELECTED_REPOSITORY,
+            SELECTED_PLAN,
+            GATEWAY_BASE_URL,
+            DEVICE_KID,
+            DEVICE_KEY_ALIAS,
+            DEVICE_PUBLIC_KEY,
+        )
 }
