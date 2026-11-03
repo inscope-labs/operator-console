@@ -23,6 +23,10 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         vectorDrawables { useSupportLibrary = true }
+
+        // Empty in defaultConfig so release never ships a production host in source.
+        // Debug may override via buildTypes.debug.
+        buildConfigField("String", "DEBUG_GATEWAY_BASE_URL", "\"\"")
     }
 
     signingConfigs {
@@ -39,6 +43,8 @@ android {
             applicationIdSuffix = ".debug"
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("debugConfig")
+            // Emulator loopback to a local gateway worker; not used in release.
+            buildConfigField("String", "DEBUG_GATEWAY_BASE_URL", "\"http://10.0.2.2:8787\"")
         }
         release {
             isMinifyEnabled = true
@@ -57,6 +63,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
