@@ -58,6 +58,11 @@ class GatewayHttpClient(
      * @throws GatewayHttpException if the gateway refused with a non-2xx status.
      */
     suspend fun request(method: String, path: String, body: String?): String {
+        if (!GatewayEndpoints.isConfigured(baseUrl)) {
+            throw GatewayNotConfiguredException(
+                "the gateway base URL is not configured (host must not be a .invalid placeholder)",
+            )
+        }
         val response = client.request(GatewayEndpoints.url(path, baseUrl)) {
             this.method = HttpMethod.parse(method)
             credentials.credential()?.let { credential ->
@@ -97,6 +102,14 @@ fun interface OperatorCredentialProvider {
  * Base for the failures the gateway surface can raise.
  */
 open class GatewayException(message: String) : Exception(message)
+
+/**
+ * The configured base URL is a scaffold placeholder or empty.
+ * No DNS lookup or socket is attempted.
+ */
+class GatewayNotConfiguredException(
+    message: String = "the gateway base URL is not configured",
+) : GatewayException(message)
 
 /**
  * The gateway refused: a non-2xx response.
