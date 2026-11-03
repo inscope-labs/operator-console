@@ -1,5 +1,7 @@
 package com.inscopelabs.buildengine.core.crypto
 
+import com.inscopelabs.buildengine.core.security.AuthTier
+
 /**
  * Parameters describing the device signing key.
  *
@@ -14,6 +16,7 @@ data class DeviceKeySpec(
     val userAuthenticationRequired: Boolean = true,
     val preferStrongBox: Boolean = true,
     val attestationChallenge: ByteArray? = null,
+    val authTier: AuthTier = AuthTier.HARDWARE_CONFIRM,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -26,6 +29,7 @@ data class DeviceKeySpec(
         if (curve != other.curve) return false
         if (userAuthenticationRequired != other.userAuthenticationRequired) return false
         if (preferStrongBox != other.preferStrongBox) return false
+        if (authTier != other.authTier) return false
         if (!attestationChallenge.contentEquals(other.attestationChallenge)) return false
 
         return true
@@ -37,6 +41,7 @@ data class DeviceKeySpec(
         result = 31 * result + curve.hashCode()
         result = 31 * result + userAuthenticationRequired.hashCode()
         result = 31 * result + preferStrongBox.hashCode()
+        result = 31 * result + authTier.hashCode()
         result = 31 * result + (attestationChallenge?.contentHashCode() ?: 0)
         return result
     }

@@ -23,6 +23,16 @@ class KeystoreSigner(
         signatureProvider = { null },
     )
 
+    constructor(kid: String, authorizedSignature: Signature) : this(
+        kidProvider = { kid },
+        signatureProvider = { authorizedSignature },
+    )
+
+    constructor(authorizedSignature: Signature) : this(
+        kidProvider = { "k1" },
+        signatureProvider = { authorizedSignature },
+    )
+
     override fun kid(): String = kidProvider()
 
     override fun sign(message: ByteArray): ByteArray {

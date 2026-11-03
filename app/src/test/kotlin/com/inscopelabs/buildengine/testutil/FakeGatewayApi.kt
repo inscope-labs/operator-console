@@ -2,6 +2,7 @@ package com.inscopelabs.buildengine.testutil
 
 import com.inscopelabs.buildengine.core.network.dto.BranchHeadDto
 import com.inscopelabs.buildengine.core.network.dto.DoctorReportDto
+import com.inscopelabs.buildengine.core.network.dto.EnrollChallengeDto
 import com.inscopelabs.buildengine.core.network.dto.EngineScopeRequestDto
 import com.inscopelabs.buildengine.core.network.dto.EnrollRequestDto
 import com.inscopelabs.buildengine.core.network.dto.EnrollResponseDto
@@ -29,6 +30,13 @@ class FakeGatewayApi : GatewayApi {
         EnrollResponseDto(kid = "k2", status = "active", enrolledAt = 1700000100L)
     }
 
+    var enrollChallengeResult: () -> EnrollChallengeDto = {
+        EnrollChallengeDto(
+            challenge = "dGVzdC1jaGFsbGVuZ2UtMzItYnl0ZXMtc3RyaW5nLTAwMQ",
+            expiresAt = 1700000300L,
+        )
+    }
+
     override suspend fun listPlans(): List<PlanSummaryDto> = emptyList()
     override suspend fun getPlan(planId: String): PlanSummaryDto = PlanSummaryDto(id = planId, title = "Plan", status = "active")
     override suspend fun planStatus(planId: String): PlanStatusDto = PlanStatusDto(id = planId, status = "active")
@@ -45,4 +53,5 @@ class FakeGatewayApi : GatewayApi {
     override suspend fun doctor(): DoctorReportDto = DoctorReportDto(healthy = true, checks = emptyList())
     override suspend fun enroll(request: EnrollRequestDto): EnrollResponseDto = enrollResult(request)
     override suspend fun rotateKey(request: RotateKeyRequestDto): EnrollResponseDto = rotateKeyResult(request)
+    override suspend fun enrollChallenge(): EnrollChallengeDto = enrollChallengeResult()
 }

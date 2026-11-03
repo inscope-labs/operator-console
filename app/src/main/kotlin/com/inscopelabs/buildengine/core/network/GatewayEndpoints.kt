@@ -40,6 +40,7 @@ object GatewayEndpoints {
 
     const val ENROLL: String = "/enroll"
     const val ENROLL_ROTATE: String = "/enroll/rotate"
+    const val ENROLL_CHALLENGE: String = "/enroll/challenge"
 
     /**
      * The framework decision endpoint.
@@ -99,6 +100,9 @@ object GatewayEndpoints {
 
     /** `POST /enroll/rotate` — key rotation. */
     fun enrollRotate(): String = ENROLL_ROTATE
+
+    /** `POST /enroll/challenge` — attestation challenge. */
+    fun enrollChallenge(): String = ENROLL_CHALLENGE
 
     /** `POST /decisions/{decisionId}` — the framework decision. */
     fun decision(decisionId: String): String = path(DECISION, "decisionId" to decisionId)

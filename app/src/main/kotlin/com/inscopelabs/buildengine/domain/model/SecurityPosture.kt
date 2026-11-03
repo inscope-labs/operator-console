@@ -1,5 +1,7 @@
 package com.inscopelabs.buildengine.domain.model
 
+import com.inscopelabs.buildengine.core.security.AuthTier
+
 /** Security posture derived from local measurements, not app configuration claims. */
 data class SecurityPosture(
     val hardwareBacked: Boolean,
@@ -9,4 +11,5 @@ data class SecurityPosture(
     val summary: String,
     val securityLevel: String = "UNKNOWN",
     val playIntegrityAvailable: Boolean = false,
+    val authTier: AuthTier? = null,
 )

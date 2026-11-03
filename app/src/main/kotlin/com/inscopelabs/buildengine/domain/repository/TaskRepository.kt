@@ -39,6 +39,11 @@ interface TaskRepository {
     suspend fun branchFor(taskId: String): AppResult<TaskBranch>
 
     /**
+     * The live remote head SHA of [branch].
+     */
+    suspend fun liveHead(branch: String): AppResult<String>
+
+    /**
      * An operator-executed status change.
      *
      * Scope: one task.

@@ -1,15 +1,18 @@
 package com.inscopelabs.buildengine.di
 
 import android.content.Context
-import com.inscopelabs.buildengine.capability.NonceSource
+import com.inscopelabs.buildengine.capability.CapabilityMinter
 import com.inscopelabs.buildengine.capability.DeviceNonceSource
+import com.inscopelabs.buildengine.capability.NonceSource
 import com.inscopelabs.buildengine.capability.signing.CapabilitySigner
 import com.inscopelabs.buildengine.capability.signing.DeviceKeyCapabilitySigner
 import com.inscopelabs.buildengine.core.crypto.DeviceKeyManager
 import com.inscopelabs.buildengine.core.crypto.KeystoreSigner
 import com.inscopelabs.buildengine.core.crypto.SecureRandomSource
 import com.inscopelabs.buildengine.core.crypto.StrongBoxSupport
+import com.inscopelabs.buildengine.core.security.BiometricGate
 import com.inscopelabs.buildengine.core.security.DeviceAttestation
+import com.inscopelabs.buildengine.core.time.Clock
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -35,6 +38,20 @@ object CryptoModule {
     fun provideNonceSource(
         secureRandomSource: SecureRandomSource,
     ): NonceSource = DeviceNonceSource(secureRandomSource)
+
+    @Provides
+    @Singleton
+    fun provideCapabilityMinter(
+        signer: CapabilitySigner,
+        nonceSource: NonceSource,
+        clock: Clock,
+    ): CapabilityMinter = CapabilityMinter(signer, nonceSource, clock)
+
+    @Provides
+    @Singleton
+    fun provideBiometricGate(
+        @ApplicationContext context: Context,
+    ): BiometricGate = BiometricGate(context)
 
     @Provides
     @Singleton

@@ -8,10 +8,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Verifies that the gate refuses when the device cannot satisfy the policy.
- *
- * SCAFFOLD PLACEHOLDER — androidx.biometric ships no separate test-fake artifact, so
- * the fakes have to be built on top of BiometricManager's error codes.
+ * Verifies that the gate and policy are constructable and available.
  */
 @RunWith(AndroidJUnit4::class)
 class BiometricGateTest {

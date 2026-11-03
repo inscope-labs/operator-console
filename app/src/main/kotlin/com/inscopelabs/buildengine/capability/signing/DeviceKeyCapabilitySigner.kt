@@ -1,6 +1,7 @@
 package com.inscopelabs.buildengine.capability.signing
 
 import com.inscopelabs.buildengine.core.crypto.KeystoreSigner
+import java.security.Signature
 
 /**
  * Model B — the console signs with its device key, the gateway verifies.
@@ -11,6 +12,14 @@ import com.inscopelabs.buildengine.core.crypto.KeystoreSigner
 class DeviceKeyCapabilitySigner(
     private val keystoreSigner: KeystoreSigner = KeystoreSigner(),
 ) : CapabilitySigner {
+
+    constructor(kid: String, authorizedSignature: Signature) : this(
+        KeystoreSigner(kid, authorizedSignature)
+    )
+
+    constructor(authorizedSignature: Signature) : this(
+        KeystoreSigner(authorizedSignature)
+    )
 
     override fun kid(): String = keystoreSigner.kid()
 

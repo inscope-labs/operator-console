@@ -178,6 +178,9 @@ class ErrorMapper {
         const val GATEWAY_HEAD_DRIFT: String = "HEAD_DRIFT"
         const val GATEWAY_HALT_ACTIVE: String = "HALT_ACTIVE"
         const val GATEWAY_GUARD_FAILED: String = "GUARD_FAILED"
+        const val GATEWAY_ENROLL_CHALLENGE_INVALID: String = "ENROLL_CHALLENGE_INVALID"
+        const val GATEWAY_ENROLL_ATTESTATION_INVALID: String = "ENROLL_ATTESTATION_INVALID"
+        const val GATEWAY_AUTH_TIER_NOT_ALLOWED: String = "AUTH_TIER_NOT_ALLOWED"
 
         /**
          * The gateway's code for each state.
@@ -191,6 +194,7 @@ class ErrorMapper {
             GATEWAY_BRANCH_MISMATCH to GatewayFailureState.SCOPE_REFUSED,
             GATEWAY_UNKNOWN_OP to GatewayFailureState.SCOPE_REFUSED,
             GATEWAY_NOT_ENROLLED to GatewayFailureState.SCOPE_REFUSED,
+            GATEWAY_AUTH_TIER_NOT_ALLOWED to GatewayFailureState.SCOPE_REFUSED,
             // The other three.
             GATEWAY_NONCE_REPLAYED to GatewayFailureState.REPLAYED,
             GATEWAY_HEAD_DRIFT to GatewayFailureState.HEAD_DRIFTED,
@@ -203,6 +207,8 @@ class ErrorMapper {
             GATEWAY_TTL_TOO_LONG to GatewayFailureState.FORMAT,
             GATEWAY_BAD_FIELD_COUNT to GatewayFailureState.FORMAT,
             GATEWAY_BAD_ENCODING to GatewayFailureState.FORMAT,
+            GATEWAY_ENROLL_CHALLENGE_INVALID to GatewayFailureState.FORMAT,
+            GATEWAY_ENROLL_ATTESTATION_INVALID to GatewayFailureState.GUARD_FAILED,
             GATEWAY_GUARD_FAILED to GatewayFailureState.GUARD_FAILED,
             GATEWAY_ENVIRONMENT_MISMATCH to GatewayFailureState.ENVIRONMENT_MISMATCH,
         )

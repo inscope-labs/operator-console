@@ -129,4 +129,14 @@ class DeviceEnrollmentStoreTest {
             assertTrue(e.message?.contains("Corrupt") == true)
         }
     }
+
+    @Test
+    fun `persists and decodes authTier`() {
+        val now = 1700000000L
+        store.recordPending("k_tier", "key_alias", "pub_key", now, "hardware_confirm")
+        store.activate("k_tier", now)
+
+        assertEquals("hardware_confirm", store.authTierFor("k_tier"))
+        assertEquals("hardware_confirm", store.activeRecord()?.authTier)
+    }
 }

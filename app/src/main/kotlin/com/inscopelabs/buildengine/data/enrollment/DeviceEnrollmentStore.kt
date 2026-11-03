@@ -29,16 +29,23 @@ class DeviceEnrollmentStore(
         val status: Status,
         val createdAtEpochSeconds: Long,
         val retiredAtEpochSeconds: Long? = null,
+        val authTier: String? = null,
     )
 
     enum class Status { PENDING, ACTIVE, RETIRED }
 
     @Synchronized
-    fun recordPending(kid: String, keyAlias: String, publicKeyBase64: String, now: Long) {
+    fun recordPending(
+        kid: String,
+        keyAlias: String,
+        publicKeyBase64: String,
+        now: Long,
+        authTier: String? = null,
+    ) {
         validateKid(kid)
         validateAlias(keyAlias)
         require(publicKeyBase64.isNotBlank())
-        val encoded = encode(Record(kid, keyAlias, publicKeyBase64, Status.PENDING, now))
+        val encoded = encode(Record(kid, keyAlias, publicKeyBase64, Status.PENDING, now, authTier = authTier))
         check(preferences.edit().putString(recordKey(kid), encoded).commit()) {
             "Unable to persist pending device enrolment"
         }
@@ -77,6 +84,7 @@ class DeviceEnrollmentStore(
 
     fun enrollmentFor(kid: String): String? = record(kid)?.publicKeyBase64
     fun keyAliasFor(kid: String): String? = record(kid)?.keyAlias
+    fun authTierFor(kid: String): String? = record(kid)?.authTier
     fun activeKid(): String? = preferences.getString(KEY_ACTIVE_KID, null)
 
     @Synchronized
@@ -87,15 +95,17 @@ class DeviceEnrollmentStore(
     private fun encode(record: Record): String = listOf(
         record.kid, record.keyAlias, record.publicKeyBase64, record.status.name,
         record.createdAtEpochSeconds.toString(), record.retiredAtEpochSeconds?.toString().orEmpty(),
+        record.authTier.orEmpty(),
     ).joinToString("\n")
 
     private fun decode(value: String): Record {
         val parts = value.split('\n')
-        require(parts.size == 6) { "Corrupt device enrolment record" }
+        require(parts.size >= 6) { "Corrupt device enrolment record" }
         validateKid(parts[0]); validateAlias(parts[1])
         val status = Status.valueOf(parts[3])
-        return Record(parts[0], parts[1], parts[2], status, parts[4].toLong(),
-            parts[5].takeIf(String::isNotBlank)?.toLong())
+        val retiredAt = parts[5].takeIf(String::isNotBlank)?.toLong()
+        val authTier = if (parts.size >= 7) parts[6].takeIf(String::isNotBlank) else null
+        return Record(parts[0], parts[1], parts[2], status, parts[4].toLong(), retiredAt, authTier)
     }
 
     private fun recordKey(kid: String) = "enrolment.$kid"

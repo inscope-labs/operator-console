@@ -67,6 +67,13 @@ class TaskRepositoryImpl(
         )
     }
 
+    override suspend fun liveHead(branch: String): AppResult<String> = callGateway(errorMapper) {
+        if (branch.isBlank()) {
+            throw NotFoundException("branch name cannot be blank")
+        }
+        gateway.branchHead(branch).headSha
+    }
+
     /**
      * An operator-executed status change.
      *

@@ -55,8 +55,19 @@ object UseCaseModule {
     fun provideConfirmAndMintCapabilityUseCase(
         capabilityMinter: CapabilityMinter,
         biometricGate: BiometricGate,
+        verifyBranchHeadUseCase: VerifyBranchHeadUseCase,
+        deviceKeyManager: DeviceKeyManager,
+        enrollmentStore: DeviceEnrollmentStore,
+        clock: com.inscopelabs.buildengine.core.time.Clock,
     ): ConfirmAndMintCapabilityUseCase =
-        ConfirmAndMintCapabilityUseCase(capabilityMinter, biometricGate)
+        ConfirmAndMintCapabilityUseCase(
+            capabilityMinter = capabilityMinter,
+            biometricGate = biometricGate,
+            verifyBranchHeadUseCase = verifyBranchHeadUseCase,
+            deviceKeyManager = deviceKeyManager,
+            enrollmentStore = enrollmentStore,
+            clock = clock,
+        )
 
     @Provides
     @Singleton
@@ -170,6 +181,7 @@ object UseCaseModule {
     fun provideReportDevicePostureUseCase(
         strongBoxSupport: StrongBoxSupport,
         deviceAttestation: DeviceAttestation,
+        enrollmentStore: DeviceEnrollmentStore,
     ): ReportDevicePostureUseCase =
-        ReportDevicePostureUseCase(strongBoxSupport, deviceAttestation)
+        ReportDevicePostureUseCase(strongBoxSupport, deviceAttestation, enrollmentStore)
 }

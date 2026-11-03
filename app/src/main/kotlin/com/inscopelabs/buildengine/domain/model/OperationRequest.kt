@@ -6,8 +6,6 @@ import com.inscopelabs.buildengine.capability.model.OperationType
 /**
  * A privileged operation, before confirmation.
  *
- * SCAFFOLD PLACEHOLDER — placeholder only, implementation pending.
- *
  * Design review §5: this is what the console shows the operator before a capability
  * is minted — the operation, the branch, the exact head SHA and the TTL.
  */
@@ -17,12 +15,11 @@ data class OperationRequest(
     val plan: String,
     val task: String,
     val order: String = "",
+    val typedHeadConfirmation: String? = null,
 )
 
 /**
  * The outcome of a privileged operation.
- *
- * SCAFFOLD PLACEHOLDER — placeholder only, implementation pending.
  */
 data class OperationResult(
     val accepted: Boolean,

@@ -31,7 +31,8 @@ without a re-architecture. See `adr/0001-capability-signing-direction.md`.
 | Location | Android Keystore; StrongBox where available | The private key never leaves the Secure Element. It cannot be read by the app, and therefore cannot be read by anything that compromises the app's process. |
 | Exportability | Non-exportable | A stolen phone yields a *capability*, never a key. |
 | Algorithm | EC P-256 (or Ed25519 where the device supports it) | Available on every device at `minSdk 28`; small signatures. |
-| User authentication | `setUserAuthenticationRequired(true)` | The key is unusable when the app cannot prompt. This is the desired property for the signing key. |
+| User authentication | Dependent on confirmation tier: `hardware_confirm` uses Keystore-enforced auth (`setUserAuthenticationParameters` on API >= 30, `setUserAuthenticationRequired(true)` on API 28-29); `in_app_confirm` uses `setUserAuthenticationRequired(false)`. | `hardware_confirm` guarantees per-use confirmation; `in_app_confirm` degrades to manual typed head confirmation when device credentials are unavailable. |
+| Attestation challenge | Random 32 bytes from `POST /enroll/challenge` passed to `setAttestationChallenge` | Without a challenge, Android returns a single self-signed cert instead of an attestation chain. |
 | Invalidated by biometric enrolment | **Yes** — never `setInvalidatedByBiometricEnrollment(false)` | Otherwise a newly enrolled biometric could mint capabilities. |
 | Alias | Stable per device, e.g. `operator-console-signing-v1` | The alias is the link between the `kid` selector and the key. |
 
@@ -40,11 +41,11 @@ itself is created and used by `DeviceKeyManager` (`core/crypto/DeviceKeyManager.
 
 ### The degradation is deliberate
 
-A key created with `setUserAuthenticationRequired(true)` is unusable when the app cannot
-prompt for authentication. The consequence is that the console degrades to **"no
-capabilities can be minted"** — never to "mint without confirmation". A device without a
-working biometric or device credential can still *read* plan state; it cannot approve a
-write. That asymmetry is the correct one.
+The console resolves one of two confirmation tiers via `AuthTierResolver.resolve()`:
+1. **`hardware_confirm`**: Strong Keystore-enforced authentication. On API >= 30, either `BIOMETRIC_STRONG` or `DEVICE_CREDENTIAL` (PIN/pattern/password) satisfies this; on API 28-29, `BIOMETRIC_STRONG` is strictly required.
+2. **`in_app_confirm`**: When no secure lock screen or biometrics are configured, the console degrades to in-app confirmation. The operator must inspect the full summary and type the first 7 hexadecimal characters of the target branch HEAD commit.
+
+The app never refuses to run or read; it only degrades how write capabilities are authorized. Furthermore, the gateway policy may reject `in_app_confirm` enrolments (`AUTH_TIER_NOT_ALLOWED`) in high-security production environments.
 
 ---
 
@@ -70,6 +71,10 @@ possess.
 | `KeyInfo.isInsideSecureHardware == true` | "Hardware-backed key" |
 | `KeyInfo.isInsideSecureHardware == false` | "Software-backed key" |
 
+Along with key hardware backing, the badge displays the active confirmation tier:
+- `"Biometric/PIN confirm"` for `hardware_confirm`
+- `"In-app confirm only (no device lock)"` for `in_app_confirm`
+
 The badge is not decoration. An operator deciding whether to approve a publish is
 deciding on the strength of the key that authorised it.
 
@@ -78,17 +83,18 @@ deciding on the strength of the key that authorised it.
 ## 4. The enrolment record
 
 The gateway holds a registry of enrolled devices. The console's side of it is
-`data/local/DeviceEnrollmentStore.kt`.
+`data/enrollment/DeviceEnrollmentStore.kt`.
 
 | Field | Description |
 |---|---|
 | `kid` | The key selector that appears in the capability's second field. A selector, not a secret. Rotating keys means minting under a new `kid`. |
 | Key alias | The Keystore alias for the private key. Local to the device; the gateway never sees it. |
 | Public key | base64url, no padding. The gateway verifies against this. |
+| `authTier` | Active confirmation tier (`hardware_confirm` or `in_app_confirm`). |
 | Enrolment state | Pending / active / retired. |
 | Created / retired timestamps | For audit. |
 
-The public key is the only thing that leaves the device during enrolment.
+The public key and attestation certificate chain are the only artefacts that leave the device during enrolment.
 
 ### Enrolment flow
 
@@ -96,26 +102,25 @@ The public key is the only thing that leaves the device during enrolment.
   operator opens the enrolment screen
             │
             ▼
+  fetch fresh challenge from gateway (POST /enroll/challenge)
+            │   32 random bytes unpadded base64url (TTL 300s)
+            ▼
   DeviceKeyManager.ensureDeviceKey(spec)
-            │   creates the key if absent, with
-            │   setUserAuthenticationRequired(true)
+            │   creates key passing raw challenge to setAttestationChallenge
             ▼
-  DeviceKeyManager.publicKeyBase64(alias)
-            │
+  DeviceAttestation.keyAttestationChain(alias)
+            │   requires chain size >= 2 (refuses self-signed chain)
             ▼
-  console presents: public key + device attestation statement
-            │   (ADR 0003 — the gateway checks the key is
-            │    hardware-backed and the device is attested)
+  console presents: public key + attestation chain + challenge + authTier
+            │   (the gateway validates attestation, challenge, and tier)
             ▼
   gateway registers the device, allocates a `kid`, returns it
             │
             ▼
-  DeviceEnrollmentStore.recordEnrollment(kid, alias, publicKey)
+  DeviceEnrollmentStore.recordEnrollment(kid, alias, publicKey, authTier)
 ```
 
-The attestation is what makes enrolment meaningful: without it, anyone could enrol a
-software key on a compromised device. The gateway verifies the attestation before it
-issues a `kid`.
+The attestation chain is what makes enrolment meaningful: without a challenge and certificate chain length $\ge 2$, anyone could enrol a software or self-signed key on a compromised device. The gateway verifies the attestation before it issues a `kid`.
 
 ---
 

@@ -1,5 +1,6 @@
 package com.inscopelabs.buildengine.ui.components
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,25 +18,41 @@ import com.inscopelabs.buildengine.R
 /**
  * The shared scaffold for a confirmation-gated action.
  *
- * SCAFFOLD PLACEHOLDER — placeholder only, implementation pending.
- *
  * Design review §5 / §13: the confirmation is the operator's, and it is what
- * authorises the capability. The biometric prompt belongs on top of this.
+ * authorises the capability.
  */
 @Composable
 fun ConfirmationScaffold(
     title: String,
-    body: String,
-    confirmLabel: String,
+    body: String = "",
+    confirmLabel: String = "Confirm",
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    isConfirmEnabled: Boolean = true,
     modifier: Modifier = Modifier,
+    content: (@Composable () -> Unit)? = null,
 ) {
-    Column(modifier = modifier.fillMaxWidth().padding(16.dp)) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Text(text = title, style = MaterialTheme.typography.headlineSmall)
-        Text(text = body, style = MaterialTheme.typography.bodyMedium)
-        Row(modifier = Modifier.padding(top = 16.dp)) {
-            Button(onClick = onConfirm) { Text(text = confirmLabel) }
+        if (body.isNotBlank()) {
+            Text(text = body, style = MaterialTheme.typography.bodyMedium)
+        }
+        content?.invoke()
+        Row(
+            modifier = Modifier.padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Button(
+                onClick = onConfirm,
+                enabled = isConfirmEnabled,
+            ) {
+                Text(text = confirmLabel)
+            }
             TextButton(onClick = onDismiss) {
                 Text(text = stringResource(R.string.action_cancel))
             }

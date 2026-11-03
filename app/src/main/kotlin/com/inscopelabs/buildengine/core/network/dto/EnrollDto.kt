@@ -15,10 +15,18 @@ import kotlinx.serialization.Serializable
  * Play Integrity attestation is deferred and is not part of this request.
  */
 @Serializable
+data class EnrollChallengeDto(
+    val challenge: String = "",
+    val expiresAt: Long = 0L,
+)
+
+@Serializable
 data class EnrollRequestDto(
     val alias: String = "",
     val publicKey: String = "",
     val attestationChain: List<String> = emptyList(),
+    val challenge: String = "",
+    val authTier: String = "",
 )
 
 @Serializable
@@ -26,6 +34,8 @@ data class RotateKeyRequestDto(
     val oldKid: String = "",
     val newPublicKey: String = "",
     val attestationChain: List<String> = emptyList(),
+    val challenge: String = "",
+    val authTier: String = "",
 )
 
 @Serializable
@@ -33,4 +43,5 @@ data class EnrollResponseDto(
     val kid: String = "",
     val status: String = "",
     val enrolledAt: Long = 0L,
+    val authTier: String? = null,
 )

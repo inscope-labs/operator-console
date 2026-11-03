@@ -10,7 +10,7 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * SCAFFOLD PLACEHOLDER — placeholder only, implementation pending.
+ * Core application-level providers for time and random source.
  */
 @Module
 @InstallIn(SingletonComponent::class)

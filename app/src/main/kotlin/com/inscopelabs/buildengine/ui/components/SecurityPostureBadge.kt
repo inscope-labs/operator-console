@@ -12,11 +12,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.inscopelabs.buildengine.R
+import com.inscopelabs.buildengine.core.security.AuthTier
 import com.inscopelabs.buildengine.domain.model.SecurityPosture
 
 /** Displays measured device security properties without implying gateway verification. */
 @Composable
 fun SecurityPostureBadge(posture: SecurityPosture, modifier: Modifier = Modifier) {
+    val tierText = when (posture.authTier) {
+        AuthTier.HARDWARE_CONFIRM -> "Biometric/PIN confirm"
+        AuthTier.IN_APP_CONFIRM -> "In-app confirm only (no device lock)"
+        null -> if (posture.hardwareBacked) "Biometric/PIN confirm" else "In-app confirm only (no device lock)"
+    }
+
     Column(
         modifier = modifier.padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -38,7 +45,13 @@ fun SecurityPostureBadge(posture: SecurityPosture, modifier: Modifier = Modifier
                 label = { Text(if (posture.attested) "Key attestation present" else "No key attestation") },
                 enabled = false,
             )
+            AssistChip(
+                onClick = {},
+                label = { Text(tierText) },
+                enabled = false,
+            )
         }
+        Text(tierText, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
         Text(posture.summary, style = MaterialTheme.typography.bodySmall)
         Text(
             text = "Local measurement only; the gateway makes the enrolment decision.",

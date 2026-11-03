@@ -27,10 +27,13 @@ class CapabilityMinter(
         order: String,
         plan: String,
         task: String,
+        overrideSigner: CapabilitySigner? = null,
+        mintedAtEpochSeconds: Long? = null,
     ): SignedCapability {
-        val now = clock.nowEpochSeconds()
+        val now = mintedAtEpochSeconds ?: clock.nowEpochSeconds()
         val exp = now + ttlSeconds
-        val kid = signer.kid()
+        val activeSigner = overrideSigner ?: signer
+        val kid = activeSigner.kid()
 
         val capability = OperatorCapability(
             kid = kid,
@@ -45,7 +48,7 @@ class CapabilityMinter(
         )
 
         val message = buildMessage(capability)
-        val signature = signer.sign(message.toByteArray(Charsets.UTF_8))
+        val signature = activeSigner.sign(message.toByteArray(Charsets.UTF_8))
         return SignedCapability(capability, signature)
     }
 

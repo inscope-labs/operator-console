@@ -41,6 +41,9 @@ class FakeTaskRepository : TaskRepository {
     var branchResult: (String) -> AppResult<TaskBranch> = { id ->
         AppResult.Failure(code = "not_found", message = "Branch not found: $id")
     }
+    var liveHeadResult: (String) -> AppResult<String> = { branch ->
+        AppResult.Failure(code = "not_found", message = "Live head not found: $branch")
+    }
     var setStatusResult: (String, TaskStatus) -> AppResult<Task> = { _, _ ->
         AppResult.Failure(code = "not_implemented", message = "Not implemented")
     }
@@ -48,5 +51,6 @@ class FakeTaskRepository : TaskRepository {
     override suspend fun getNextTasks(): AppResult<List<Task>> = nextTasksResult
     override suspend fun getTask(taskId: String): AppResult<Task> = singleTaskResult(taskId)
     override suspend fun branchFor(taskId: String): AppResult<TaskBranch> = branchResult(taskId)
+    override suspend fun liveHead(branch: String): AppResult<String> = liveHeadResult(branch)
     override suspend fun setStatus(taskId: String, status: TaskStatus): AppResult<Task> = setStatusResult(taskId, status)
 }

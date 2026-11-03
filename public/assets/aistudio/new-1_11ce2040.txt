@@ -1,0 +1,144 @@
+# operator-xconsole — Stage 4.2 close-out (remediation + confirmation and minting)
+
+Repo: inscope-labs/operator-console, Android app under app/. One stage per run.
+
+## Rules (standing, plus this stage)
+1. Touch ONLY the files listed in section 3. Every other file stays byte-identical
+   (the push is a whole-tree snapshot).
+2. Protected paths, never edit: .github/workflows/*.yml, proguard-rules.pro,
+   AndroidManifest.xml, app/build.gradle.kts, version.properties, build-logs/**.
+   minSdk is 28, USE_BIOMETRIC and androidx.biometric are already present. If you think a
+   protected change is needed, stop and put the exact diff in your report.
+3. No release-build verification, no shell setup commands, no HEAD drift checks.
+4. Never add: GitHub credentials, Runtime.exec/ProcessBuilder, git dependencies, persisted
+   session tokens, durable audit storage, or any Lab biometric bypass (Phase 5 owns that).
+5. Do not invent wire fields or endpoints beyond the CONTRACT ADDENDUM below. Anything else
+   the contract is silent on: stop and report.
+6. Remove every SCAFFOLD PLACEHOLDER KDoc line and TODO("SCAFFOLD...") from the files you implement.
+7. No log line, error, UI string or report may contain a signature, nonce, challenge or credential.
+   Use util/Logger and util/Redactor.
+8. Mandatory report: agent-reports/<UTC-ISO-timestamp>-stage-4-2-confirm-and-mint.md
+   (tasks done, files changed, tests added, skipped items, stop-and-ask items). Name this
+   stage "Stage 4.2 — Confirmation and minting (the single path)". Use task IDs T4-2xx only.
+
+## CONTRACT ADDENDUM (shared verbatim with the gateway prompt; the gateway implements it)
+A. New endpoint POST /enroll/challenge. Auth: operator bearer. Body: {}.
+   200: {"challenge":"<base64url, 32 random bytes, unpadded>","expiresAt":<epoch seconds>}.
+   Single use, TTL 300 s.
+B. POST /enroll and POST /enroll/rotate request bodies gain two required fields:
+   "challenge" (the exact string returned by A) and "authTier" ("hardware_confirm" or
+   "in_app_confirm"). The Android key-attestation challenge bytes are the base64url-DECODED
+   challenge (32 raw bytes). Responses gain an optional "authTier" (the tier the gateway derived).
+C. New error codes (standard {code,message} body): ENROLL_CHALLENGE_INVALID (400, unknown/expired/used),
+   ENROLL_ATTESTATION_INVALID (400, bad chain/challenge/key mismatch/tier mismatch),
+   AUTH_TIER_NOT_ALLOWED (403, tier not permitted in this environment).
+D. The 10-field capability message and signature encoding are UNCHANGED. The tier is a property
+   of the kid in the gateway registry, not of the wire (D-T1).
+
+## 1. Problems this stage fixes (from the audit of Stage 4.1)
+- EnrollDeviceUseCase creates the key with no attestation challenge. Without one, Android returns
+  a self-signed certificate, so "chain not empty" proves nothing.
+- The 4.1 key uses setUserAuthenticationRequired(true) only. BiometricPolicy allows DEVICE_CREDENTIAL,
+  but that key cannot be unlocked by a PIN, and devices without biometrics must still work.
+- BiometricGate.authenticate() returns Boolean, but the plan requires a CryptoObject bound to the
+  signing key. KeystoreSigner's signatureProvider defaults to null, so signing is unreachable.
+- VerifyBranchHeadUseCase returns Boolean, which cannot tell "drifted" from "could not check".
+
+## 2. Design (follow exactly)
+Tiers (new core/security/AuthTier.kt and AuthTierResolver.kt):
+- hardware_confirm: Keystore-enforced per-use user authentication.
+  API >= 30: authenticators BIOMETRIC_STRONG or DEVICE_CREDENTIAL (KeyguardManager.isDeviceSecure
+  is enough; no biometric sensor needed).
+  API 28-29: BIOMETRIC_STRONG only, and only if BiometricManager.canAuthenticate == SUCCESS.
+  (The BIOMETRIC_STRONG|DEVICE_CREDENTIAL combination is not supported on API 28-29.)
+- in_app_confirm: everything else, including no secure lock screen. The app never refuses to
+  run or to read; it only degrades how writes are confirmed.
+- AuthTierResolver.resolve(): pure function of injected facts (sdkInt, isDeviceSecure,
+  biometricStatus) so JVM tests can cover every branch.
+
+Key creation (DeviceKeySpec, DeviceKeyManager):
+- hardware_confirm, API >= 30: setUserAuthenticationParameters(0, AUTH_BIOMETRIC_STRONG or
+  AUTH_DEVICE_CREDENTIAL); API 28-29: setUserAuthenticationRequired(true). In both cases keep
+  setInvalidatedByBiometricEnrollment(true) only when biometrics are the sole authenticator.
+- in_app_confirm: setUserAuthenticationRequired(false), no invalidation flag.
+- setAttestationChallenge(challengeBytes) is MANDATORY on every new key (enrolment and rotation).
+- Existing key with a different tier than the resolver now returns, or created without a
+  challenge: ensureDeviceKey must not silently reuse it. Surface a typed KeyNeedsRotation result
+  so the UI offers rotation/re-enrolment. Never crash.
+- Handle KeyPermanentlyInvalidatedException, UnrecoverableKeyException and a missing alias
+  (lock screen removed, biometrics changed) as NEEDS_REENROLLMENT state. Reads keep working;
+  writes are disabled with a clear message.
+
+Enrolment: fetch challenge (A) -> generate fresh key with that challenge -> read chain -> require
+chain size >= 2 (single self-signed cert = no attestation, refuse) -> send publicKey, chain,
+challenge, authTier. Map ENROLL_CHALLENGE_INVALID by fetching a new challenge once, then surfacing
+an error. Map AUTH_TIER_NOT_ALLOWED to a clear read-only state with explanatory text, not a crash.
+Same for rotation.
+
+Single path (the heart of 4.2). ConfirmAndMintCapabilityUseCase order: VerifyBranchHead ->
+show summary (confirmation port) -> authorize signing -> mint. Details:
+- hardware_confirm: build the Signature (SHA256withECDSA), initSign(privateKey) BEFORE the prompt,
+  pass it in BiometricPrompt.CryptoObject, take result.cryptoObject.signature, and only then
+  build the capability (timestamps, exp, nonce are computed AFTER the prompt so the TTL starts at
+  approval), update(message), sign, convert DER to raw r||s via the existing EcdsaEncoding.
+- in_app_confirm: show the same summary plus a typed confirmation of the first 7 hex chars of the
+  expected head. No CryptoObject. The signer uses a non-auth key.
+- Keep the wire message, codec and vectors byte-identical. Existing CapabilityMinterTest,
+  codec vector tests and signer tests must pass UNCHANGED. If you cannot add the new flow without
+  editing them, stop and report.
+
+## 3. Tasks and files (the only files you may touch; creating new ones in these packages is allowed)
+T4-201 core/security/BiometricPolicy.kt, BiometricGate.kt, AuthTier.kt (new), AuthTierResolver.kt (new),
+       BiometricPromptHost.kt (new), MainActivity.kt (minimal: register/unregister the host in
+       onResume/onPause, weak reference, no other change).
+  BiometricGate: open class so tests can fake it. API: canAuthenticate(policy): status;
+  suspend authorize(signature: Signature, info: PromptInfoSpec): AuthorizedSignature, throwing/returning
+  typed outcomes: Cancelled, Lockout, NoPromptHost, HardwareUnavailable, KeyInvalidated, Failed.
+  Prompt text states the operation and short branch name, never secrets.
+T4-202 domain/usecase/common/VerifyBranchHeadUseCase.kt, domain/repository/TaskRepository.kt
+       (add liveHead(branch)), data/repository/TaskRepositoryImpl.kt (use GatewayApi.branchHead),
+       test util FakeRepositories.kt. Result type: sealed Match / Drifted(live) / Unavailable.
+       Unavailable and Drifted both refuse (fail closed); Drifted asks for re-review.
+T4-203 domain/usecase/common/ConfirmAndMintCapabilityUseCase.kt, domain/model/OperationRequest.kt,
+       capability/signing/DeviceKeyCapabilitySigner.kt, core/crypto/KeystoreSigner.kt (accept an
+       authorized Signature), capability/CapabilityMinter.kt only if an overload is unavoidable.
+       Result: sealed MintResult { Minted, HeadDrifted, HeadUnavailable, Declined, AuthFailed,
+       LockedOut, KeyInvalidated, NotEnrolled, ExpiredWhileConfirming, TierNotAllowed }.
+       Add test ArchitectureTest.kt: source-grep that ".mint(" appears only in
+       ConfirmAndMintCapabilityUseCase.kt, CapabilityMinter.kt and the minter's own tests.
+T4-204 ui/components/ConfirmationScaffold.kt, CapabilitySummaryCard.kt (operation, task, plan,
+       branch, full 40-char head, TTL, posture/tier badge) and a typed-confirm field for in_app_confirm.
+       These are generic; 4.3 reuses them. Do not build Publish screens.
+T4-205 Remediation of 4.1: core/crypto/DeviceKeySpec.kt, DeviceKeyManager.kt, DeviceAttestation.kt,
+       domain/usecase/enrollment/EnrollDeviceUseCase.kt, RotateDeviceKeyUseCase.kt,
+       data/enrollment/DeviceEnrollmentStore.kt (persist authTier), domain/model/SecurityPosture.kt,
+       core/security/DevicePosture.kt, ui/components/SecurityPostureBadge.kt (show tier text:
+       "Biometric/PIN confirm" or "In-app confirm only (no device lock)"), ui/enrollment/*,
+       di/CryptoModule.kt, di/UseCaseModule.kt, di/DataModule.kt.
+T4-206 Network: core/network/GatewayEndpoints.kt (ENROLL_CHALLENGE), core/network/dto/EnrollDto.kt
+       (challenge/authTier fields, EnrollChallengeDto), core/network/ErrorMapper.kt (three new codes),
+       data/remote/GatewayApi.kt and GatewayRepository.kt (enrollChallenge()), test util FakeGatewayApi.kt.
+T4-207 Docs: docs/gateway-contract.md (apply the ADDENDUM as section 3.15a plus 3.15/3.16 changes),
+       docs/adr/0007-confirmation-tiers-and-attestation-challenge.md (decision, tiers, rationale,
+       production policy is gateway-configured), docs/device-enrollment.md, docs/threat-model.md
+       (in_app_confirm residual risk: no hardware presence proof; gateway policy gates it).
+
+## 4. Tests (JVM, no device)
+- AuthTierResolver: every branch (API 28/29/30+, secure/not secure, biometric SUCCESS/NONE_ENROLLED/NO_HARDWARE).
+- A device with no biometric hardware but a PIN resolves hardware_confirm on API >= 30; a device with
+  no lock screen resolves in_app_confirm AND the app still launches, reads, and shows a clear write state.
+- ConfirmAndMint: every MintResult path with a fake BiometricGate and fake clock, including the
+  TTL starting after approval, Cancelled, Lockout, drift, Unavailable, and in_app_confirm wrong/right typed head.
+- Enrol/rotate: challenge fetched first, key created with the challenge, chain size 1 refused,
+  tier sent, ENROLL_CHALLENGE_INVALID retried once, AUTH_TIER_NOT_ALLOWED leaves reads working.
+- Key tier mismatch yields KeyNeedsRotation, not a silent reuse; invalidated key yields NEEDS_REENROLLMENT.
+- ArchitectureTest as in T4-203. Existing tests unchanged and green.
+androidTest additions are allowed only as new files (BiometricGate and tier on-device), not required to run.
+
+## 5. Out of scope
+Publish/reconcile/halt/resume/upload/decision use cases and screens (4.3, 4.4), Lab bypass (5.x),
+mTLS, Play Integrity, any protected-path change.
+
+## 6. Done when
+No SCAFFOLD/TODO in any file you touched; files outside section 3 are byte-identical; all existing and
+new JVM tests pass; report written; and the report lists any stop-and-ask items verbatim.

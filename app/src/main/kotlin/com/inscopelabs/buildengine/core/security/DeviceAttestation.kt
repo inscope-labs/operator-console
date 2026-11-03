@@ -32,12 +32,14 @@ open class DeviceAttestation(
         val store = keyStoreProvider()
         val chain = store.getCertificateChain(alias)
             ?: throw GeneralSecurityException("No key-attestation certificate chain is available")
-        if (chain.isEmpty()) throw GeneralSecurityException("Key-attestation chain is empty")
+        if (chain.size < 2) {
+            throw GeneralSecurityException("Key-attestation chain size must be at least 2 (single self-signed certificate indicates no attestation challenge)")
+        }
         return chain.map { Base64.getEncoder().encodeToString(it.encoded) }
     }
 
     open fun hasKeyAttestation(alias: String): Boolean = try {
-        keyAttestationChain(alias).isNotEmpty()
+        keyAttestationChain(alias).size >= 2
     } catch (_: Exception) {
         false
     }

@@ -369,6 +369,22 @@ Health, repository access, and ruleset diagnostic report.
 
 ---
 
+### 3.15a `POST /enroll/challenge`
+Fetches a single-use random attestation challenge string.
+
+- **Auth**: Operator Bearer.
+- **Request Body**: `{}`
+- **Success Response**: `200 OK`
+```json
+{
+  "challenge": "B4z0r...32_random_bytes_base64url_unpadded...",
+  "expiresAt": 1761840300
+}
+```
+- **Notes**: Single use, TTL 300 s. The Android key-attestation challenge bytes are the base64url-decoded challenge (32 raw bytes).
+
+---
+
 ### 3.15 `POST /enroll`
 Enrols a new device public key and attestation statement.
 
@@ -381,7 +397,9 @@ Enrols a new device public key and attestation statement.
   "attestationChain": [
     "MIIB...certificate1_base64...",
     "MIIB...certificate2_base64..."
-  ]
+  ],
+  "challenge": "B4z0r...32_bytes_base64url...",
+  "authTier": "hardware_confirm"
 }
 ```
 - **Success Response**: `200 OK`
@@ -389,7 +407,8 @@ Enrols a new device public key and attestation statement.
 {
   "kid": "k2",
   "status": "active",
-  "enrolledAt": 1761840000
+  "enrolledAt": 1761840000,
+  "authTier": "hardware_confirm"
 }
 ```
 
@@ -404,7 +423,9 @@ Rotates an enrolled device key. Retires old `kid`.
 {
   "oldKid": "k2",
   "newPublicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE...",
-  "attestationChain": ["..."]
+  "attestationChain": ["..."],
+  "challenge": "B4z0r...32_bytes_base64url...",
+  "authTier": "hardware_confirm"
 }
 ```
 - **Success Response**: `200 OK`
@@ -412,7 +433,8 @@ Rotates an enrolled device key. Retires old `kid`.
 {
   "kid": "k3",
   "status": "active",
-  "rotatedAt": 1761840000
+  "rotatedAt": 1761840000,
+  "authTier": "hardware_confirm"
 }
 ```
 
@@ -436,6 +458,9 @@ When a request is rejected, the gateway responds with standard HTTP error status
 | `BAD_SIGNATURE` | `401 Unauthorized` | Signature | ECDSA or HMAC signature verification failed against the registered key. |
 | `OPERATOR_AUTH` | `401 Unauthorized` | Auth | Missing or invalid `Authorization: Bearer` operator credential header. |
 | `NOT_ENROLLED` | `403 Forbidden` | Enrolment | Device key attestation rejected or device has been revoked. |
+| `ENROLL_CHALLENGE_INVALID` | `400 Bad Request` | Enrolment | Enrolment challenge is unknown, expired, or already used. |
+| `ENROLL_ATTESTATION_INVALID` | `400 Bad Request` | Enrolment | Attestation certificate chain invalid, challenge mismatch, key mismatch, or tier mismatch. |
+| `AUTH_TIER_NOT_ALLOWED` | `403 Forbidden` | Policy | Enrolment auth tier not permitted by gateway policy in this environment. |
 | `BRANCH_MISMATCH` | `403 Forbidden` | Scope | Capability target branch does not match work order or request endpoint branch. |
 | `ENVIRONMENT_MISMATCH` | `403 Forbidden` | Safety | Lab or test invocation executed against a production-configured gateway. |
 | `EXPIRED` | `400 Bad Request` | Time | Capability expiry timestamp `exp` is in the past. |

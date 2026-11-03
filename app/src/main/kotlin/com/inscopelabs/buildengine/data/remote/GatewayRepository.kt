@@ -7,6 +7,7 @@ import com.inscopelabs.buildengine.core.network.GatewayHttpException
 import com.inscopelabs.buildengine.core.network.GatewayProtocolException
 import com.inscopelabs.buildengine.core.network.dto.BranchHeadDto
 import com.inscopelabs.buildengine.core.network.dto.DoctorReportDto
+import com.inscopelabs.buildengine.core.network.dto.EnrollChallengeDto
 import com.inscopelabs.buildengine.core.network.dto.EnrollRequestDto
 import com.inscopelabs.buildengine.core.network.dto.EnrollResponseDto
 import com.inscopelabs.buildengine.core.network.dto.EngineScopeRequestDto
@@ -115,6 +116,9 @@ class GatewayRepository(
 
     override suspend fun rotateKey(request: RotateKeyRequestDto): EnrollResponseDto =
         decode(httpClient.post(GatewayEndpoints.enrollRotate(), json.encodeToString(request)))
+
+    override suspend fun enrollChallenge(): EnrollChallengeDto =
+        decode(httpClient.post(GatewayEndpoints.enrollChallenge(), "{}"))
 
     /**
      * The gateway preflight — `GET /health`.

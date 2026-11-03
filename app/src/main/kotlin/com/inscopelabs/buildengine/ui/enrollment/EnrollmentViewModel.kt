@@ -2,7 +2,10 @@ package com.inscopelabs.buildengine.ui.enrollment
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.inscopelabs.buildengine.core.crypto.KeyNeedsRotationException
+import com.inscopelabs.buildengine.core.crypto.NeedsReenrollmentException
 import com.inscopelabs.buildengine.domain.model.SecurityPosture
+import com.inscopelabs.buildengine.domain.usecase.enrollment.AuthTierNotAllowedException
 import com.inscopelabs.buildengine.domain.usecase.enrollment.EnrollDeviceUseCase
 import com.inscopelabs.buildengine.domain.usecase.enrollment.ReportDevicePostureUseCase
 import com.inscopelabs.buildengine.domain.usecase.enrollment.RotateDeviceKeyUseCase
@@ -71,7 +74,10 @@ class EnrollmentViewModel @Inject constructor(
     }
 
     private fun safeMessage(error: Exception): String = when (error) {
-        is GeneralSecurityException -> "Android Keystore or attestation refused the operation."
+        is AuthTierNotAllowedException -> error.message ?: "The authentication tier is not permitted in this environment. The console operates in read-only mode."
+        is KeyNeedsRotationException -> error.message ?: "Device key needs rotation."
+        is NeedsReenrollmentException -> error.message ?: "Device requires re-enrolment."
+        is GeneralSecurityException -> error.message?.takeIf { it.isNotBlank() } ?: "Android Keystore or attestation refused the operation."
         is IOException -> "Secure local storage is unavailable."
         is IllegalArgumentException -> error.message ?: "The supplied value is invalid."
         else -> error.message?.take(240) ?: "The operation failed closed."

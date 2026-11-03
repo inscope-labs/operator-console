@@ -2,6 +2,7 @@ package com.inscopelabs.buildengine.data.remote
 
 import com.inscopelabs.buildengine.core.network.dto.BranchHeadDto
 import com.inscopelabs.buildengine.core.network.dto.DoctorReportDto
+import com.inscopelabs.buildengine.core.network.dto.EnrollChallengeDto
 import com.inscopelabs.buildengine.core.network.dto.EnrollRequestDto
 import com.inscopelabs.buildengine.core.network.dto.EnrollResponseDto
 import com.inscopelabs.buildengine.core.network.dto.EngineScopeRequestDto
@@ -85,4 +86,7 @@ interface GatewayApi {
 
     /** `POST /enroll/rotate`. */
     suspend fun rotateKey(request: RotateKeyRequestDto): EnrollResponseDto
+
+    /** `POST /enroll/challenge`. */
+    suspend fun enrollChallenge(): EnrollChallengeDto
 }

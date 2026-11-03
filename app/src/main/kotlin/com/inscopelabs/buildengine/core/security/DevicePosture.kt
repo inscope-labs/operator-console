@@ -8,6 +8,7 @@ data class DevicePosture(
     val keyAttestationAvailable: Boolean,
     /** Play Integrity is intentionally deferred under D-T4. */
     val playIntegrityAvailable: Boolean = false,
+    val authTier: AuthTier? = null,
 ) {
     val isStrongBoxBacked: Boolean get() = securityLevel == "STRONGBOX"
 }
