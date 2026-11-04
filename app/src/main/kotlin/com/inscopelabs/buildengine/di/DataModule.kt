@@ -15,10 +15,12 @@ import com.inscopelabs.buildengine.data.local.HealthSnapshotStore
 import com.inscopelabs.buildengine.data.local.OperatorCredentialStore
 import com.inscopelabs.buildengine.data.local.SelectionStore
 import com.inscopelabs.buildengine.data.remote.GatewayRepository
+import com.inscopelabs.buildengine.data.repository.ConnectionStatusRepositoryImpl
 import com.inscopelabs.buildengine.data.repository.OperationRepositoryImpl
 import com.inscopelabs.buildengine.data.repository.PlanRepositoryImpl
 import com.inscopelabs.buildengine.data.repository.SessionRepositoryImpl
 import com.inscopelabs.buildengine.data.repository.TaskRepositoryImpl
+import com.inscopelabs.buildengine.domain.repository.ConnectionStatusRepository
 import com.inscopelabs.buildengine.domain.repository.OperationRepository
 import com.inscopelabs.buildengine.domain.repository.PlanRepository
 import com.inscopelabs.buildengine.domain.repository.SessionRepository
@@ -90,6 +92,12 @@ object DataModule {
     fun provideHealthSnapshotStore(
         @Named(GATEWAY_URL_STORE_FILE) dataStore: DataStore<Preferences>,
     ): HealthSnapshotStore = HealthSnapshotStore(dataStore)
+
+    @Provides
+    @Singleton
+    fun provideConnectionStatusRepository(
+        impl: ConnectionStatusRepositoryImpl,
+    ): ConnectionStatusRepository = impl
 
 
     @Provides

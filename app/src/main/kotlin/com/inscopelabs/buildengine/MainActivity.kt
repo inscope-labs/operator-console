@@ -10,7 +10,7 @@ import androidx.fragment.app.FragmentActivity
 import com.inscopelabs.buildengine.core.security.ActivityBiometricPromptHost
 import com.inscopelabs.buildengine.core.security.BiometricPromptHost
 import com.inscopelabs.buildengine.core.security.SecureWindow
-import com.inscopelabs.buildengine.ui.navigation.AppNavHost
+import com.inscopelabs.buildengine.ui.shell.ConsoleShell
 import com.inscopelabs.buildengine.ui.theme.OperatorConsoleTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -32,7 +32,7 @@ class MainActivity : FragmentActivity() {
         setContent {
             OperatorConsoleTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    AppNavHost()
+                    ConsoleShell()
                 }
             }
         }
