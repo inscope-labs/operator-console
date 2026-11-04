@@ -2,7 +2,11 @@ package com.inscopelabs.buildengine.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.content.Context
+import com.inscopelabs.buildengine.core.network.GatewayActivityEvent
+import com.inscopelabs.buildengine.core.network.GatewayActivityLog
 import com.inscopelabs.buildengine.core.network.GatewayEndpoints
+import com.inscopelabs.buildengine.diagnostics.DiagnosticPreferences
 import com.inscopelabs.buildengine.core.result.AppResult
 import com.inscopelabs.buildengine.core.time.Clock
 import com.inscopelabs.buildengine.data.local.GatewayBaseUrlStore
@@ -14,6 +18,7 @@ import com.inscopelabs.buildengine.domain.model.OperatorSession
 import com.inscopelabs.buildengine.domain.repository.SessionRepository
 import com.inscopelabs.buildengine.ui.common.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.IOException
 import java.security.GeneralSecurityException
 import javax.inject.Inject
@@ -41,6 +46,10 @@ data class SettingsState(
     val healthError: String? = null,
     val credentialConfigured: Boolean,
     val session: OperatorSession?,
+    /** When true, gateway exchanges are recorded in the activity log. */
+    val gatewayActivityLogEnabled: Boolean = false,
+    /** Recent gateway events (newest first), only meaningful when diagnostics enabled. */
+    val gatewayActivityEvents: List<GatewayActivityEvent> = emptyList(),
     val notice: SettingsNotice? = null,
     val error: SettingsError? = null,
 )
@@ -63,19 +72,27 @@ enum class SettingsError {
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val credentialStore: OperatorCredentialStore,
     private val gatewayBaseUrlStore: GatewayBaseUrlStore,
     private val healthSnapshotStore: HealthSnapshotStore,
     private val gatewayRepository: GatewayRepository,
     private val sessionRepository: SessionRepository,
     private val clock: Clock,
+    private val activityLog: GatewayActivityLog,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<UiState<SettingsState>>(UiState.Idle)
     val uiState: StateFlow<UiState<SettingsState>> = _uiState.asStateFlow()
 
     init {
+        activityLog.isEnabled = DiagnosticPreferences.isGatewayActivityLogEnabled(appContext)
         refresh()
+        viewModelScope.launch {
+            activityLog.events.collect { events ->
+                publish { it.copy(gatewayActivityEvents = events) }
+            }
+        }
     }
 
     fun refresh() {
@@ -83,12 +100,16 @@ class SettingsViewModel @Inject constructor(
             val baseUrl = gatewayBaseUrlStore.read()
             val configured = credentialStore.read() != null
             val snapshot = healthSnapshotStore.read()
+            val logEnabled = DiagnosticPreferences.isGatewayActivityLogEnabled(appContext)
+            activityLog.isEnabled = logEnabled
             publish {
                 it.copy(
                     gatewayBaseUrl = baseUrl,
                     gatewayConfigured = GatewayEndpoints.isConfigured(baseUrl),
                     healthSnapshot = snapshot,
                     credentialConfigured = configured,
+                    gatewayActivityLogEnabled = logEnabled,
+                    gatewayActivityEvents = activityLog.events.value,
                 )
             }
         }
@@ -250,6 +271,31 @@ class SettingsViewModel @Inject constructor(
             }
         }
     }
+
+
+    fun setGatewayActivityLogEnabled(enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            DiagnosticPreferences.setGatewayActivityLogEnabled(appContext, enabled)
+            activityLog.isEnabled = enabled
+            if (!enabled) {
+                activityLog.clear()
+            }
+            publish {
+                it.copy(
+                    gatewayActivityLogEnabled = enabled,
+                    gatewayActivityEvents = if (enabled) activityLog.events.value else emptyList(),
+                )
+            }
+        }
+    }
+
+    fun clearGatewayActivityLog() {
+        activityLog.clear()
+        publish { it.copy(gatewayActivityEvents = emptyList()) }
+    }
+
+    /** Redacted activity log text for system share sheet. */
+    fun gatewayActivityExportText(): String = activityLog.exportText()
 
     private fun publish(transform: (SettingsState) -> SettingsState) {
         _uiState.update { current ->
