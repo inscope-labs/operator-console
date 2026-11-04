@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Design review §13 / ADR 0003: the channel to the gateway must be mutually
-    authenticated, not merely TLS. Cleartext is refused outright.
+    Design review §13 / ADR 0003 / Stage 7 client hardening.
 
-    SCAFFOLD PLACEHOLDER: the <pin-set> below is where the deployment's pin material
-    goes. It is deliberately empty here — a scaffold must not fail a build over a
-    missing deployment secret, and a pin set that is wrong is worse than no pin set.
+    Production posture: cleartext is refused outright. TLS to the gateway is required.
+    Certificate pinning remains a scaffold placeholder (wrong pins are worse than none).
+
+    mTLS is deferred (ADR 0006). The bearer operator credential is the console's sole
+    identity on the gateway until mutual TLS is installed on the OkHttp engine.
+
+    Debug builds overlay this file (src/debug/res/xml/) to allow cleartext only to
+    local lab hosts (10.0.2.2, localhost) so the emulator can reach a LAN gateway.
 -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false">
