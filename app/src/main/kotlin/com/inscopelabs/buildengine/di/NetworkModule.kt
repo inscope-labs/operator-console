@@ -18,6 +18,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.HttpTimeout
+import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
 /**
@@ -26,10 +28,22 @@ import javax.inject.Singleton
  * Design review §13 / ADR 0003: the transport to the gateway must be mutually
  * authenticated, not merely TLS. The client certificate and the pin set belong here.
  * mTLS remains deferred (ADR 0006); the bearer credential is the console's identity.
+ *
+ * Stage 7: connect/read/write/call timeouts so bad networks fail predictably instead
+ * of hanging the UI thread's coroutine indefinitely.
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
+
+    /** TCP connect budget (ms). */
+    const val CONNECT_TIMEOUT_MS: Long = 15_000
+
+    /** Socket read/write budget (ms). */
+    const val SOCKET_TIMEOUT_MS: Long = 30_000
+
+    /** Whole-call budget including connect + body (ms). */
+    const val CALL_TIMEOUT_MS: Long = 45_000
 
     @Provides
     @Singleton
@@ -46,8 +60,23 @@ object NetworkModule {
     @Singleton
     fun provideHttpClient(config: MtlsConfig): HttpClient = HttpClient(OkHttp) {
         expectSuccess = false
+        engine {
+            config {
+                connectTimeout(CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                readTimeout(SOCKET_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                writeTimeout(SOCKET_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                callTimeout(CALL_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+            }
+        }
+        install(HttpTimeout) {
+            connectTimeoutMillis = CONNECT_TIMEOUT_MS
+            socketTimeoutMillis = SOCKET_TIMEOUT_MS
+            requestTimeoutMillis = CALL_TIMEOUT_MS
+        }
         // SCAFFOLD: mTLS socket factory, certificate pinner and attestation header
-        // go here. See docs/adr/0003-mtls-to-gateway.md.
+        // go here. See docs/adr/0003-mtls-to-gateway.md and ADR 0006 (deferred).
+        // Until mTLS is installed, the bearer operator credential is the sole
+        // identity on the gateway (docs/gateway-contract.md §1.2).
     }
 
     /**
