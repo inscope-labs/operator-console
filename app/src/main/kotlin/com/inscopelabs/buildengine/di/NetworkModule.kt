@@ -3,6 +3,7 @@ package com.inscopelabs.buildengine.di
 import com.inscopelabs.buildengine.core.network.ErrorMapper
 import com.inscopelabs.buildengine.core.network.GatewayBaseUrlProvider
 import com.inscopelabs.buildengine.core.network.GatewayEndpoints
+import com.inscopelabs.buildengine.core.network.GatewayActivityLog
 import com.inscopelabs.buildengine.core.network.GatewayHttpClient
 import com.inscopelabs.buildengine.core.network.MtlsConfig
 import com.inscopelabs.buildengine.core.network.OperatorCredentialProvider
@@ -63,10 +64,12 @@ object NetworkModule {
         client: HttpClient,
         baseUrlStore: GatewayBaseUrlStore,
         credentialStore: OperatorCredentialStore,
+        activityLog: GatewayActivityLog,
     ): GatewayHttpClient = GatewayHttpClient(
         client = client,
         baseUrlProvider = GatewayBaseUrlProvider { baseUrlStore.current() },
         credentials = OperatorCredentialProvider { credentialStore.read() },
+        activityLog = activityLog,
     )
 
     @Provides

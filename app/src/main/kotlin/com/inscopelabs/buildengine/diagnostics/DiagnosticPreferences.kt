@@ -14,4 +14,14 @@ object DiagnosticPreferences {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putBoolean(DiagnosticSettings.PREF_REMOTE_REPORTING, enabled).apply()
     }
+
+    fun isGatewayActivityLogEnabled(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(DiagnosticSettings.PREF_GATEWAY_ACTIVITY_LOG, false)
+    }
+
+    fun setGatewayActivityLogEnabled(context: Context, enabled: Boolean) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(DiagnosticSettings.PREF_GATEWAY_ACTIVITY_LOG, enabled).apply()
+    }
 }
