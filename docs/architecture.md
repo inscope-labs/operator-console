@@ -56,8 +56,8 @@ operator's behalf and to prove it to the gateway. Everything else it does is rea
 | `core.security.CertificatePinning` | §13 | Pins the gateway host. |
 | `core.security.DevicePosture` | §13 | What the device can honestly claim. |
 | `core.security.SecureWindow` | §13 | `FLAG_SECURE` — the console is not observable in screenshots. |
-| `core.network` | §7, §8 | The only code that speaks HTTP. Every request is audited gateway-side; nothing here logs a credential, a signature or a nonce. |
-| `core.network.MtlsConfig` | §13, ADR 0003 | Mutually authenticated transport, not merely TLS. |
+| `core.network` | §7, §8 | The only code that speaks HTTP. Every request is audited gateway-side; nothing here logs a credential, a signature or a nonce. Connect/read/call timeouts are fixed on the OkHttp engine (Stage 7). |
+| `core.network.MtlsConfig` | §13, ADR 0003 / **0006** | Mutually authenticated transport is the target posture; **mTLS is deferred** (ADR 0006). The bearer operator credential is the sole identity until mTLS is installed. |
 | `core.network.ErrorMapper` | §12, App. B.3 | The V5–V8 rejections map to four *distinct* states. A refused scope mismatch, a replayed capability, a drifted head and an active halt are not the same message. |
 | `core.time.Clock` | §5 | Injectable, so capability TTL behaviour is testable without waiting five minutes. |
 | `core.result.AppResult` | — | The result type shared across layers. |
@@ -85,6 +85,21 @@ operator's behalf and to prove it to the gateway. Everything else it does is rea
 | `util.Logger` | §8 | Every line passes through the gate. |
 
 ---
+
+
+## 2.1 Transport posture (Stage 7)
+
+- **Timeouts.** The Ktor `OkHttp` engine applies connect (15s), socket read/write (30s), and
+  whole-call (45s) budgets. A hung network fails the request instead of blocking the operator
+  indefinitely. Values live on `NetworkModule` so tests and docs stay aligned.
+- **Cleartext.** Release builds refuse cleartext (`network_security_config`,
+  `usesCleartextTraffic=false`). Debug builds may use HTTP only to lab hosts
+  (`10.0.2.2`, `localhost`, `127.0.0.1`) so the emulator can reach a LAN gateway via
+  `BuildConfig.DEBUG_GATEWAY_BASE_URL`.
+- **Identity.** mTLS and certificate pinning remain deferred (ADR 0006 / ADR 0003 scaffold).
+  The `Authorization: Bearer <operator_credential>` header is the console's only identity on
+  the gateway (`docs/gateway-contract.md` §1.2). Privileged operations still require a live
+  capability in the request body; connectivity alone is not authority.
 
 ## 3. Phase mapping
 
