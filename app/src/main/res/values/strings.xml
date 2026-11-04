@@ -156,4 +156,14 @@
     <string name="connection_connected_test">Connected (test)</string>
     <string name="connection_connected_production">Connected (production)</string>
     <string name="connection_connected_other">Connected (%1$s)</string>
+
+    <!-- Diagnostics / gateway activity log (Stage 6) -->
+    <string name="settings_diagnostics_heading">Diagnostics</string>
+    <string name="settings_diagnostics_help">When enabled, recent gateway requests are recorded in memory (method, path, outcome only — no tokens or capabilities). Nothing is written to durable storage until you share.</string>
+    <string name="settings_gateway_activity_log">Gateway activity log</string>
+    <string name="settings_gateway_activity_empty">No gateway activity recorded yet.</string>
+    <string name="settings_gateway_activity_share">Share log</string>
+    <string name="settings_gateway_activity_clear">Clear log</string>
+    <string name="settings_gateway_activity_share_subject">Operator Console gateway activity</string>
+    <string name="settings_gateway_activity_share_title">Share activity log</string>
 </resources>
