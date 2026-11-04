@@ -69,6 +69,10 @@ Scope is the Android operator console (`app/`). Gateway Worker behaviour is unch
 
 **Goal:** Lock the posture in tests and docs.
 
+Regression gates: `ErrorMapperTest` (transport + V5–V8), `NotConfiguredUiTest` (banner + idle).
+Operator help: [operator-connectivity.md](operator-connectivity.md). Architecture §2.2 session ≠ connectivity.
+
+
 - UI/instrumentation: cold start with default config → no crash, not-configured UI
 - Unit: transport mapping regressions
 - Update `docs/architecture.md` / operator help: session ≠ connectivity; privileged ops still require a live gateway
