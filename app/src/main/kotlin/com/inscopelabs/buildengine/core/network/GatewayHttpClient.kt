@@ -10,6 +10,8 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
+import java.io.IOException
+import java.net.UnknownHostException
 
 /**
  * The HTTP transport to the gateway.
@@ -17,37 +19,8 @@ import io.ktor.http.isSuccess
  * Design review §8: every request must produce an audit record, but credentials,
  * signatures and nonces must never appear in a log line. See util/Redactor.kt.
  *
- * This class speaks HTTP and nothing else. It does not log, it does not parse the
- * body's JSON, and it does not decide what a refusal means — the body of a refusal
- * is handed on untouched so that the layer above can map it.
- *
- * ### Authentication
- *
- * The channel is HTTPS with host verification, and the console's identity on the
- * gateway is the `Authorization: Bearer <operator_credential>` header
- * (docs/gateway-contract.md §1.2). That credential is gateway-scoped and holds no
- * repository authority; a privileged operation additionally carries its capability
- * in the request body.
- *
- * mTLS is deferred (ADR 0006), so the certificate pinner and the client
- * certificate are not installed here. They belong on the Ktor engine in
- * `di/NetworkModule.kt`, so that one place owns the channel's posture and every
- * request inherits it. A per-request header set in the client would be a second
- * place to forget.
- *
- * ### Base URL
- *
- * The host is resolved per request via [baseUrlProvider] so a Settings change takes
- * effect without rebuilding or restarting the process. There is no hard dependency
- * on [GatewayEndpoints.BASE_URL] alone; that constant remains the scaffold default
- * only when nothing is configured.
- *
- * ### Failures
- *
- * A non-2xx response is a refusal, and a refusal is not an exception in the
- * transport sense — it is the gateway's answer. It becomes a [GatewayHttpException],
- * carrying the status and the body, because the status alone does not say *why*
- * and the body is where the gateway says why.
+ * When a [GatewayActivityLog] is supplied, each exchange records method, path, and
+ * outcome only — never tokens, capabilities, or bodies.
  */
 class GatewayHttpClient(
     private val client: HttpClient,
@@ -55,6 +28,7 @@ class GatewayHttpClient(
         GatewayEndpoints.BASE_URL
     },
     private val credentials: OperatorCredentialProvider = OperatorCredentialProvider { null },
+    private val activityLog: GatewayActivityLog? = null,
 ) {
 
     suspend fun get(path: String): String = request("GET", path, body = null)
@@ -70,30 +44,92 @@ class GatewayHttpClient(
     suspend fun request(method: String, path: String, body: String?): String {
         val baseUrl = baseUrlProvider.baseUrl()
         if (!GatewayEndpoints.isConfigured(baseUrl)) {
+            record(method, path, GatewayActivityEvent.Outcome.NOT_CONFIGURED)
             throw GatewayNotConfiguredException(
                 "the gateway base URL is not configured (host must not be a .invalid placeholder)",
             )
         }
-        val response = client.request(GatewayEndpoints.url(path, baseUrl)) {
-            this.method = HttpMethod.parse(method)
-            credentials.credential()?.let { credential ->
-                header(HttpHeaders.Authorization, "Bearer $credential")
+        return try {
+            val response = client.request(GatewayEndpoints.url(path, baseUrl)) {
+                this.method = HttpMethod.parse(method)
+                credentials.credential()?.let { credential ->
+                    header(HttpHeaders.Authorization, "Bearer $credential")
+                }
+                if (body != null) {
+                    contentType(ContentType.Application.Json)
+                    setBody(body)
+                }
             }
-            if (body != null) {
-                contentType(ContentType.Application.Json)
-                setBody(body)
-            }
-        }
 
-        val payload = response.bodyAsText()
-        if (!response.status.isSuccess()) {
-            throw GatewayHttpException(
+            val payload = response.bodyAsText()
+            if (!response.status.isSuccess()) {
+                record(
+                    method,
+                    path,
+                    GatewayActivityEvent.Outcome.REFUSED,
+                    statusCode = response.status.value,
+                )
+                throw GatewayHttpException(
+                    statusCode = response.status.value,
+                    body = payload,
+                    message = "the gateway refused $method $path with ${response.status.value}",
+                )
+            }
+            record(
+                method,
+                path,
+                GatewayActivityEvent.Outcome.SUCCESS,
                 statusCode = response.status.value,
-                body = payload,
-                message = "the gateway refused $method $path with ${response.status.value}",
             )
+            payload
+        } catch (error: GatewayNotConfiguredException) {
+            throw error
+        } catch (error: GatewayHttpException) {
+            throw error
+        } catch (error: UnknownHostException) {
+            record(
+                method,
+                path,
+                GatewayActivityEvent.Outcome.UNREACHABLE,
+                detail = "host could not be resolved",
+            )
+            throw error
+        } catch (error: IOException) {
+            record(
+                method,
+                path,
+                GatewayActivityEvent.Outcome.UNREACHABLE,
+                detail = "transport failure",
+            )
+            throw error
+        } catch (error: Exception) {
+            record(
+                method,
+                path,
+                GatewayActivityEvent.Outcome.ERROR,
+                detail = error.javaClass.simpleName,
+            )
+            throw error
         }
-        return payload
+    }
+
+    private fun record(
+        method: String,
+        path: String,
+        outcome: GatewayActivityEvent.Outcome,
+        statusCode: Int? = null,
+        detail: String? = null,
+    ) {
+        activityLog?.record(
+            GatewayActivityEvent(
+                method = method,
+                path = path,
+                outcome = outcome,
+                statusCode = statusCode,
+                detail = detail,
+                epochMillis = System.currentTimeMillis(),
+            ),
+        )
     }
 }
 
