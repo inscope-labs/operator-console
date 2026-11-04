@@ -1,5 +1,6 @@
 package com.inscopelabs.buildengine.ui.settings
 
+import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,6 +14,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -23,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -96,6 +99,12 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 state = current,
                 onStart = { viewModel.startSession() },
                 onEnd = { viewModel.endSession() },
+            )
+            DiagnosticsSection(
+                state = current,
+                onToggleActivityLog = { viewModel.setGatewayActivityLogEnabled(it) },
+                onClearActivityLog = { viewModel.clearGatewayActivityLog() },
+                exportText = { viewModel.gatewayActivityExportText() },
             )
 
             state.error?.let { error ->
@@ -321,6 +330,82 @@ private fun LabelAndValue(label: String, value: String, monospace: Boolean = fal
                 MaterialTheme.typography.bodyMedium
             },
         )
+    }
+}
+
+
+@Composable
+private fun DiagnosticsSection(
+    state: SettingsState,
+    onToggleActivityLog: (Boolean) -> Unit,
+    onClearActivityLog: () -> Unit,
+    exportText: () -> String,
+) {
+    val context = LocalContext.current
+    SettingsCard(title = stringResource(R.string.settings_diagnostics_heading)) {
+        Text(
+            text = stringResource(R.string.settings_diagnostics_help),
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.settings_gateway_activity_log),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            Switch(
+                checked = state.gatewayActivityLogEnabled,
+                onCheckedChange = onToggleActivityLog,
+            )
+        }
+        if (state.gatewayActivityLogEnabled) {
+            if (state.gatewayActivityEvents.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.settings_gateway_activity_empty),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                state.gatewayActivityEvents.take(20).forEach { event ->
+                    Text(
+                        text = event.summaryLine(),
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        val text = exportText()
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.settings_gateway_activity_share_subject))
+                            putExtra(Intent.EXTRA_TEXT, text)
+                        }
+                        context.startActivity(
+                            Intent.createChooser(intent, context.getString(R.string.settings_gateway_activity_share_title)),
+                        )
+                    },
+                    enabled = state.gatewayActivityEvents.isNotEmpty(),
+                ) {
+                    Text(stringResource(R.string.settings_gateway_activity_share))
+                }
+                TextButton(
+                    onClick = onClearActivityLog,
+                    enabled = state.gatewayActivityEvents.isNotEmpty(),
+                ) {
+                    Text(stringResource(R.string.settings_gateway_activity_clear))
+                }
+            }
+        }
     }
 }
 
