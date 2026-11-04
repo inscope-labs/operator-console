@@ -149,4 +149,11 @@
     <string name="recovery_copied">Diagnostic details copied to clipboard</string>
     <string name="recovery_copy_failed">Failed to copy diagnostic report</string>
     <string name="recovery_restart_failed">Failed to restart application</string>
+
+    <!-- Connection status banner (Stage 5) -->
+    <string name="connection_not_configured">Not configured — tap to open Settings</string>
+    <string name="connection_unreachable">Unreachable — test connection in Settings</string>
+    <string name="connection_connected_test">Connected (test)</string>
+    <string name="connection_connected_production">Connected (production)</string>
+    <string name="connection_connected_other">Connected (%1$s)</string>
 </resources>
