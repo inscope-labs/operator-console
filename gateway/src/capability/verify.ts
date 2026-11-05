@@ -148,6 +148,46 @@ export async function verifyCapability(
  * - ArrayBuffer → HMAC-SHA256 (Model A compatibility).
  * Signature is base64url (no padding).
  */
+
+/** DER ECDSA-Sig-Value SEQUENCE { r, s } → fixed-width r||s (IEEE P1363). */
+function ecdsaDerToRaw(derSig: Uint8Array, coordLen: number): Uint8Array {
+  // Minimal DER parse for SEQUENCE of two INTEGERs
+  if (derSig.length < 8 || derSig[0] !== 0x30) {
+    throw new Error('not DER ECDSA sig');
+  }
+  let o = 2;
+  if (derSig[1] & 0x80) {
+    const n = derSig[1] & 0x7f;
+    o = 2 + n;
+  }
+  const readInt = (): Uint8Array => {
+    if (derSig[o] !== 0x02) throw new Error('expected INTEGER');
+    o++;
+    let len = derSig[o++];
+    if (len & 0x80) {
+      const n = len & 0x7f;
+      len = 0;
+      for (let i = 0; i < n; i++) len = (len << 8) | derSig[o++];
+    }
+    const v = derSig.subarray(o, o + len);
+    o += len;
+    return v;
+  };
+  const r = readInt();
+  const s = readInt();
+  const out = new Uint8Array(coordLen * 2);
+  const copy = (src: Uint8Array, destOff: number) => {
+    let i = 0;
+    while (i < src.length - 1 && src[i] === 0) i++;
+    const useful = src.subarray(i);
+    if (useful.length > coordLen) throw new Error('coord too large');
+    out.set(useful, destOff + (coordLen - useful.length));
+  };
+  copy(r, 0);
+  copy(s, coordLen);
+  return out;
+}
+
 async function verifySignature(
   message: string,
   signatureB64url: string,
@@ -173,10 +213,24 @@ async function verifySignature(
     // Model B: asymmetric
     const algo = key.algorithm as { name: string; namedCurve?: string };
     if (algo.name === 'ECDSA') {
+      const curve = (algo as { namedCurve?: string }).namedCurve ?? 'P-256';
+      const coordLen = curve === 'P-384' ? 48 : 32;
+      // Accept IEEE P1363 (raw) or DER SEQUENCE signatures.
+      let rawSig = sig;
+      if (sig.length > 0 && sig[0] === 0x30) {
+        rawSig = ecdsaDerToRaw(sig, coordLen);
+      } else if (sig.length !== coordLen * 2) {
+        // try DER anyway / reject
+        try {
+          rawSig = ecdsaDerToRaw(sig, coordLen);
+        } catch {
+          return false;
+        }
+      }
       return crypto.subtle.verify(
         { name: 'ECDSA', hash: 'SHA-256' },
         key,
-        sig,
+        rawSig,
         data
       );
     }
