@@ -101,6 +101,27 @@ operator's behalf and to prove it to the gateway. Everything else it does is rea
   the gateway (`docs/gateway-contract.md` §1.2). Privileged operations still require a live
   capability in the request body; connectivity alone is not authority.
 
+
+## 2.2 Session vs connectivity (Stage 8)
+
+An **operator session** (local biometric unlock / credential presentation for privileged
+flows) is not the same as **gateway connectivity**.
+
+| Concern | Meaning |
+|--------|---------|
+| **Not configured** | No usable gateway base URL. The console must not open a socket. |
+| **Unreachable / connected** | Transport and last successful health probe (shell banner). |
+| **Operator session** | Local proof the human is present for privileged actions. |
+| **Capability** | Scoped, short-lived authority the gateway enforces. |
+
+Privileged operations (publish, enrol, halt/resume) still require a **live gateway** and a
+valid capability. A green connection banner only means health succeeded — it is not
+authority to write. Offline or idle first paint must not crash; screens stay on Idle /
+not-configured UI until the operator refreshes or tests the connection in Settings.
+
+See also [console-connectivity-remediation.md](console-connectivity-remediation.md) Stages 2–6
+and [operator-connectivity.md](operator-connectivity.md).
+
 ## 3. Phase mapping
 
 From the recommended sequence (§16):
