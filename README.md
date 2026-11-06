@@ -211,7 +211,20 @@ echo "sdk.dir=$ANDROID_HOME" > local.properties
 ./gradlew :app:connectedDebugAndroidTest   # instrumented (device/emulator)
 ```
 
-Toolchain is pinned in `gradle/libs.versions.toml` (Gradle, AGP, Kotlin, KSP, Hilt, Compose BOM; `compileSdk`/`targetSdk` 36, `minSdk` 28). Treat that file as the source of truth for versions. `minSdk 28` is the Keystore floor. StrongBox needs Android 12+ **and** a secure element; many devices are software-backed, and the console must report what is true.
+Toolchain pinned in `gradle/libs.versions.toml`:
+
+| Tool / Library | Version | Notes |
+|---|---|---|
+| Gradle | 8.14.6 | Build runner |
+| Android Gradle Plugin | 8.13.2 | Built-in Kotlin support |
+| Kotlin | 2.3.20 | Language standard |
+| KSP | 2.3.12 | Strictly pairs with Kotlin 2.3.20 |
+| Hilt | 2.58 | Dependency injection |
+| Compose BOM | 2026.06.01 | Verified against libs.versions.toml |
+| compileSdk / targetSdk | 36 / 36 | Android 16 API target |
+| minSdk | 28 | Keystore floor (API 28+ required) |
+
+`minSdk 28` is the Keystore floor. StrongBox needs Android 12+ **and** a secure element; many devices are software-backed, and the console must report what is true. Target release package ID: `applicationId = "com.inscopelabs.operatorconsole"` (namespace `com.inscopelabs.buildengine`).
 
 ### Build and test (Gateway A)
 

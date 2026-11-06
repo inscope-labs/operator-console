@@ -6,6 +6,7 @@
 | **Date** | 2026-10-30 |
 | **Decision ID** | D-T5 |
 | **Related** | Phase 5, `docs/gateway-contract.md`, `docs/threat-model.md` |
+| **Amended by** | `RELEASE-PLAN.md` (BD-1.1, BD-1.6, BD-5.1), 2026-11-06 |
 
 ---
 
@@ -33,13 +34,17 @@ integrity or trigger false security alarms.
 
 **We introduce an explicit "Lab Mode" engine in the application with strict environment isolation.**
 
-### 1. The Environment Guard
+### 1. The Environment Guard (Amended per BD-1.1 / BD-1.6)
+Environments across the console and gateway are explicitly closed to: `test`, `staging`, and `production`.
 Before executing any scenario or mutating any capability, the Lab engine calls `GET /health`
 on the configured gateway.
 - If the gateway responds with `"environment": "test"`, the Lab is permitted to run.
-- If the gateway reports any other environment (e.g. `"production"`), omits the environment
+- If the gateway reports `"staging"`, `"production"`, any unknown environment, omits the environment
   property, or fails the health check, Lab Mode **refuses execution immediately** and
   displays a prominent safety refusal: `ENVIRONMENT_MISMATCH`.
+- The gateway accepts HMAC capability signing keys *only* when `ENVIRONMENT=test`. The gateway must
+  never hold a Lab HMAC key in `staging` or `production` (BD-1.6). Lenient attestation runs only on `test` (BD-1.1).
+- Packaging rule (BD-5.1): Lab code and `HmacCapabilitySigner` are debug/test tools excluded from release builds.
 - This check is enforced programmatically prior to each run and cannot be overridden by UI controls.
 
 ### 2. Lab Signing (D-T5)

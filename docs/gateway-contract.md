@@ -381,7 +381,7 @@ Fetches a single-use random attestation challenge string.
   "expiresAt": 1761840300
 }
 ```
-- **Notes**: Single use, TTL 300 s. The Android key-attestation challenge bytes are the base64url-decoded challenge (32 raw bytes).
+- **Notes**: Single use, TTL 300 s. The Android key-attestation challenge bytes are the base64url-decoded challenge (32 raw bytes). Attestation challenge lifecycle and confirmation tiers are specified in `docs/adr/0012-confirmation-tiers-and-attestation-challenge.md`.
 
 ---
 

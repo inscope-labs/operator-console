@@ -1,4 +1,8 @@
-# Operator Console — Connectivity Remediation Plan
+# Operator Console — Connectivity Remediation Plan (SUPERSEDED)
+
+> **SUPERSEDED BY [`RELEASE-PLAN.md`](../RELEASE-PLAN.md)**
+> Stages 2–8 of this remediation plan are folded into Phase 2 of `RELEASE-PLAN.md`.
+> Do not execute from this file.
 
 Eight stages to make network access deliberate, visible, and non-fatal.
 Scope is the Android operator console (`app/`). Gateway Worker behaviour is unchanged.

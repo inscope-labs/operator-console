@@ -45,7 +45,7 @@ The console resolves one of two confirmation tiers via `AuthTierResolver.resolve
 1. **`hardware_confirm`**: Strong Keystore-enforced authentication. On API >= 30, either `BIOMETRIC_STRONG` or `DEVICE_CREDENTIAL` (PIN/pattern/password) satisfies this; on API 28-29, `BIOMETRIC_STRONG` is strictly required.
 2. **`in_app_confirm`**: When no secure lock screen or biometrics are configured, the console degrades to in-app confirmation. The operator must inspect the full summary and type the first 7 hexadecimal characters of the target branch HEAD commit.
 
-The app never refuses to run or read; it only degrades how write capabilities are authorized. Furthermore, the gateway policy may reject `in_app_confirm` enrolments (`AUTH_TIER_NOT_ALLOWED`) in high-security production environments.
+The app never refuses to run or read; it only degrades how write capabilities are authorized. Furthermore, the gateway policy may reject `in_app_confirm` enrolments (`AUTH_TIER_NOT_ALLOWED`) in high-security production environments. See `adr/0012-confirmation-tiers-and-attestation-challenge.md` for policy and architecture details.
 
 ---
 

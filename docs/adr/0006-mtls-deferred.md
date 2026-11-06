@@ -6,8 +6,8 @@
 | **Date** | 2026-10-30 |
 | **Decision IDs** | D-T3, D-T4 |
 | **Supersedes** | Partially modifies ADR 0003 for the test application |
-| **Related** | `docs/adr/0003-mtls-to-gateway.md`, `docs/gateway-contract.md`, Phase 4 |
-| **Amended by** | ADR 0007 (production transport posture), 2026-11-02 |
+| **Related** | `docs/adr/0003-mtls-to-gateway.md`, `docs/adr/0012-confirmation-tiers-and-attestation-challenge.md`, `docs/gateway-contract.md`, Phase 4 |
+| **Amended by** | ADR 0007 (production transport posture), 2026-11-02; ADR 0012 (confirmation tiers & attestation challenge), 2026-11-03 |
 
 ---
 
