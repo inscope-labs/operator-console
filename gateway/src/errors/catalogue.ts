@@ -42,8 +42,7 @@ export type ErrorCode =
   | 'ENROLL_CHALLENGE_INVALID'
   | 'ENROLL_ATTESTATION_INVALID'
   | 'AUTH_TIER_NOT_ALLOWED'
-  // Fail-closed stub (Stage 1.1) — the operation exists in the contract but is
-  // not implemented in this build. Never a success, never a 2xx.
+  // Stub / unverified transaction
   | 'NOT_IMPLEMENTED';
 
 export interface GatewayErrorBody {
@@ -94,6 +93,5 @@ export const ERROR_MESSAGE: Partial<Record<ErrorCode, string>> = {
   ENROLL_ATTESTATION_INVALID:
     'Attestation chain, challenge binding, key, or tier mismatch',
   AUTH_TIER_NOT_ALLOWED: 'Derived auth tier is not permitted in this environment',
-  NOT_IMPLEMENTED:
-    'Operation is not implemented in this gateway build; no work was performed',
+  NOT_IMPLEMENTED: 'Operation or route not yet implemented',
 };

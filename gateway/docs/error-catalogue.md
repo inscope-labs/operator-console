@@ -25,6 +25,12 @@ success. See ADR 0002 — *Fail-closed stub refusal*.
 | `ENROLL_ATTESTATION_INVALID` | 400 | Bad chain, challenge binding, leaf/key mismatch, or claimed tier mismatch |
 | `AUTH_TIER_NOT_ALLOWED` | 403 | Derived auth tier not in `ALLOWED_AUTH_TIERS` for this environment |
 
+## Implementation status
+
+| Code | HTTP | Meaning |
+|------|------|---------|
+| `NOT_IMPLEMENTED` | 501 | Operation, transaction, or route not yet implemented; fail closed |
+
 ## Capability / guards / adapter
 
 See `src/errors/catalogue.ts` for the full TypeScript union and HTTP status map (`OPERATOR_AUTH`, `UNKNOWN_KID`, `BAD_SIGNATURE`, `BRANCH_*`, `HEAD_MOVED`, `NONCE_REPLAYED`, `REPO_NOT_PRIVATE`, …).

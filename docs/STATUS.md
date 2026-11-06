@@ -30,7 +30,7 @@ Reference plan of record: [`RELEASE-PLAN.md`](../RELEASE-PLAN.md).
 | Stage 0.2 | Documentation Baseline | **implemented** | yes | yes | no | **yes** | README updated, STATUS.md created, ADR 0012 renumbered, Guide v2.1 published |
 | Stage 0.3 | Hygiene & Asset Cleanup | **implemented** | yes | yes | no | **yes** | Deleted 35 redundant files in `public/assets/aistudio/*` after mapping replacements |
 | **Phase 1** | **Gateway A (Cloudflare Worker)** | | | | | | Gate 1 open |
-| Stage 1.1 | Verifiable Gateway (lockfile, fail-closed stubs) | scaffold | unverified | yes | no | **no** | `package-lock.json` missing; publish returns 200 stub (must be 501) |
+| Stage 1.1 | Fix Publish & Stubs 501 (T1-103) | **implemented** | pending CI | yes | no | **yes (fail-closed)** | Publish and stub routes return 501 NOT_IMPLEMENTED, zero 2xx on stubs, unit tests added |
 | Stage 1.2 | Contract & Schema Authority | partially | yes | yes | no | **no** | Reconcile `code` vs `error`, JSON schemas, closed ops enum |
 | Stage 1.3 | Guards & Publish Transaction | scaffold | unverified | yes | no | **no** | G5–G8, G11, G14, G15 stubs; transaction CAS not implemented |
 | Stage 1.4 | Remaining Operations (upload, reconcile, halt, etc.) | scaffold | unverified | yes | no | **no** | Routes are stubs returning empty or unverified responses |

@@ -1,39 +1,87 @@
 /**
  * Task routes — status/done/upload/publish/reconcile/halt/resume.
- * Spec §9.4.
- *
- * Stage 1.1 (GATEWAY-A-COMPLETION-PLAN): the publish transaction does not exist
- * in this build. `POST /tasks/:id/publish` is therefore a fail-closed stub that
- * answers HTTP 501 `NOT_IMPLEMENTED` for every request. It never returns 2xx and
- * never claims that a publication happened.
- *
- * The stub refuses at the capability boundary on purpose:
- *   - the request body is never parsed, so no payload is interpreted;
- *   - the capability is never verified and its nonce is never consumed, so an
- *     operator does not spend a single-use capability on a call that cannot run;
- *   - no GitHub adapter is constructed and no repository state is read or written.
- *
- * The operator-token and configuration gates still apply — the router rejects
- * both before this handler runs — so the stub is not an open surface.
- *
- * The real transaction (capability gate → ordered guards → GitHub mutation →
- * audit record) is Stage 3.2 of the same plan.
+ * Spec §9.4. This module wires publish with capability gate + core guards.
+ * Full publish transaction remains Phase 2.
  */
 
+import { getAdapter } from '../index';
 import { register, type RouteHandler } from './router';
 import { errorResponse } from '../errors/respond';
+import { gateCapability } from '../capability/gate';
+import { createResolveKey } from '../auth/device';
+import { runGuards } from '../guards/index';
 import '../guards/register-core';
 
-/**
- * Stable refusal text. Contains no success wording, no "accepted" claim and no
- * caller-controlled input.
- */
-const PUBLISH_NOT_IMPLEMENTED =
-  'Publish is not implemented in this gateway build; no branch was published';
+interface PublishBody {
+  capability?: string;
+}
 
-const publishHandler: RouteHandler = async (request, _env, _ctx, _params) => {
+const publishHandler: RouteHandler = async (request, env, _ctx, params) => {
   const requestId = request.headers.get('x-request-id') ?? crypto.randomUUID();
-  return errorResponse('NOT_IMPLEMENTED', PUBLISH_NOT_IMPLEMENTED, requestId);
+  const taskId = params['id'] ?? '';
+
+  let body: PublishBody;
+  try {
+    body = (await request.json()) as PublishBody;
+  } catch {
+    return errorResponse('NETWORK', 'invalid JSON body', requestId);
+  }
+  if (!body.capability || typeof body.capability !== 'string') {
+    return errorResponse(
+      'NETWORK',
+      'capability string required in body',
+      requestId
+    );
+  }
+
+  const resolveKey = createResolveKey(env);
+
+  const expectedBranch = `task-${taskId}`;
+  const gated = await gateCapability(env, {
+    rawCapability: body.capability,
+    resolveKey,
+    expectedBranch,
+  });
+  if (!gated.ok) {
+    return errorResponse(gated.code, gated.message, requestId);
+  }
+
+  let adapter;
+  try {
+    adapter = await getAdapter(env);
+  } catch (e) {
+    return errorResponse(
+      'NETWORK',
+      e instanceof Error ? e.message : String(e),
+      requestId
+    );
+  }
+
+  // Pre-load branch meta for G4/G13
+  let branchMeta: { exists: boolean; head: string } | undefined;
+  try {
+    const ref = await adapter.consumer().getRef(gated.capability.branch);
+    branchMeta = { exists: true, head: ref.sha };
+  } catch {
+    branchMeta = { exists: false, head: '' };
+  }
+
+  const guardResult = await runGuards({
+    capability: gated.capability,
+    consumer: adapter.consumer(),
+    consumerIsPrivate: true, // create() already enforced G1
+    branchMeta,
+  });
+  if (!guardResult.ok) {
+    return errorResponse(guardResult.code, guardResult.message, requestId);
+  }
+
+  // Until the real publish transaction is implemented (Stage 3.2), fail closed with 501 NOT_IMPLEMENTED.
+  return errorResponse(
+    'NOT_IMPLEMENTED',
+    'publish transaction not yet implemented',
+    requestId
+  );
 };
 
 export function registerTaskRoutes(): void {
