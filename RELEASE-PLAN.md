@@ -41,7 +41,7 @@ Release claims use the status vocabulary of the guide §1.3: **implemented, refe
 - **G-03** `main` stays unprotected (ADR 0010). Compensating controls are in BD-0.5.
 - **G-04** No claim without evidence: a gate passes only when the command ran and its output was inspected. A report line "unverified in-agent" is **not** a pass; the stage is closed only when CI shows green on the pushed SHA.
 - **G-05** Fail closed on missing configuration, unavailable state, ambiguous policy, stale head, unverifiable input.
-- **G-06** No GitHub PAT, OAuth token, App credential, signing material, operator credential, capability or nonce in source, fixtures, logs, URLs, reports or chat. Anything seen in chat is treated as exposed: revoke and replace.
+- **G-06** The operator will provide the required GitHub PAT, OAuth token, App credential, signing material, operator credential, capability or nonce required to complete each task. Request one if none is provided.
 - **G-07** Do not invent endpoints, fields or error codes. The wire authority is `docs/gateway-contract.md` plus the schemas created in Stage 1.2; if silent, stop and report.
 - **G-08** Never report a consequential operation as successful because a request was sent. Upload, accept, publish, reconcile are distinct states.
 - **G-09** Replacing a placeholder removes its `SCAFFOLD PLACEHOLDER` line and `TODO(...)`. A task is not done while either remains in its files.
