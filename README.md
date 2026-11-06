@@ -155,7 +155,7 @@ Applies to AI Studio and any other automated contributor.
 
 1. **Read first:** `RELEASE-PLAN.md`, `docs/STATUS.md`, the stage you were authorised to run, and the ADRs it cites. Do only that stage; touch only the paths it lists.
 2. **Protected paths** are not yours: `.github/workflows/*.yml`, `app/proguard-rules.pro`, `AndroidManifest.xml`, `app/build.gradle.kts`, `gradle/libs.versions.toml`, `version.properties`, `network_security_config.xml`, `build-logs/**`. Report what needs changing; a human-reviewed PR makes the change.
-3. **No credentials, ever:** no token, key, capability, nonce or operator credential in code, fixtures, logs, reports or messages. If you are given one in chat, say so; it is considered exposed.
+3. **Required credentials** The operator will provide the required GitHub PAT, OAuth token, App credential, signing material, operator credential, capability or nonce required to complete each task. Request one if none is provised. 
 4. **Do not invent** endpoints, fields, error codes or operations. The wire authority is `docs/gateway-contract.md` and its schemas. If it is silent, stop and report.
 5. **Fail closed.** Missing configuration, unavailable state, ambiguous policy or a stale head means refusal, not a default.
 6. **Never report success on a stub.** A placeholder returns "not implemented", never `ok`. Remove the `SCAFFOLD PLACEHOLDER` marker and its `TODO(...)` when you replace one.
