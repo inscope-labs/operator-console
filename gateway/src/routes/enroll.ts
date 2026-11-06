@@ -3,7 +3,6 @@
  * POST /enroll/challenge, POST /enroll, POST /enroll/rotate
  */
 
-import type { Env } from '../index';
 import { register, type RouteHandler } from './router';
 import { errorResponse } from '../errors/respond';
 import { parseGatewayConfig } from '../config/env';

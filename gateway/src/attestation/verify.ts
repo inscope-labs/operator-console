@@ -161,14 +161,6 @@ interface ParsedCert {
   keyCertSign: boolean;
 }
 
-function findChildSeqByIndex(tbs: DerNode, pred: (c: DerNode, i: number) => boolean): DerNode | null {
-  if (!tbs.children) return null;
-  for (let i = 0; i < tbs.children.length; i++) {
-    if (pred(tbs.children[i], i)) return tbs.children[i];
-  }
-  return null;
-}
-
 /** Extract subjectPublicKeyInfo SEQUENCE TLV from original TBS bytes by walking offsets — use node rebuild. */
 function rebuildUniversalSeq(node: DerNode): Uint8Array {
   if (!node.children) {

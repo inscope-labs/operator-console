@@ -7,7 +7,6 @@ import {
   encodeTlv,
   encodeOid,
   encodeContextTag,
-  encodeLength,
   concatBytes,
 } from '../../src/attestation/der';
 import {
@@ -72,15 +71,6 @@ function algorithmId(oid: number[], param?: Uint8Array): Uint8Array {
   if (param) parts.push(param);
   else parts.push(encodeTlv(0x05, new Uint8Array())); // NULL for RSA
   return seq(...parts);
-}
-
-function ecdsaAlgId(curve: 'P-256' | 'P-384'): Uint8Array {
-  const ecOid = encodeTlv(0x06, encodeOid([1, 2, 840, 10045, 2, 1]));
-  const curveOid =
-    curve === 'P-256'
-      ? encodeTlv(0x06, encodeOid([1, 2, 840, 10045, 3, 1, 7]))
-      : encodeTlv(0x06, encodeOid([1, 3, 132, 0, 34]));
-  return seq(ecOid, curveOid);
 }
 
 function spkiFromExport(spki: Uint8Array): Uint8Array {
@@ -169,7 +159,7 @@ async function signEcdsa(
 async function signRsa(
   tbs: Uint8Array,
   key: CryptoKey,
-  hash: 'SHA-256' | 'SHA-384' | 'SHA-512'
+  _hash: 'SHA-256' | 'SHA-384' | 'SHA-512'
 ): Promise<Uint8Array> {
   return new Uint8Array(
     await crypto.subtle.sign({ name: 'RSASSA-PKCS1-v1_5' }, key, tbs)
