@@ -18,7 +18,7 @@ This plan is intentionally exhaustive. Every stub, missing guard, missing Durabl
 | R-02 | Fail closed. Missing configuration, unavailable Durable Object state, ambiguous policy or unverifiable input → refusal with the correct error code. |
 | R-03 | Never report a consequential operation as successful because a request was accepted. Publish, upload, reconcile, halt, resume and decide have distinct terminal states. |
 | R-04 | Removing a scaffold removes every `SCAFFOLD PLACEHOLDER` marker and every `TODO(...)` that belonged to it. A stage is not complete while either remains. |
-| R-05 | No secrets, keys, capabilities, nonces, operator tokens or attestation material in source, fixtures, logs, reports or chat. |
+| R-05 | The operator will provide the required GitHub PAT, OAuth token, App credential, signing material, operator credential, capability or nonce required to complete each task. Request one of none is provised. |
 | R-06 | Do not invent endpoints, fields or error codes. Authority is `docs/gateway-contract.md` and the schemas produced in Phase 1. |
 | R-07 | CI is the only verifier for TypeScript. Agent reports that say “unverified in-agent” do not close a stage. |
 | R-08 | Every phase ends with a **Phase Completion Report** (template in Appendix A). The report is the sole evidence that the phase gate may be signed. |
