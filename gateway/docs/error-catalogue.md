@@ -8,6 +8,15 @@ Stable public error codes returned as JSON `{ "error", "message", "request_id" }
 |------|------|---------|
 | `CONFIG_INVALID` | 503 | Environment validation failed; all routes except `/health` refuse work |
 
+## Not implemented (fail-closed stub)
+
+| Code | HTTP | Meaning |
+|------|------|---------|
+| `NOT_IMPLEMENTED` | 501 | The operation is in the contract but is not implemented in this gateway build. The request was refused before any work was performed: nothing was published, uploaded, reconciled, halted or resumed. |
+
+`NOT_IMPLEMENTED` is never returned with a 2xx status and its body never claims
+success. See ADR 0002 — *Fail-closed stub refusal*.
+
 ## Enrolment / attestation (GW-A addendum)
 
 | Code | HTTP | Meaning |

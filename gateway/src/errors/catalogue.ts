@@ -41,7 +41,10 @@ export type ErrorCode =
   // Enrolment / attestation (GW-A addendum)
   | 'ENROLL_CHALLENGE_INVALID'
   | 'ENROLL_ATTESTATION_INVALID'
-  | 'AUTH_TIER_NOT_ALLOWED';
+  | 'AUTH_TIER_NOT_ALLOWED'
+  // Fail-closed stub (Stage 1.1) — the operation exists in the contract but is
+  // not implemented in this build. Never a success, never a 2xx.
+  | 'NOT_IMPLEMENTED';
 
 export interface GatewayErrorBody {
   error: ErrorCode;
@@ -81,6 +84,7 @@ export const HTTP_STATUS: Record<ErrorCode, number> = {
   ENROLL_CHALLENGE_INVALID: 400,
   ENROLL_ATTESTATION_INVALID: 400,
   AUTH_TIER_NOT_ALLOWED: 403,
+  NOT_IMPLEMENTED: 501,
 };
 
 /** Human-readable defaults (no secrets). */
@@ -90,4 +94,6 @@ export const ERROR_MESSAGE: Partial<Record<ErrorCode, string>> = {
   ENROLL_ATTESTATION_INVALID:
     'Attestation chain, challenge binding, key, or tier mismatch',
   AUTH_TIER_NOT_ALLOWED: 'Derived auth tier is not permitted in this environment',
+  NOT_IMPLEMENTED:
+    'Operation is not implemented in this gateway build; no work was performed',
 };
