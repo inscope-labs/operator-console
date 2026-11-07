@@ -48,7 +48,7 @@ Release claims use the status vocabulary of the guide §1.3: **implemented, refe
 - **G-09** Replacing a placeholder removes its `SCAFFOLD PLACEHOLDER` line and `TODO(...)`. A task is not done while either remains in its files.
 - **G-10** A failed gate blocks the phase transition. Record it; do not mark complete on documentation changes alone.
 - **G-11** Update console docs, gateway docs and build-engine documentation together whenever an operation name, capability field, endpoint, release class or agent transport changes.
-- **G-12** Scope split: AI Studio edits only `app/**`, `docs/**` Android documents and `agent-reports/**` allowed for the stage. It never creates, edits or deletes anything under `gateway/**`. Before each run it starts from the current `main` (pull first) so that gateway PRs merged meanwhile are not overwritten; if its working tree contains `gateway/**` changes, it discards them and reports.
+- **G-13** Scope split: AI Studio edits only `app/**`, `docs/**` Android documents and `agent-reports/**` allowed for the stage. It never creates, edits or deletes anything under `gateway/**`. Before each run it starts from the current `main` (pull first) so that gateway PRs merged meanwhile are not overwritten; if its working tree contains `gateway/**` changes, it discards them and reports.
 
 ### A.4 Evidence-based baseline (5 Nov 2026)
 
@@ -516,7 +516,7 @@ Android phases begin at Phase 2. Stage and task IDs keep their numbers (no renum
 | Risk | Mitigation |
 |---|---|
 | AI Studio silently overwrites out-of-band changes | One stage per run; Claude rebases open branches first; diff review; protected paths |
-| Two agents write the same files | AI Studio `app/**` only, gateway agent `gateway/**` only (G-12); pull `main` before each run |
+| Two agents write the same files | AI Studio `app/**` only, gateway agent `gateway/**` only (G-13); pull `main` before each run |
 | False success report from a stub | G-08; success only after head verification |
 | Pin lockout or silent pin expiry | BD-2.1/2.2, rotation drill, release check on expiry |
 | Cross-environment capability replay | Per-environment keys (T2-204), per-environment credentials, environment equality check |
