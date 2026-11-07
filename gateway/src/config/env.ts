@@ -40,6 +40,7 @@ export type ConfigProblemClass =
   | 'ENVIRONMENT_INVALID'
   | 'ATTESTATION_MODE_INVALID'
   | 'ATTESTATION_MODE_REFUSED_IN_PRODUCTION'
+  | 'ATTESTATION_MODE_REFUSED_OUTSIDE_TEST'
   | 'ALLOWED_AUTH_TIERS_INVALID'
   | 'ATTESTATION_ROOT_SHA256_INVALID'
   | 'PARSE_ERROR';
@@ -89,8 +90,12 @@ export function parseGatewayConfig(env: Record<string, unknown>): ConfigResult {
       problems.push('ATTESTATION_MODE_INVALID');
     } else {
       attestationMode = modeParsed.data;
-      if (attestationMode === 'lenient' && environment === 'production') {
-        problems.push('ATTESTATION_MODE_REFUSED_IN_PRODUCTION');
+      if (attestationMode === 'lenient' && environment !== 'test') {
+        problems.push(
+          environment === 'production'
+            ? 'ATTESTATION_MODE_REFUSED_IN_PRODUCTION'
+            : 'ATTESTATION_MODE_REFUSED_OUTSIDE_TEST'
+        );
       }
     }
   }

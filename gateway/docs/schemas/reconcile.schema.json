@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inscope-labs.com/schemas/operator-gateway/reconcile.schema.json",
+  "title": "ReconcileTaskOperation",
+  "description": "Request and response schemas for POST /tasks/{id}/reconcile",
+  "definitions": {
+    "request": {
+      "type": "object",
+      "properties": {
+        "plan": { "type": "string" },
+        "task": { "type": "string" },
+        "branch": { "type": "string" },
+        "head": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "submissionId": { "type": "string" },
+        "capability": { "type": "string" }
+      },
+      "required": ["plan", "task", "branch", "head", "submissionId", "capability"],
+      "additionalProperties": false
+    },
+    "response": {
+      "type": "object",
+      "properties": {
+        "accepted": { "type": "boolean" },
+        "operation": {
+          "type": "string",
+          "enum": ["RECONCILE", "reconcile"]
+        },
+        "branch": { "type": "string" },
+        "headSha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "outcome": { "type": "string" },
+        "auditRef": { "type": "string" }
+      },
+      "required": ["accepted", "operation", "branch", "headSha", "outcome", "auditRef"],
+      "additionalProperties": false
+    }
+  }
+}

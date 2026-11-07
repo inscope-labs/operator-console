@@ -31,11 +31,10 @@ Reference plan of record: [`RELEASE-PLAN.md`](../RELEASE-PLAN.md).
 | Stage 0.3 | Hygiene & Asset Cleanup | **implemented** | yes | yes | no | **yes** | Deleted 35 redundant files in `public/assets/aistudio/*` after mapping replacements |
 | **Phase 1** | **Gateway A (Cloudflare Worker)** | | | | | | Gate 1 open |
 | Stage 1.1 | Fix Publish & Stubs 501 (T1-103) | **implemented** | pending CI | yes | no | **yes (fail-closed)** | Publish and stub routes return 501 NOT_IMPLEMENTED, zero 2xx on stubs, unit tests added |
-| Stage 1.2 | Contract & Schema Authority | partially | yes | yes | no | **no** | Reconcile `code` vs `error`, JSON schemas, closed ops enum |
-| Stage 1.3 | Guards & Publish Transaction | scaffold | unverified | yes | no | **no** | G5–G8, G11, G14, G15 stubs; transaction CAS not implemented |
-| Stage 1.4 | Remaining Operations (upload, reconcile, halt, etc.) | scaffold | unverified | yes | no | **no** | Routes are stubs returning empty or unverified responses |
-| Stage 1.5 | Audit, Privacy & Admin Revocation | scaffold | unverified | yes | no | **no** | `routes/admin.ts` and audit DO stream are stubs |
-| Stage 1.6 | Conformance & Deployed Staging Acceptance | not deployed | unverified | no | no | **no** | Staging Worker not deployed; secrets not provisioned |
+| Stage 1.2 | Environment Model (BD-1.1) | **implemented** | pending CI | yes | no | **yes** | Environments closed to test/staging/production; lenient mode and HMAC refused outside test |
+| Stage 1.3 | Contract Schemas & Error Catalogue Freeze (T1-201, ADR 0003) | **implemented** | pending CI | yes | no | **yes** | 22 JSON schemas published; code/error aligned; frozen error catalogue & spec G1–G15 numbering |
+| Stage 1.4 | CI Hardening (Fail-Closed) & Lockfile (T1-101, T1-102) | not started | no | no | no | **no** | Package lockfile, removal of `|| true`, workflow rename to gateway-*.yml |
+| Stage 1.5 | Phase 1 Completion Report & Sign-off | not started | no | no | no | **no** | Gate 1 completion report (Appendix A template) |
 | **Phase 2** | **Android Transport & Connectivity** | | | | | | Gate 2 open |
 | Stage 2.1 | Connectivity Remediation (BaseUrlStore, no init dial) | scaffold | partially | yes | no | **no** | Stage 1 of remediation merged; stages 2–8 pending |
 | Stage 2.2 | Environment Safety (per-env keys & slots) | not started | no | no | no | **no** | Enrolment key namespacing by environment required |

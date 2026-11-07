@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inscope-labs.com/schemas/operator-gateway/enroll-rotate.schema.json",
+  "title": "DeviceEnrollmentRotation",
+  "description": "Request and response schemas for POST /enroll/rotate",
+  "definitions": {
+    "request": {
+      "type": "object",
+      "properties": {
+        "oldKid": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]{1,16}$"
+        },
+        "newPublicKey": {
+          "type": "string",
+          "description": "X.509 SubjectPublicKeyInfo in base64"
+        },
+        "attestationChain": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "challenge": {
+          "type": "string"
+        },
+        "authTier": {
+          "type": "string",
+          "enum": ["hardware_confirm", "in_app_confirm"]
+        }
+      },
+      "required": ["oldKid", "newPublicKey", "attestationChain", "challenge", "authTier"],
+      "additionalProperties": false
+    },
+    "response": {
+      "type": "object",
+      "properties": {
+        "kid": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]{1,16}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "revoked", "retired"]
+        },
+        "rotatedAt": { "type": "integer" },
+        "authTier": {
+          "type": "string",
+          "enum": ["hardware_confirm", "in_app_confirm"]
+        }
+      },
+      "required": ["kid", "status", "rotatedAt", "authTier"],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inscope-labs.com/schemas/operator-gateway/tasks-next.schema.json",
+  "title": "TasksNextResponse",
+  "description": "List of ready tasks from GET /tasks/next",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" },
+      "planId": { "type": "string" },
+      "title": { "type": "string" },
+      "branch": { "type": "string" },
+      "status": {
+        "type": "string",
+        "enum": ["draft", "ready", "in_progress", "completed", "blocked"]
+      },
+      "headSha": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      }
+    },
+    "required": ["id", "planId", "title", "branch", "status", "headSha"],
+    "additionalProperties": false
+  }
+}

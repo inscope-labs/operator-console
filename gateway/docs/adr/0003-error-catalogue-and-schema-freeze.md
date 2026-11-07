@@ -1,46 +1,41 @@
-# ADR 0003 — Error catalogue and schema freeze (Stage 1.3)
+# ADR 0003 — Error Catalogue and Contract Schema Freeze
 
 | | |
 |---|---|
 | **Status** | Accepted |
 | **Date** | 2026-11-07 |
-| **Decision IDs** | GATEWAY-A-COMPLETION-PLAN Stage 1.3, R-06, R-07 |
-| **Related** | `gateway/docs/error-catalogue.md`, `gateway/src/errors/catalogue.ts`, `gateway/docs/schemas/`, ADR 0002 |
+| **Decision IDs** | GATEWAY-A-COMPLETION-PLAN Stage 1.3, RELEASE-PLAN T1-201, T1-202, BD-1.3, BD-1.4, BD-1.5, BD-1.7, R-06 |
+| **Related** | `docs/gateway-contract.md`, `gateway/docs/error-catalogue.md`, `gateway/src/errors/catalogue.ts`, ADR 0002 |
 
 ---
 
 ## Context
 
-Stage 1.3 requires a frozen public error catalogue and machine-readable JSON
-schemas for every request/response body defined in the operator gateway contract.
-Before this stage the catalogue documentation was incomplete, several contract
-error names differed from the TypeScript union, and no schemas existed for
-conformance vectors to reference.
+Prior to this decision, several subtle drifts existed between the gateway implementation, the wire specification, and the Android client:
+1. **Error response property naming**: The contract (`docs/gateway-contract.md §4`) and the Android client (`GatewayErrorDto`) specified that errors carry a `code` string (`{"code": "...", "message": "..."}`). The gateway implementation in `catalogue.ts` and `respond.ts` returned `error` (`{"error": "...", "message": "...", "request_id": "..."}`), causing the Android client's parser to observe an empty `code`.
+2. **Operation naming & enumeration**: The wire specification and test fixtures used uppercase strings (`PUBLISH`, `UPLOAD`, `RECONCILE`, `DECIDE`, etc.), while the TypeScript codec checked against a lowercase closed set and lacked `new_plan`.
+3. **Guard numbering**: Contract fixtures used legacy names (`G1_EMPTY_DIFF`), whereas the spec and codebase use G1–G15 (`G1` private, `G6` delta empty, `G8` denied path, `G13` exact head, `G14` halt).
+4. **Machine-readable schemas**: There were no authoritative JSON Schemas defined for validating request and response payloads across components.
 
 ## Decision
 
-1. **Runtime authority** is `gateway/src/errors/catalogue.ts`. Every public code,
-   its HTTP status, and a default message live there.
-2. **Documentation authority** is `gateway/docs/error-catalogue.md`, kept identical
-   to the TypeScript union.
-3. **Response body shape** is frozen as:
-   ```json
-   { "error": "<ErrorCode>", "message": "<string>", "request_id": "<string>" }
-   ```
-   Parent contract §4 historically used `{ "code", "message" }`. Gateway A does
-   not change shape mid-flight; clients already consume `error` + `request_id`.
-4. **Aliases** from parent contract names to frozen codes are documented in the
-   catalogue (e.g. `HEAD_DRIFT` → `HEAD_MOVED`, `EXPIRED` → `CAPABILITY_EXPIRED`).
-5. **JSON Schemas** under `gateway/docs/schemas/` cover health, plans, tasks,
-   branches, enrol, publish/upload/reconcile, halt/resume, sync, doctor, and
-   decide. Success bodies allow additional properties per contract §1.5.
-6. **New codes** after this freeze require a simultaneous update of TypeScript,
-   the markdown catalogue, and (where applicable) schemas. Changing the meaning
-   of an existing code requires a new ADR.
+1. **Reconcile error response shape with `code` authoritative**:
+   - `GatewayErrorBody` specifies `code` as the primary, authoritative machine-readable code field.
+   - `error` is mirrored alongside `code` in the JSON response (`{ code, error, message, request_id }`) for backwards compatibility with any existing tests asserting `body.error`.
+   - Android's `GatewayErrorDto` and `ErrorMapper` support both `code` and the `error` alias through an `effectiveCode` fallback.
+2. **Freeze public error catalogue**:
+   - The TypeScript union `ErrorCode` in `src/errors/catalogue.ts`, the documentation in `gateway/docs/error-catalogue.md`, and the contract table in `docs/gateway-contract.md §4` are synchronized and frozen.
+   - All codes used by upcoming phases (including `HEAD_MOVED`/`HEAD_DRIFT`, `DEVICE_NOT_ENROLLED`/`NOT_ENROLLED`, `HALT_ACTIVE` HTTP 423, `NOT_IMPLEMENTED` HTTP 501, guard codes G1–G15) are formally registered.
+3. **Case-insensitive wire operation parsing**:
+   - The gateway's `isOperationType` and `decodeCapability` normalize operation tokens case-insensitively while preserving canonical lowercase `OperationType` internally.
+   - Support for all 13 operations is formalized (`publish`, `upload`, `reconcile`, `halt`, `resume`, `decide`, `order`, `set`, `new`, `new_plan`, `sync`, `doctor`, `set_in_progress`, `set_done`).
+4. **Spec G1–G15 guard identity**:
+   - Contract §5 fixture branches are updated to reference the authoritative spec numbers (G1 private, G3 shape, G6 delta, G7 merge commits, G8 denied path, G11 secrets, G13 exact head, G14 halt, G15 submission immutability).
+5. **Publish formal JSON Schemas**:
+   - 22 draft 2020-12 JSON Schemas are published under `docs/schemas/` and mirrored under `gateway/docs/schemas/` covering every request, response, and error payload in the contract.
 
 ## Consequences
 
-- Conformance vectors and the Android `ErrorMapper` must use frozen names only.
-- Stage 2.4 capability edge-case tests can rely on `BAD_FIELD_COUNT` and
-  `BAD_ENCODING` being present.
-- Lab environment safety can refuse with `ENVIRONMENT_MISMATCH`.
+- The Android application cleanly deserializes error responses and maps them into exact `GatewayFailureState` UI states.
+- The TypeScript gateway accepts standard test vectors and Android client capabilities without casing discrepancies.
+- Gateway CI and Android integration can perform automated schema conformance verification.

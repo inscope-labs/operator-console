@@ -72,7 +72,7 @@ class ErrorMapper {
      */
     fun map(statusCode: Int, body: String?): AppResult.Failure {
         val error = parse(body)
-        val gatewayCode = error?.code?.trim()?.takeIf { it.isNotEmpty() }
+        val gatewayCode = error?.effectiveCode?.trim()?.takeIf { it.isNotEmpty() }
         val state = stateFor(gatewayCode ?: "", statusCode)
 
         val detail = error?.message?.trim()?.takeIf { it.isNotEmpty() }
@@ -188,22 +188,44 @@ class ErrorMapper {
         const val GATEWAY_UNKNOWN_KID: String = "UNKNOWN_KID"
         const val GATEWAY_BAD_SIGNATURE: String = "BAD_SIGNATURE"
         const val GATEWAY_OPERATOR_AUTH: String = "OPERATOR_AUTH"
+        const val GATEWAY_CREDENTIAL_NOT_ACCEPTED: String = "CREDENTIAL_NOT_ACCEPTED"
         const val GATEWAY_NOT_ENROLLED: String = "NOT_ENROLLED"
+        const val GATEWAY_DEVICE_NOT_ENROLLED: String = "DEVICE_NOT_ENROLLED"
+        const val GATEWAY_TOKEN_UNAVAILABLE: String = "TOKEN_UNAVAILABLE"
         const val GATEWAY_BRANCH_MISMATCH: String = "BRANCH_MISMATCH"
         const val GATEWAY_ENVIRONMENT_MISMATCH: String = "ENVIRONMENT_MISMATCH"
         const val GATEWAY_EXPIRED: String = "EXPIRED"
+        const val GATEWAY_CAPABILITY_EXPIRED: String = "CAPABILITY_EXPIRED"
         const val GATEWAY_TTL_TOO_LONG: String = "TTL_TOO_LONG"
         const val GATEWAY_UNKNOWN_OP: String = "UNKNOWN_OP"
         const val GATEWAY_BAD_FIELD_COUNT: String = "BAD_FIELD_COUNT"
         const val GATEWAY_BAD_ENCODING: String = "BAD_ENCODING"
         const val GATEWAY_BRANCH_NOT_TASK: String = "BRANCH_NOT_TASK"
+        const val GATEWAY_BRANCH_INVALID: String = "BRANCH_INVALID"
+        const val GATEWAY_BRANCH_MISSING: String = "BRANCH_MISSING"
         const val GATEWAY_NONCE_REPLAYED: String = "NONCE_REPLAYED"
         const val GATEWAY_HEAD_DRIFT: String = "HEAD_DRIFT"
+        const val GATEWAY_HEAD_MOVED: String = "HEAD_MOVED"
         const val GATEWAY_HALT_ACTIVE: String = "HALT_ACTIVE"
         const val GATEWAY_GUARD_FAILED: String = "GUARD_FAILED"
+        const val GATEWAY_REPO_NOT_PRIVATE: String = "REPO_NOT_PRIVATE"
+        const val GATEWAY_ANCESTRY_FAIL: String = "ANCESTRY_FAIL"
+        const val GATEWAY_DELTA_EMPTY: String = "DELTA_EMPTY"
+        const val GATEWAY_MERGE_COMMITS: String = "MERGE_COMMITS"
+        const val GATEWAY_DENIED_PATH: String = "DENIED_PATH"
+        const val GATEWAY_SECRET_IN_DIFF: String = "SECRET_IN_DIFF"
+        const val GATEWAY_SUBMISSION_IMMUTABLE: String = "SUBMISSION_IMMUTABLE"
+        const val GATEWAY_UNKNOWN_REPO: String = "UNKNOWN_REPO"
+        const val GATEWAY_RATE_BUDGET_LOW: String = "RATE_BUDGET_LOW"
+        const val GATEWAY_RULESET_REJECTED: String = "RULESET_REJECTED"
+        const val GATEWAY_RECONCILE_REQUIRED: String = "RECONCILE_REQUIRED"
+        const val GATEWAY_NETWORK: String = "NETWORK"
+        const val GATEWAY_CONFIG_INVALID: String = "CONFIG_INVALID"
+        const val GATEWAY_NOT_FOUND: String = "NOT_FOUND"
         const val GATEWAY_ENROLL_CHALLENGE_INVALID: String = "ENROLL_CHALLENGE_INVALID"
         const val GATEWAY_ENROLL_ATTESTATION_INVALID: String = "ENROLL_ATTESTATION_INVALID"
         const val GATEWAY_AUTH_TIER_NOT_ALLOWED: String = "AUTH_TIER_NOT_ALLOWED"
+        const val GATEWAY_NOT_IMPLEMENTED: String = "NOT_IMPLEMENTED"
 
         /**
          * The gateway's code for each state.
@@ -214,26 +236,53 @@ class ErrorMapper {
         private val GATEWAY_CODE_STATES: Map<String, GatewayFailureState> = mapOf(
             // Scope refused.
             GATEWAY_BRANCH_NOT_TASK to GatewayFailureState.SCOPE_REFUSED,
+            GATEWAY_BRANCH_INVALID to GatewayFailureState.SCOPE_REFUSED,
             GATEWAY_BRANCH_MISMATCH to GatewayFailureState.SCOPE_REFUSED,
             GATEWAY_UNKNOWN_OP to GatewayFailureState.SCOPE_REFUSED,
             GATEWAY_NOT_ENROLLED to GatewayFailureState.SCOPE_REFUSED,
+            GATEWAY_DEVICE_NOT_ENROLLED to GatewayFailureState.SCOPE_REFUSED,
             GATEWAY_AUTH_TIER_NOT_ALLOWED to GatewayFailureState.SCOPE_REFUSED,
-            // The other three.
+            // The other three core states.
             GATEWAY_NONCE_REPLAYED to GatewayFailureState.REPLAYED,
             GATEWAY_HEAD_DRIFT to GatewayFailureState.HEAD_DRIFTED,
+            GATEWAY_HEAD_MOVED to GatewayFailureState.HEAD_DRIFTED,
             GATEWAY_HALT_ACTIVE to GatewayFailureState.HALT_ACTIVE,
-            // General.
+            // Authentication.
             GATEWAY_UNKNOWN_KID to GatewayFailureState.AUTHENTICATION,
             GATEWAY_BAD_SIGNATURE to GatewayFailureState.AUTHENTICATION,
             GATEWAY_OPERATOR_AUTH to GatewayFailureState.AUTHENTICATION,
+            GATEWAY_CREDENTIAL_NOT_ACCEPTED to GatewayFailureState.AUTHENTICATION,
+            // Format.
             GATEWAY_EXPIRED to GatewayFailureState.FORMAT,
+            GATEWAY_CAPABILITY_EXPIRED to GatewayFailureState.FORMAT,
             GATEWAY_TTL_TOO_LONG to GatewayFailureState.FORMAT,
             GATEWAY_BAD_FIELD_COUNT to GatewayFailureState.FORMAT,
             GATEWAY_BAD_ENCODING to GatewayFailureState.FORMAT,
+            GATEWAY_UNKNOWN_REPO to GatewayFailureState.FORMAT,
             GATEWAY_ENROLL_CHALLENGE_INVALID to GatewayFailureState.FORMAT,
-            GATEWAY_ENROLL_ATTESTATION_INVALID to GatewayFailureState.GUARD_FAILED,
+            // Guard failures.
             GATEWAY_GUARD_FAILED to GatewayFailureState.GUARD_FAILED,
+            GATEWAY_ENROLL_ATTESTATION_INVALID to GatewayFailureState.GUARD_FAILED,
+            GATEWAY_REPO_NOT_PRIVATE to GatewayFailureState.GUARD_FAILED,
+            GATEWAY_ANCESTRY_FAIL to GatewayFailureState.GUARD_FAILED,
+            GATEWAY_DELTA_EMPTY to GatewayFailureState.GUARD_FAILED,
+            GATEWAY_MERGE_COMMITS to GatewayFailureState.GUARD_FAILED,
+            GATEWAY_DENIED_PATH to GatewayFailureState.GUARD_FAILED,
+            GATEWAY_SECRET_IN_DIFF to GatewayFailureState.GUARD_FAILED,
+            GATEWAY_RULESET_REJECTED to GatewayFailureState.GUARD_FAILED,
+            // Conflict & lifecycle.
+            GATEWAY_SUBMISSION_IMMUTABLE to GatewayFailureState.CONFLICT,
+            GATEWAY_RECONCILE_REQUIRED to GatewayFailureState.CONFLICT,
+            // Not found & rate limit.
+            GATEWAY_BRANCH_MISSING to GatewayFailureState.NOT_FOUND,
+            GATEWAY_NOT_FOUND to GatewayFailureState.NOT_FOUND,
+            GATEWAY_RATE_BUDGET_LOW to GatewayFailureState.RATE_LIMITED,
+            // Environment & gateway errors.
             GATEWAY_ENVIRONMENT_MISMATCH to GatewayFailureState.ENVIRONMENT_MISMATCH,
+            GATEWAY_TOKEN_UNAVAILABLE to GatewayFailureState.GATEWAY_ERROR,
+            GATEWAY_NETWORK to GatewayFailureState.GATEWAY_ERROR,
+            GATEWAY_CONFIG_INVALID to GatewayFailureState.GATEWAY_ERROR,
+            GATEWAY_NOT_IMPLEMENTED to GatewayFailureState.GATEWAY_ERROR,
         )
 
         /**

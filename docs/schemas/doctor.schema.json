@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inscope-labs.com/schemas/operator-gateway/doctor.schema.json",
+  "title": "DoctorDiagnosticReport",
+  "description": "Diagnostic and ruleset verification report from GET /doctor",
+  "type": "object",
+  "properties": {
+    "healthy": { "type": "boolean" },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "passed": { "type": "boolean" },
+          "details": { "type": "string" }
+        },
+        "required": ["name", "passed"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["healthy", "checks"],
+  "additionalProperties": false
+}

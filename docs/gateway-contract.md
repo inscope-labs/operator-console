@@ -61,14 +61,20 @@ The gateway directly replaces the legacy CLI `cbridge` while eliminating reposit
 
 | `cbridge` Command | Gateway Endpoint | Scope | Capability Required | Notes |
 |---|---|---|---|---|
-| `publish` | `POST /tasks/{id}/publish` | Task branch (`^task-`) | Yes | Runs task guard G1–G13 |
+| `publish` | `POST /tasks/{id}/publish` | Task branch (`^task-`) | Yes | Runs task guard G1–G15 |
 | `upload` | `POST /tasks/{id}/upload` | Task branch (`^task-`) | Yes | Uploads submission archive |
 | `reconcile` | `POST /tasks/{id}/reconcile` | Task branch (`^task-`) | Yes | Merges/reconciles completed task |
+| `decide` | `POST /plans/{id}/decide` | Task/Plan scope | Yes | Decision execution per BD-1.3 |
+| `status` | `GET /plans/{id}/status` | Read-only | No | Returns plan status |
+| `status` (transition) | `POST /plans/{id}/status` | Plan scope | Yes (`set` / `set_in_progress` / `set_done`) | Guarded status mutation with compare-and-swap per BD-1.3/BD-1.4 |
+| `order` | `POST /plans/{id}/order` | Task scope | Yes (`ORDER`) | Work order minting |
+| `operations` | `GET /operations/{id}` | Read-only | No (Bearer auth) | Operation lookup keyed by idempotency key per BD-1.7 |
+| `audit` | `GET /audit` / `GET /audit/{ref}` | Read-only | No (Bearer auth) | Audit journal inspection |
 | `halt` | `POST /halt` | Engine branch (`engine`) | Yes (Engine scoped) | Global emergency stop |
 | `resume` | `POST /resume` | Engine branch (`engine`) | Yes (Engine scoped) | Resumes engine processing |
-| `status` | `GET /plans/{id}/status` | Read-only | No | Returns plan status |
 | `sync` / `verify-main` | `POST /sync` | Read-only / sync | No (Bearer auth) | Fast-forwards tracking |
 | `doctor` | `GET /doctor` | Read-only | No (Bearer auth) | Verifies config & rulesets |
+| `revoke` | `POST /admin/revoke` | Admin | No (Bearer auth) | Device key revocation per BD-1.10 |
 | `init` / `bootstrap` | *EXCLUDED* | None | N/A | **Explicitly Out of Scope**; console never provisions repos |
 
 ---
@@ -440,13 +446,138 @@ Rotates an enrolled device key. Retires old `kid`.
 
 ---
 
+### 3.17 `POST /plans/{id}/status`
+Guarded plan status mutation with compare-and-swap (BD-1.3, BD-1.4).
+
+- **Auth**: Operator Bearer + Capability (`SET`, `SET_IN_PROGRESS`, `SET_DONE`).
+- **Request Body**:
+```json
+{
+  "plan": "atlas",
+  "task": "10008",
+  "branch": "task-10008-refactor-parser",
+  "expectedHead": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+  "targetStatus": "in_progress",
+  "capability": "ctxop-v1\n..."
+}
+```
+- **Success Response**: `200 OK`
+```json
+{
+  "accepted": true,
+  "operation": "SET_IN_PROGRESS",
+  "plan": "atlas",
+  "task": "10008",
+  "newStatus": "in_progress",
+  "headSha": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+  "auditRef": "audit-20261030-98239"
+}
+```
+
+---
+
+### 3.18 `POST /plans/{id}/decide`
+Submits an operator decision on a plan milestone or review point (BD-1.3).
+
+- **Auth**: Operator Bearer + Capability (`DECIDE`).
+- **Request Body**:
+```json
+{
+  "plan": "atlas",
+  "task": "10008",
+  "branch": "task-10008-refactor-parser",
+  "decision": "APPROVED",
+  "notes": "Reviewed test coverage and verification log",
+  "capability": "ctxop-v1\n..."
+}
+```
+- **Success Response**: `200 OK`
+```json
+{
+  "accepted": true,
+  "operation": "DECIDE",
+  "plan": "atlas",
+  "decision": "APPROVED",
+  "auditRef": "audit-20261030-98240"
+}
+```
+
+---
+
+### 3.19 `GET /operations/{id}`
+Operation lookup keyed by idempotency key / request ID for journal recovery (BD-1.7).
+
+- **Auth**: Operator Bearer.
+- **Success Response**: `200 OK`
+```json
+{
+  "id": "7f3c9b1e5d2a7046",
+  "operation": "PUBLISH",
+  "status": "completed",
+  "branch": "task-10008-refactor-parser",
+  "headSha": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+  "auditRef": "audit-20261030-98234",
+  "timestamp": 1761840000
+}
+```
+- **Error Response**: `404 Not Found` if operation key has not been seen.
+
+---
+
+### 3.20 `GET /audit` & `GET /audit/{ref}`
+Audit journal log inspection.
+
+- **Auth**: Operator Bearer.
+- **Success Response (`GET /audit`)**: `200 OK`
+```json
+[
+  {
+    "auditRef": "audit-20261030-98234",
+    "timestamp": "2026-10-30T16:00:00Z",
+    "operation": "PUBLISH",
+    "plan": "atlas",
+    "task": "10008",
+    "branch": "task-10008-refactor-parser",
+    "headSha": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+    "kid": "k2",
+    "authTier": "hardware_confirm"
+  }
+]
+```
+
+---
+
+### 3.21 `POST /admin/revoke`
+Device key revocation and security posture intervention (BD-1.10).
+
+- **Auth**: Operator Bearer.
+- **Request Body**:
+```json
+{
+  "kid": "k2",
+  "reason": "Device retired by operator",
+  "confirmation": "REVOKE k2"
+}
+```
+- **Success Response**: `200 OK`
+```json
+{
+  "revoked": true,
+  "kid": "k2",
+  "revokedAt": 1761840000
+}
+```
+
+---
+
 ## 4. Error Taxonomy & Status Codes
 
 When a request is rejected, the gateway responds with standard HTTP error status codes and a structured body:
 ```json
 {
   "code": "<MACHINE_READABLE_CODE>",
-  "message": "<HUMAN_READABLE_SUMMARY>"
+  "message": "<HUMAN_READABLE_SUMMARY>",
+  "request_id": "<UUID>"
 }
 ```
 
@@ -454,31 +585,48 @@ When a request is rejected, the gateway responds with standard HTTP error status
 
 | Error Code | HTTP Status | Rejection Stage | Description |
 |---|---|---|---|
-| `UNKNOWN_KID` | `401 Unauthorized` | Identity | The key selector `kid` is not recognized in the gateway device registry. |
-| `BAD_SIGNATURE` | `401 Unauthorized` | Signature | ECDSA or HMAC signature verification failed against the registered key. |
+| `UNKNOWN_KID` | `401 Unauthorized` | Identity | Key selector `kid` is not recognized in device registry. |
+| `BAD_SIGNATURE` | `401 Unauthorized` | Signature | ECDSA or HMAC signature verification failed against registered key. |
 | `OPERATOR_AUTH` | `401 Unauthorized` | Auth | Missing or invalid `Authorization: Bearer` operator credential header. |
-| `NOT_ENROLLED` | `403 Forbidden` | Enrolment | Device key attestation rejected or device has been revoked. |
+| `CREDENTIAL_NOT_ACCEPTED` | `400 Bad Request` | Auth | Operator credential format is invalid. |
+| `DEVICE_NOT_ENROLLED` / `NOT_ENROLLED` | `401 Unauthorized` / `403 Forbidden` | Enrolment | Device key attestation rejected or device has been revoked. |
 | `ENROLL_CHALLENGE_INVALID` | `400 Bad Request` | Enrolment | Enrolment challenge is unknown, expired, or already used. |
 | `ENROLL_ATTESTATION_INVALID` | `400 Bad Request` | Enrolment | Attestation certificate chain invalid, challenge mismatch, key mismatch, or tier mismatch. |
 | `AUTH_TIER_NOT_ALLOWED` | `403 Forbidden` | Policy | Enrolment auth tier not permitted by gateway policy in this environment. |
 | `BRANCH_MISMATCH` | `403 Forbidden` | Scope | Capability target branch does not match work order or request endpoint branch. |
 | `ENVIRONMENT_MISMATCH` | `403 Forbidden` | Safety | Lab or test invocation executed against a production-configured gateway. |
-| `EXPIRED` | `400 Bad Request` | Time | Capability expiry timestamp `exp` is in the past. |
+| `CAPABILITY_EXPIRED` / `EXPIRED` | `401 Unauthorized` / `400 Bad Request` | Time | Capability expiry timestamp `exp` is in the past. |
 | `TTL_TOO_LONG` | `400 Bad Request` | Time | Capability TTL exceeds the gateway maximum of 300 seconds. |
 | `UNKNOWN_OP` | `400 Bad Request` | Format | Capability `op` is not member of closed `OperationType` enumeration. |
 | `BAD_FIELD_COUNT` | `400 Bad Request` | Format | Wire message does not contain exactly 10 LF-separated fields. |
 | `BAD_ENCODING` | `400 Bad Request` | Format | Contains CR (`\r`), trailing LF, invalid characters, or bad base64url padding. |
-| `BRANCH_NOT_TASK` | `400 Bad Request` | Scope | Task operation branch does not match required regex `^task-[A-Za-z0-9._-]+$`. |
+| `BRANCH_NOT_TASK` / `BRANCH_INVALID` | `400 Bad Request` | Scope | Task operation branch does not match required regex `^task-[A-Za-z0-9._-]+$` or is `main`. |
+| `BRANCH_MISSING` | `404 Not Found` | Existence | Target branch does not exist on remote repository (G4). |
 | `NONCE_REPLAYED` | `409 Conflict` | Replay | Nonce has already been presented within its validity window. |
-| `HEAD_DRIFT` | `409 Conflict` | Concurrency | Expected head SHA in capability does not match actual remote branch HEAD. |
-| `HALT_ACTIVE` | `423 Locked` | State | Global engine halt marker is active; write operations are blocked. |
-| `GUARD_FAILED` | `422 Unprocessable Entity` | Guard | cbridge guard check failed (e.g. `GUARD_FAILED:G3_TOUCHES_PROTECTED_PATH`). |
+| `HEAD_MOVED` / `HEAD_DRIFT` | `409 Conflict` | Concurrency | Expected head SHA in capability does not match actual remote branch HEAD (G13). |
+| `HALT_ACTIVE` | `423 Locked` | State | Global engine halt marker is active; write operations are blocked (G14). |
+| `REPO_NOT_PRIVATE` | `403 Forbidden` | Security | Target repository is not verified private (G1). |
+| `ANCESTRY_FAIL` | `409 Conflict` | Git Guard | Task branch is not a direct descendant of upstream base (G5). |
+| `DELTA_EMPTY` | `400 Bad Request` | Git Guard | Task branch diff contains zero commits or empty tree delta (G6). |
+| `MERGE_COMMITS` | `400 Bad Request` | Git Guard | Task branch diff contains forbidden merge commits (G7). |
+| `DENIED_PATH` | `403 Forbidden` | Git Guard | Diff touches protected paths `engine/`, `plans/`, `.github/` (G8). |
+| `SECRET_IN_DIFF` | `403 Forbidden` | Git Guard | Diff contains detected token or private key patterns (G11). |
+| `SUBMISSION_IMMUTABLE` | `409 Conflict` | Lifecycle | Submission artifact identifier already recorded and cannot be overwritten (G15). |
+| `GUARD_FAILED` | `422 Unprocessable Entity` | Guard | Generic cbridge guard check failed. |
+| `UNKNOWN_REPO` | `400 Bad Request` | Adapter | Repository not registered in gateway configuration. |
+| `RULESET_REJECTED` | `403 Forbidden` | Adapter | Upstream GitHub repository ruleset rejected compare-and-swap push. |
+| `RECONCILE_REQUIRED` | `409 Conflict` | Adapter | Task branch requires manual reconciliation before state transition. |
+| `TOKEN_UNAVAILABLE` | `503 Service Unavailable`| Adapter | GitHub installation token temporarily unavailable. |
+| `RATE_BUDGET_LOW` | `429 Too Many Requests` | Adapter | Upstream GitHub rate limit budget exhausted. |
+| `NETWORK` | `502 Bad Gateway` | Network | Upstream platform or network communication failure. |
+| `CONFIG_INVALID` | `503 Service Unavailable`| Config | Gateway configuration or secrets invalid or missing. |
+| `NOT_IMPLEMENTED` | `501 Not Implemented` | Lifecycle | Operation is defined in contract but not yet implemented (fail closed). |
 
 ---
 
 ### 4.2 Mapping to UI States in `ErrorMapper`
 
-The console's `ErrorMapper` maps incoming errors into one of four primary UI states (plus general authentication and format errors):
+The console's `ErrorMapper` maps incoming errors into one of four primary UI states (plus general authentication, format, and guard errors):
 
 ```
                        ┌────────────────────────┐
@@ -491,32 +639,35 @@ The console's `ErrorMapper` maps incoming errors into one of four primary UI sta
 │  Scope Refused   │      │     Replayed     │      │   Head Drifted   │      │   Halt Active    │
 └──────────────────┘      └──────────────────┘      └──────────────────┘      └──────────────────┘
 · BRANCH_NOT_TASK         · NONCE_REPLAYED          · HEAD_DRIFT              · HALT_ACTIVE
+· BRANCH_INVALID                                    · HEAD_MOVED
 · BRANCH_MISMATCH
 · UNKNOWN_OP
 · NOT_ENROLLED
+· DEVICE_NOT_ENROLLED
+· AUTH_TIER_NOT_ALLOWED
 ```
 
 1. **Scope Refused**: The operation was rejected because the scope of the capability was denied (branch mismatch, invalid operation type, or device not enrolled). The user must not re-mint without reviewing scope.
 2. **Replayed**: The nonce was already used. A fresh capability must be generated with biometric confirmation.
-3. **Head Drifted**: The branch has advanced remotely since the operator reviewed it. The UI prompts the operator to inspect the new HEAD SHA before approving.
-4. **Halt Active**: The system is halted. Write actions are locked until an authorized operator issues a RESUME.
+3. **Head Drifted**: The branch has advanced remotely since the operator reviewed it (`HEAD_DRIFT` / `HEAD_MOVED`). The UI prompts the operator to inspect the new HEAD SHA before approving.
+4. **Halt Active**: The system is halted (`HALT_ACTIVE`). Write actions are locked until an authorized operator issues a RESUME.
 
 ---
 
 ## 5. Fixture Branches for Guard Conformance (Test Consumer Repository)
 
-The test consumer repository must maintain the following fixed branch fixtures to validate gateway and Lab enforcement of `guard_task()` rules.
+The test consumer repository must maintain the following fixed branch fixtures to validate gateway and Lab enforcement of `guard_task()` rules. Numbering aligns with spec G1–G15 per BD-1.5.
 
 | Fixture Branch Name | Scenario / Guard Target | Description & Trigger Condition | Expected Result & Code |
 |---|---|---|---|
 | `task-fx-clean` | Clean baseline | Valid commit with single task commit, correct author, clean diff. | `200 OK` (Accepted) |
-| `not-task-invalid` | Branch naming | Branch name does not start with `task-`. | `400 Bad Request` (`BRANCH_NOT_TASK`) |
-| `task-fx-no-commits` | `G1_EMPTY_DIFF` | Branch has zero commits beyond upstream base. | `422 Unprocessable Entity` (`GUARD_FAILED:G1_EMPTY_DIFF`) |
-| `task-fx-merge-commit` | `G2_NO_MERGE_COMMITS` | Branch contains a merge commit (`git merge`). | `422 Unprocessable Entity` (`GUARD_FAILED:G2_NO_MERGE_COMMITS`) |
-| `task-fx-touch-engine` | `G3_PROTECTED_PATH` | Diff modifies files in `engine/`. | `422 Unprocessable Entity` (`GUARD_FAILED:G3_PROTECTED_PATH`) |
-| `task-fx-touch-plans` | `G3_PROTECTED_PATH` | Diff modifies files in `plans/`. | `422 Unprocessable Entity` (`GUARD_FAILED:G3_PROTECTED_PATH`) |
-| `task-fx-touch-github` | `G3_PROTECTED_PATH` | Diff modifies files in `.github/workflows/`. | `422 Unprocessable Entity` (`GUARD_FAILED:G3_PROTECTED_PATH`) |
-| `task-fx-deny-text` | `G4_DENY_TEXT` | Commit message contains forbidden token (`DENY_TEXT` or `WIP`). | `422 Unprocessable Entity` (`GUARD_FAILED:G4_DENY_TEXT`) |
-| `task-fx-secret-pattern` | `G5_SECRET_DETECTED` | Diff contains detected token pattern (`ghp_` or `github_pat_`). | `422 Unprocessable Entity` (`GUARD_FAILED:G5_SECRET_DETECTED`) |
-| `task-fx-disallowed-author` | `G6_AUTHOR_UNAUTHORIZED`| Commit author email not on allowed operator list. | `422 Unprocessable Entity` (`GUARD_FAILED:G6_AUTHOR_UNAUTHORIZED`) |
-| `task-fx-drifted-head` | Head Race Check | Capability head SHA is set to parent commit while branch has moved ahead. | `409 Conflict` (`HEAD_DRIFT`) |
+| `not-task-invalid` | G3 Branch Shape | Branch name does not start with `task-`. | `400 Bad Request` (`BRANCH_INVALID` / `BRANCH_NOT_TASK`) |
+| `task-fx-no-commits` | G6 Non-Empty Delta | Branch has zero commits beyond upstream base. | `400 Bad Request` (`DELTA_EMPTY`) |
+| `task-fx-merge-commit` | G7 No Merge Commits | Branch contains a merge commit (`git merge`). | `400 Bad Request` (`MERGE_COMMITS`) |
+| `task-fx-touch-engine` | G8 Denied Paths | Diff modifies files in `engine/`. | `403 Forbidden` (`DENIED_PATH`) |
+| `task-fx-touch-plans` | G8 Denied Paths | Diff modifies files in `plans/`. | `403 Forbidden` (`DENIED_PATH`) |
+| `task-fx-touch-github` | G8 Denied Paths | Diff modifies files in `.github/workflows/`. | `403 Forbidden` (`DENIED_PATH`) |
+| `task-fx-secret-pattern` | G11 Secret Patterns | Diff contains detected token pattern (`ghp_` or `github_pat_`). | `403 Forbidden` (`SECRET_IN_DIFF`) |
+| `task-fx-drifted-head` | G13 Exact Head SHA | Capability head SHA is set to parent commit while branch has moved ahead. | `409 Conflict` (`HEAD_MOVED` / `HEAD_DRIFT`) |
+| `task-fx-halt-active` | G14 Global Halt | Write requested while repository halt marker is engaged. | `423 Locked` (`HALT_ACTIVE`) |
+| `task-fx-submission-reused` | G15 Submission Immutable | Task upload presents already existing submission ID. | `409 Conflict` (`SUBMISSION_IMMUTABLE`) |

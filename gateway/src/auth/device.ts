@@ -88,6 +88,10 @@ export async function resolveDeviceKey(
   if (lab) {
     const alg = (lab.algorithm || 'HMAC').toUpperCase();
     if (alg === 'HMAC' || alg === 'HS256') {
+      // BD-1.6: HMAC lab signing keys are permitted ONLY when ENVIRONMENT === 'test'
+      if (env.ENVIRONMENT !== 'test') {
+        return null;
+      }
       const secret = lab.secret ?? '';
       let bytes: Uint8Array;
       if (lab.encoding === 'base64' || lab.encoding === 'base64url') {

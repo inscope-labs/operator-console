@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inscope-labs.com/schemas/operator-gateway/operation-lookup.schema.json",
+  "title": "OperationLookupResponse",
+  "description": "Operation outcome lookup keyed by idempotency key from GET /operations/{id}",
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "operation": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "completed", "failed", "refused"]
+    },
+    "branch": { "type": "string" },
+    "headSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "auditRef": { "type": "string" },
+    "timestamp": { "type": "integer" }
+  },
+  "required": ["id", "operation", "status", "auditRef", "timestamp"],
+  "additionalProperties": false
+}

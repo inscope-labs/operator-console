@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inscope-labs.com/schemas/operator-gateway/enroll.schema.json",
+  "title": "DeviceEnrollment",
+  "description": "Request and response schemas for POST /enroll",
+  "definitions": {
+    "request": {
+      "type": "object",
+      "properties": {
+        "alias": { "type": "string" },
+        "publicKey": {
+          "type": "string",
+          "description": "X.509 SubjectPublicKeyInfo in base64"
+        },
+        "attestationChain": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "X.509 certificate chain in base64 DER order: leaf first, root last"
+        },
+        "challenge": {
+          "type": "string",
+          "description": "Challenge string obtained from /enroll/challenge"
+        },
+        "authTier": {
+          "type": "string",
+          "enum": ["hardware_confirm", "in_app_confirm"]
+        }
+      },
+      "required": ["alias", "publicKey", "attestationChain", "challenge", "authTier"],
+      "additionalProperties": false
+    },
+    "response": {
+      "type": "object",
+      "properties": {
+        "kid": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]{1,16}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "revoked", "retired"]
+        },
+        "enrolledAt": { "type": "integer" },
+        "authTier": {
+          "type": "string",
+          "enum": ["hardware_confirm", "in_app_confirm"]
+        }
+      },
+      "required": ["kid", "status", "enrolledAt", "authTier"],
+      "additionalProperties": false
+    }
+  }
+}

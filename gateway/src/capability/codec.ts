@@ -74,7 +74,17 @@ export function decodeCapability(message: string): OperatorCapability {
   if (!isOperationType(opRaw)) {
     throw new Error(`UNKNOWN_OP: ${opRaw}`);
   }
-  if (!/^task-[A-Za-z0-9._-]+$/.test(branch)) {
+  const op = opRaw.toLowerCase() as OperationType;
+
+  const isTask = !(
+    op === 'halt' ||
+    op === 'resume' ||
+    op === 'sync' ||
+    op === 'doctor' ||
+    op === 'new' ||
+    op === 'new_plan'
+  );
+  if (isTask && !/^task-[A-Za-z0-9._-]+$/.test(branch)) {
     throw new Error(`BRANCH_INVALID: ${branch}`);
   }
   if (!/^[0-9a-f]{40}$/i.test(head)) {
@@ -91,7 +101,7 @@ export function decodeCapability(message: string): OperatorCapability {
     order,
     plan,
     task,
-    op: opRaw as OperationType,
+    op,
     branch,
     head,
     nonce,

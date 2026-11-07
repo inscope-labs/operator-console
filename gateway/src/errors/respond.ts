@@ -11,6 +11,7 @@ export function errorResponse(
   requestId: string = crypto.randomUUID()
 ): Response {
   const body: GatewayErrorBody = {
+    code,
     error: code,
     message,
     request_id: requestId,

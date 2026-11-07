@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inscope-labs.com/schemas/operator-gateway/plan-status-transition.schema.json",
+  "title": "PlanStatusTransition",
+  "description": "Request and response schemas for POST /plans/{id}/status",
+  "definitions": {
+    "request": {
+      "type": "object",
+      "properties": {
+        "plan": { "type": "string" },
+        "task": { "type": "string" },
+        "branch": { "type": "string" },
+        "expectedHead": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "targetStatus": {
+          "type": "string",
+          "enum": ["draft", "ready", "in_progress", "completed", "halted", "archived"]
+        },
+        "capability": { "type": "string" }
+      },
+      "required": ["plan", "task", "branch", "expectedHead", "targetStatus", "capability"],
+      "additionalProperties": false
+    },
+    "response": {
+      "type": "object",
+      "properties": {
+        "accepted": { "type": "boolean" },
+        "operation": { "type": "string" },
+        "plan": { "type": "string" },
+        "task": { "type": "string" },
+        "newStatus": { "type": "string" },
+        "headSha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "auditRef": { "type": "string" }
+      },
+      "required": ["accepted", "operation", "plan", "task", "newStatus", "headSha", "auditRef"],
+      "additionalProperties": false
+    }
+  }
+}

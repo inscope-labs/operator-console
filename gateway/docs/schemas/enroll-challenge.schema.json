@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inscope-labs.com/schemas/operator-gateway/enroll-challenge.schema.json",
+  "title": "EnrollChallengeResponse",
+  "description": "Single-use random enrolment challenge from POST /enroll/challenge",
+  "type": "object",
+  "properties": {
+    "challenge": {
+      "type": "string",
+      "description": "Base64url unpadded encoded 32 random bytes"
+    },
+    "expiresAt": {
+      "type": "integer",
+      "description": "Unix epoch seconds (TTL 300 s)"
+    }
+  },
+  "required": ["challenge", "expiresAt"],
+  "additionalProperties": false
+}

@@ -2,7 +2,7 @@
  * GET /branches/:name/head — contract 3.7.
  */
 
-import { getAdapter } from '../runtime';
+import { getAdapter } from '../adapter/get-adapter';
 import { register, type RouteHandler } from './router';
 import { errorResponse } from '../errors/respond';
 

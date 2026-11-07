@@ -24,6 +24,6 @@ export const ETAG_MAX_ENTRIES = 512;
 export const AUTH_TIERS = ['hardware_confirm', 'in_app_confirm'] as const;
 export type AuthTier = (typeof AUTH_TIERS)[number];
 
-/** Allowed deployment environments (Stage 1.2 / BD-1.1). */
-export type EnvironmentName = 'test' | 'staging' | 'production';
+export const ENVIRONMENTS = ['test', 'staging', 'production'] as const;
+export type EnvironmentName = (typeof ENVIRONMENTS)[number];
 export type AttestationMode = 'strict' | 'lenient';

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inscope-labs.com/schemas/operator-gateway/sync.schema.json",
+  "title": "SyncTracking",
+  "description": "Request and response schemas for POST /sync",
+  "definitions": {
+    "request": {
+      "type": "object",
+      "properties": {
+        "branch": { "type": "string" }
+      },
+      "required": ["branch"],
+      "additionalProperties": false
+    },
+    "response": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["synced", "ahead", "behind", "diverged"]
+        },
+        "headSha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "inSync": { "type": "boolean" }
+      },
+      "required": ["status", "headSha", "inSync"],
+      "additionalProperties": false
+    }
+  }
+}
