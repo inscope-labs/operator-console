@@ -1,9 +1,10 @@
 # Operator Console — v0.6.0 RELEASE PLAN
 
-**Repository:** `inscope-labs/operator-console` (Android app `app/` + Operator Gateway "Gateway A" `gateway/`)
-**Plan revision:** 1.0 — DRAFT for operator review
+**Repository:** `inscope-labs/operator-console` — this plan covers the **Android app (`app/`) only**. Operator Gateway "Gateway A" (`gateway/`) has its own plan and agent: `gateway/GATEWAY-A-COMPLETION-PLAN.md`.
+**Plan revision:** 1.1 — Android-only scope (gateway work moved to its own plan)
 **Review baseline:** 5 November 2026 (`main` as cloned on that date; I did not run any build or test)
 **Supersedes:** `docs/V0.6.0-BUILD-PLAN.md` (OC-0…OC-9), the unfinished parts of `IMPLEMENTATION-PLAN.md` (Phases 4.3–6, kept in `public/assets/aistudio/IMPLEMENTATION-PLAN_c11dc242.md`), `docs/console-connectivity-remediation.md` stages 2–8, and the open stop-and-ask items in the `gateway-repair-ga` agent reports.
+**Gateway plan (separate owner):** `gateway/GATEWAY-A-COMPLETION-PLAN.md`. No stage in this plan changes `gateway/**`; this plan only consumes the gateway's published contract and its verified gates.
 **Companion:** `inscope-labs/build-engine` → `docs/release/V0.6.0-BUILD-PLAN.md` (Gateways B/C, conformance, compatibility record).
 **Operator guide:** `operator-console-build-engine-operator-guide-v2_0.md` — verified in Part B; corrections to be published as v2.1.
 
@@ -15,7 +16,7 @@
 
 ### A.1 Objective
 
-Release **Operator Console 0.6.0**: a native Android client plus Gateway A, supported as the operator control surface that replaces the Termux `cbridge` for the operations listed in the (to-be-completed) cbridge coverage matrix, proven by an end-to-end run on the real acceptance device against deployed staging gateways.
+Release **Operator Console 0.6.0**: a native Android client (working against Gateway A, which is delivered by its own plan), supported as the operator control surface that replaces the Termux `cbridge` for the operations listed in the (to-be-completed) cbridge coverage matrix, proven by an end-to-end run on the real acceptance device against deployed staging gateways.
 
 Two acceptance levels, never conflated:
 
@@ -29,7 +30,7 @@ Release claims use the status vocabulary of the guide §1.3: **implemented, refe
 | Element | Owner | Notes |
 |---|---|---|
 | Android app code, tests, docs in allowed paths | AI Studio agent `[AIS]` | One stage per run; pushes directly to `main` (ADR 0010) |
-| Gateway A code (`gateway/src`, `gateway/tests`, `gateway/docs`) | `[AIS]` or Claude | The AI Studio agent cannot run `npm install`; **CI is the only verifier** (see Stage 1.1) |
+| Gateway A code, tests, docs, CI (`gateway/**`) | Gateway agent, per `gateway/GATEWAY-A-COMPLETION-PLAN.md` | **Not owned by this plan. AI Studio `[AIS]` must not edit `gateway/**`.** Stages in the two plans are independent; "Stage N.M" in this plan never means a gateway stage |
 | Protected paths: `.github/workflows/*.yml`, `proguard-rules.pro`, `AndroidManifest.xml`, `app/build.gradle.kts`, `version.properties`, `build-logs/**` | Claude via branch + PR, operator merges `[CLAUDE]` | Also `gradle/libs.versions.toml` and `network_security_config.xml` by convention in this plan |
 | Decisions, secrets, Cloudflare/GitHub environment setup, device tests, approvals, publication | Operator `[OP]` | Sole human authority |
 | Build-engine contracts, Gateways B/C, compatibility record | build-engine repo `[BE]` | Consumed here; not edited here |
@@ -42,15 +43,16 @@ Release claims use the status vocabulary of the guide §1.3: **implemented, refe
 - **G-04** No claim without evidence: a gate passes only when the command ran and its output was inspected. A report line "unverified in-agent" is **not** a pass; the stage is closed only when CI shows green on the pushed SHA.
 - **G-05** Fail closed on missing configuration, unavailable state, ambiguous policy, stale head, unverifiable input.
 - **G-06** The operator will provide the required GitHub PAT, OAuth token, App credential, signing material, operator credential, capability or nonce required to complete each task. Request one if none is provided.
-- **G-07** Do not invent endpoints, fields or error codes. The wire authority is `docs/gateway-contract.md` plus the schemas created in Stage 1.2; if silent, stop and report.
+- **G-07** Do not invent endpoints, fields or error codes. The wire authority is `docs/gateway-contract.md` plus the schemas published by the gateway plan; if silent, stop and report.
 - **G-08** Never report a consequential operation as successful because a request was sent. Upload, accept, publish, reconcile are distinct states.
 - **G-09** Replacing a placeholder removes its `SCAFFOLD PLACEHOLDER` line and `TODO(...)`. A task is not done while either remains in its files.
 - **G-10** A failed gate blocks the phase transition. Record it; do not mark complete on documentation changes alone.
 - **G-11** Update console docs, gateway docs and build-engine documentation together whenever an operation name, capability field, endpoint, release class or agent transport changes.
+- **G-12** Scope split: AI Studio edits only `app/**`, `docs/**` Android documents and `agent-reports/**` allowed for the stage. It never creates, edits or deletes anything under `gateway/**`. Before each run it starts from the current `main` (pull first) so that gateway PRs merged meanwhile are not overwritten; if its working tree contains `gateway/**` changes, it discards them and reports.
 
 ### A.4 Evidence-based baseline (5 Nov 2026)
 
-Status words per the guide. "Per report" = taken from AI Studio agent reports; I did not execute tests.
+Status words per the guide. "Per report" = taken from AI Studio agent reports; I did not execute tests. Gateway A rows are baseline evidence only; the work to change them is tracked in `gateway/GATEWAY-A-COMPLETION-PLAN.md`.
 
 | Area | Status | Evidence / gap |
 |---|---|---|
@@ -99,7 +101,7 @@ I checked the guide's 105 items and §10 observations against: the console READM
 | # | Guide location | Problem | Correction |
 |---|---|---|---|
 | C-1 | §1.1 table, §10.2 item 12, §13 | States the gateway is "a separate project/repository, not part of the Android app tree". Gateway A **is** in this repository (`gateway/`), per the README ownership table and `V0.6.0-BUILD-PLAN.md`. Only Gateways B/C live in build-engine. | Gateway A = `operator-console/gateway`; deployed endpoint, secrets, runbook are this plan's Stage 1.6 outputs. Three gateways, three trust boundaries (A operator, B Class B read, C Class B write). |
-| C-2 | §10.2 item 11 | Treats `cbridge-ci.yml` / `cbridge-deploy.yml` as "legacy/unclear". They are Gateway A's CI and deploy workflows under an old name, and both are permissive. | Rename to `gateway-ci.yml` / `gateway-deploy.yml`, make them fail-closed (Stage 1.1, 1.6). Until then: **do not deploy from them**. |
+| C-2 | §10.2 item 11 | Treats `cbridge-ci.yml` / `cbridge-deploy.yml` as "legacy/unclear". They are Gateway A's CI and deploy workflows under an old name, and both are permissive. | Rename to `gateway-ci.yml` / `gateway-deploy.yml`, make them fail-closed (gateway plan). Until then: **do not deploy from them**. |
 | C-3 | Items 51, 59–61, 67, §11 step 8 | Says biometric confirmation is mandatory and device unlock alone is not approval. The implemented and operator-approved design has **two confirmation tiers**: `hardware_confirm` (BiometricPrompt bound to the key; device PIN/pattern allowed on API 30+) and `in_app_confirm` (typed first 7 hex characters of the expected head SHA, no device lock). The operator requires that a device without biometrics must not stop the app. | Rewrite: *approval = the confirmation gesture the gateway's allowed tier requires, producing a signature with the device key*. The tier is recorded in the audit record. Which tier each operation needs, and whether production accepts `in_app_confirm`, is BD-3.1. Keep: never pre-mint, never approve a batch. |
 | C-4 | Item 61 ("SHA truncated/ambiguous") | The `in_app_confirm` gesture types a 7-character prefix. | Clarify: the summary always shows the **full 40-character SHA**; the typed prefix is only the confirmation gesture. Approval is refused if the full SHA is not displayed. |
 | C-5 | §1.2, item 6 vs. README "no persisted session token" | "Operator credential" is persisted (encrypted) while "session token" is not; the guide does not distinguish. | Define: operator bearer credential = persisted in Keystore-backed encrypted storage, gateway-scoped, rotatable; session = in-memory unlock only. |
@@ -117,9 +119,9 @@ I checked the guide's 105 items and §10 observations against: the console READM
 | A-5 | Items 52, 64, 94 (unknown outcome) | Requires a gateway operation-lookup endpoint (BD-1.7) and a durable journal (Stage 3.2). Neither exists yet. |
 | A-6 | Item 65 (distinct confirmation for halt/resume/decide) | Contract has `halt`/`resume`; `decide` is in the op enumeration with no endpoint. Per-operation tier minimums are BD-3.1. |
 | A-7 | Items 41, 79–80 (gateway credential scope) | `gateway/src/adapter/github-app-auth.ts` exists. The credential model (GitHub App vs token, repository list, permissions) is undocumented: BD-0.6 and `docs/gateway-credential-scope.md` (T1-205). |
-| A-8 | Items 8, 90 (revoke device key) | There is **no revocation route**: `routes/admin.ts` is a stub. Required in Stage 1.5; authority is BD-1.10. |
+| A-8 | Items 8, 90 (revoke device key) | There is **no revocation route**: `routes/admin.ts` is a stub. Required in the gateway plan; authority is BD-1.10. |
 | A-9 | Item 102 (staging test list) | Gateway A has no V1–V12 gate in its deploy workflow and no live conformance identity (BD-1.9). |
-| A-10 | Item 105 (local vs live conformance) | Kept. Stage 1.6 requires the live run to be archived separately from the local run. |
+| A-10 | Item 105 (local vs live conformance) | Kept. The gateway plan requires the live run to be archived separately from the local run. |
 
 ### B.4 Improvements added to the operator's responsibilities
 
@@ -137,13 +139,13 @@ I checked the guide's 105 items and §10 observations against: the console READM
 | Guide items | Where enforced / executed |
 |---|---|
 | 1–2 (official build, debug vs release) | Stage 7.1 release check; Stage 8.2 clean-device install |
-| 3–8 (enrolment, posture, key loss) | Stages 2.4, 3.5; Stage 1.5 (revocation); Stage 7.2/7.5 drills |
+| 3–8 (enrolment, posture, key loss) | Stages 2.4, 3.5; gateway plan (revocation); Stage 7.2/7.5 drills |
 | 13–14 (no shell, no commands) | `ArchitectureTest` extensions (T3-601) |
 | 15–28 (plan inspection, readiness, work orders) | Stages 4.2, 4.3 (contract limits per C-6) |
 | 29–40 (agent work, context) | Stages 6.1–6.3, with build-engine contracts |
-| 41–58 (submission, publication) | Stages 1.3, 1.4, 3.3, 3.4, 6.2 |
+| 41–58 (submission, publication) | Gateway plan; Stages 3.3, 3.4, 6.2 |
 | 59–67 (capability safety, halt/resume) | Stages 3.3–3.5 |
-| 68–82 (review, plan-state integrity, governance) | Stages 1.4, 4.3, 4.4; repo controls BD-0.5 |
+| 68–82 (review, plan-state integrity, governance) | Gateway plan; Stages 4.3, 4.4; repo controls BD-0.5 |
 | 83–94 (blockers, incidents, recovery) | Stages 3.2, 4.3; drills in 7.3, 7.5 |
 | 95–105 (release, deployment, lifecycle) | Phases 7, 8; cross-repo X-1…X-6 |
 | §10.3 mandatory reconciliation list | See B.6 |
@@ -154,8 +156,8 @@ I checked the guide's 105 items and §10 observations against: the console READM
 |---|---|
 | Reconcile build-engine `RELEASE-PLAN.md` with v0.5.0 / 0.6.0 | X-1 (build-engine) |
 | Single authoritative maturity/status document | T0-202 (`docs/STATUS.md`) |
-| Identify gateway repository, endpoints, deployment commit, runbook | T1-601, T1-605 (this repo; corrects C-1) |
-| Reconcile `cbridge-*` workflows | T1-102 (rename, harden) |
+| Identify gateway repository, endpoints, deployment commit, runbook | Gateway plan (this repo; corrects C-1) |
+| Reconcile `cbridge-*` workflows | Gateway plan (rename, harden) |
 | Define the replacement point per Termux/local action | Stage 6.4, BD-6.3 |
 | Prove live end-to-end operation | Stage 7.3 |
 | Update docs together | Rule G-11 |
@@ -177,7 +179,9 @@ Each row blocks the stage named. "Default" is my recommendation, not a decision.
 | BD-0.5 | Release provenance with an unprotected `main` (ADR 0010). Accept the residual risk in writing and adopt: `v*` tag ruleset (does not block pushes to `main`), release workflow only from a tag on a CI-green SHA, GitHub `release` environment with the operator as required reviewer | accept + controls / protect `main` (needs new decision, would block AI Studio) | accept + controls | 0.3, 7.1, 8.3 |
 | BD-0.6 | Gateway GitHub credential model: GitHub App vs fine-grained token as a Worker secret; exact repository list and permissions; how Gateway A learns per-plan consumer repositories (build-engine DX-1) | App / token; static list / per-plan registry | GitHub App, least-privilege, per-environment installation, repository list in validated configuration | 1.3 |
 
-### Phase 1 — Gateway A
+### Phase 1 — Gateway A (decisions only; the work is in the gateway plan)
+
+The operator still closes these decisions because the Android stages consume their outcomes (BD-1.3 and BD-1.7 block Stages 3.2, 3.4 and 4.2). "Blocks" stage numbers in this table are **gateway-plan** stages, not Android stages.
 
 | ID | Decision | Options | Default | Blocks |
 |---|---|---|---|---|
@@ -253,9 +257,9 @@ Each row blocks the stage named. "Default" is my recommendation, not a decision.
 | ID | Dependency | Needed by |
 |---|---|---|
 | X-1 | Reconcile build-engine `RELEASE-PLAN.md` header and phase state with v0.5.0 released and 0.6.0 in progress | Phase 0 |
-| X-2 | BE-0 documents: `COMPATIBILITY-MATRIX.md`, `CAPABILITY-CONFORMANCE.md`, `CBRIDGE-COVERAGE-MATRIX.md` (not present on `main` at review) | Stage 1.2, 6.4 |
+| X-2 | BE-0 documents: `COMPATIBILITY-MATRIX.md`, `CAPABILITY-CONFORMANCE.md`, `CBRIDGE-COVERAGE-MATRIX.md` (not present on `main` at review) | Gateway plan (contract), Stage 6.4 |
 | X-3 | Protocol identifier `build-engine/0.6` change | Stage 8.1 |
-| X-4 | DX-1 credential model for per-plan repositories; DX-2 hostnames and pilot repositories | Stage 1.3, 1.6 |
+| X-4 | DX-1 credential model for per-plan repositories; DX-2 hostnames and pilot repositories | Gateway plan |
 | X-5 | Production-on-`workers.dev` gate change in build-engine | Stage 7.3 (production only) |
 | X-6 | BE-7 joint pilot scheduled with this plan's Stage 7.4; BE-8 compatibility record lists console APK and Gateway A with checksums | Phase 7–8 |
 
@@ -265,7 +269,7 @@ Each row blocks the stage named. "Default" is my recommendation, not a decision.
 
 Task IDs: `T<phase>-<n>`; the hundreds digit is the stage (T3-204 = stage 3.2). Prefix with the plan number when registered. Evidence: each stage report `agent-reports/<UTC>-<slug>.md`; each phase gate adds `docs/release/PHASE-<n>-EVIDENCE.md`.
 
-Path shorthand: `M/` = `app/src/main/kotlin/com/inscopelabs/buildengine/`, `T/` = `app/src/test/kotlin/com/inscopelabs/buildengine/`, `A/` = `app/src/androidTest/kotlin/com/inscopelabs/buildengine/`, `G/` = `gateway/`.
+Path shorthand: `M/` = `app/src/main/kotlin/com/inscopelabs/buildengine/`, `T/` = `app/src/test/kotlin/com/inscopelabs/buildengine/`, `A/` = `app/src/androidTest/kotlin/com/inscopelabs/buildengine/`. (Gateway paths are out of scope for this plan.)
 
 ### Phase 0 — Baseline, decisions, hygiene (docs and housekeeping only)
 
@@ -289,51 +293,17 @@ Path shorthand: `M/` = `app/src/main/kotlin/com/inscopelabs/buildengine/`, `T/` 
 - T0-301 Delete `public/assets/aistudio/*` per BD-0.4 after listing each file's replacement in the report.
 - T0-302 `[BE]` X-1: build-engine reconciles its `RELEASE-PLAN.md` header.
 
-### Phase 1 — Gateway A: verifiable, contract-true, fail-closed
+### Phase 1 — Gateway A (not part of this plan)
 
-**Gate 1:** Gateway A passes typecheck, lint, unit, conformance, log-hygiene and bundle checks in CI with **no permissive step**; every advertised operation is implemented and refuses unsafe input; a deliberately failing gate demonstrably blocks deployment; live conformance on deployed staging is archived.
+Gateway A is planned, built and verified under `gateway/GATEWAY-A-COMPLETION-PLAN.md` by its own agent. This plan schedules **no** gateway task, stage or gate. The former Phase 1 stages (T1-101 … T1-605) were removed from this plan in revision 1.1; their text is in git history before that revision.
 
-**Stage 1.1 — Make the gateway verifiable `[CLAUDE]` for workflows/lockfile, `[AIS]` for fixes**
-- T1-101 Commit `gateway/package-lock.json`; `npm ci` only; add `typecheck`.
-- T1-102 Rename to `gateway-ci.yml` / `gateway-deploy.yml`; remove every `|| true`; fix `setup-node` cache path; add a job that runs the existing unit suite.
-- T1-103 **Fail-closed stubs:** `POST /tasks/:id/publish` and the stub routes (`admin`, `decisions`, `doctor`, `sync`) return 501 `NOT_IMPLEMENTED` through the error catalogue. No stub returns 2xx.
-- T1-104 Run the suite once in CI; fix what breaks. Known risks from reports: router tests omitting `ENVIRONMENT` (BD-1.2), X.509 test helpers, unverified `tsc`.
-- T1-105 Demonstrate that a failing test and a failing log-hygiene check each turn CI red (record the run).
+**What Android stages need from the gateway plan** (operator confirms each before authorizing the dependent Android stage):
+- Published contract, JSON schemas and frozen error catalogue (`docs/gateway-contract.md`, `gateway/docs/**`): needed by Stages 2.x–3.x for DTOs and error mapping.
+- Operations lookup, decide, status transition and admin revoke/list in the contract (BD-1.3, BD-1.7, BD-1.10): needed by Stages 3.2, 3.4, 4.2 and 4.4.
+- A controlled gateway to test against: a deployed `test` Worker and deployed staging Gateway A: needed by Stages 2.3 (pin capture), 5.x, 7.2–7.4.
+- Gateway CI green on the pushed SHA: Android stages do not wait on it unless they test against the deployed gateway.
 
-**Stage 1.2 — Contract and schema authority `[AIS]` paths `docs/**`, `G/docs/**`, `G/src/errors/**`**
-- T1-201 Reconcile `docs/gateway-contract.md`, `docs/capability-format.md`, `G/docs/*` with the code and with BD-1.1…1.5, and with build-engine `CAPABILITY-CONFORMANCE.md` (X-2). Specific drifts: error body field (`code` in the contract, `error` in the gateway: **align the gateway to the contract**); operation names (`PUBLISH` in the wire example, lower-case closed enum in code); contract lists 5 capability ops while the enum has 13; contract §5 guard IDs vs. spec G1–G15; contract §2 mapping lacks status transition, decision, order and operation lookup.
-- T1-202 Publish JSON Schemas for every request/response; add a CI check that fails when Kotlin DTOs or gateway types diverge from them (demonstrate with a deliberate mismatch).
-- T1-203 Regenerate vectors for any wire change; keep the reproducibility job green.
-- T1-204 Add endpoints per BD-1.3/1.7 to the contract (status transition, decide, operations lookup, admin revoke/list, audit read).
-- T1-205 `docs/gateway-credential-scope.md`: the GitHub credential, its permissions, repositories, and blast radius (guide items 41, 79–80).
-
-**Stage 1.3 — Guards and the publish transaction `[AIS]` `G/src/guards/**`, `G/src/adapter/**`, `G/src/durable-objects/**`**
-- T1-301 Implement G5 (ancestry), G6 (non-empty delta), G7 (no merge commits), G8 (denied paths), G11 (secret patterns), G14 (halt), G15 (submission immutable); register in the publish guard set; fixtures per contract §5.
-- T1-302 Implement `adapter/transaction.ts` (branch-head compare-and-swap on the expected SHA), `etag-cache.ts`, `rate-coordinator.ts`, `errors.ts`.
-- T1-303 Real publish: capability gate → guards → transaction → audit write-ahead → response with `auditRef`; replay and stale head produce `NONCE_REPLAYED` / `HEAD_DRIFT` and no write.
-- T1-304 Nonce store: schedule the alarm cleanup at expiry (open TODO in `nonce-store.ts`); test that cleanup never frees an unexpired nonce.
-- T1-305 `[OP]` Provision the test consumer repository with the fixture branches (`task-fx-*`); no credential enters the repository.
-
-**Stage 1.4 — Remaining operations `[AIS]`**
-- T1-401 `upload` (size/count caps, safe paths, single `SUBMISSION.json`, id and plan match; mirrors `cbridge`).
-- T1-402 `reconcile` (reports `MERGED:` / `CLOSED:` outcomes; never merges on its own).
-- T1-403 `halt` / `resume`: repository-wide state in a Durable Object plus marker; G14 reads it; `resume` separately scoped (guide item 66).
-- T1-404 `decide`, status transitions (per BD-1.3/1.4): attribution, rationale, scope and evidence are required fields; plan-state changes through compare-and-swap only.
-- T1-405 `sync`, `doctor` (reports rulesets and Actions permissions state read-only; flags the accepted R0-004 residuals).
-- T1-406 `GET /operations/{id}` (BD-1.7): returns `unknown | in_progress | succeeded | refused | conflict`; idempotency key stored before the side effect.
-
-**Stage 1.5 — Audit, privacy, administration `[AIS]`**
-- T1-501 `audit/record.ts`, `emit.ts`, `durable-objects/audit-stream.ts` per BD-1.8; fields include operation, plan, task/order, branch, expected and actual SHA, `kid`, confirmation tier, outcome, request id; never capability, signature, nonce, payload or credential.
-- T1-502 Extend `verify-log-hygiene` to scan for capability, nonce, signature and token shapes in code and in captured test logs.
-- T1-503 `routes/admin.ts`: list enrolments, revoke a `kid`, rotate-in-place checks (BD-1.10). A revoked key is refused immediately and audited.
-- T1-504 Finalize `docs/error-catalogue.md`; every code has a test.
-
-**Stage 1.6 — Conformance and deployed staging acceptance `[CLAUDE]` `[OP]`**
-- T1-601 `docs/ENVIRONMENTS.md` and runbook (deploy, rollback, rotate credential, revoke device, halt/resume, incident) with no secret values (BD-7.3).
-- T1-602 `[CLAUDE]` Deploy workflow as a fail-closed sequence: typecheck → unit → conformance V1–V12 → privacy/log hygiene → bundle verification → staging acceptance → **production approval by required reviewer**.
-- T1-603 `[OP]` Create `staging` GitHub environment and secrets (Cloudflare token and account, GitHub App credentials, operator bearer credential, attestation root fingerprints `ATTESTATION_ROOT_SHA256`, signing keys); production environment with required reviewer. Separate values per environment.
-- T1-604 Deploy a throwaway `test` Worker and run live conformance (BD-1.9a); deploy staging Gateway A; archive both outputs separately from the local run (guide item 105).
-- T1-605 Record deployment version, commit SHA, workflow run, environment, conformance result, rollback point (guide item 104).
+Android phases begin at Phase 2. Stage and task IDs keep their numbers (no renumbering).
 
 ### Phase 2 — Android: configuration, transport, connectivity
 
@@ -413,7 +383,7 @@ Path shorthand: `M/` = `app/src/main/kotlin/com/inscopelabs/buildengine/`, `T/` 
 - T4-301 Submission inspection (paths, file hashes, expected branch SHA, restrictions); blocked-task views that keep **missing input, spec conflict, decision needed, policy refusal, technical failure** distinct (guide item 37); rework creates a new revision identity and preserves the original.
 
 **Stage 4.4 — Governance and audit views `[AIS]`**
-- T4-401 Decision history, audit inspection, device list/revoke screens (using T1-503), halt/resume screen.
+- T4-401 Decision history, audit inspection, device list/revoke screens (using the gateway admin routes defined in the gateway plan), halt/resume screen.
 
 **Stage 4.5 — Polish `[AIS]`**
 - T4-501 Replace the placeholder theme files (`Color.kt`, `Theme.kt`, `Type.kt` still carry scaffold markers); accessibility and small-screen checks per BD-4.2; delete every remaining `SCAFFOLD` marker not on the deferred list.
@@ -482,9 +452,9 @@ Path shorthand: `M/` = `app/src/main/kotlin/com/inscopelabs/buildengine/`, `T/` 
 | OP-0.1 | Phase 0 | Revoke all previously pasted PATs; confirm |
 | OP-0.2 | Phase 0 | Apply `v*` tag ruleset and `release` environment (BD-0.5) |
 | OP-0.3 | Phase 0 | Answer Part C Phase 0–1 decisions; merge ADR 0011 |
-| OP-1.1 | Stage 1.3 | Provision test consumer repository with `task-fx-*` branches |
-| OP-1.2 | Stage 1.6 | Create GitHub App; create `staging`/`production` environments; supply secrets (never in chat) |
-| OP-1.3 | Stage 1.6 | Supply attestation root fingerprints and per-environment signing keys |
+| OP-1.1 | Gateway plan | Provision test consumer repository with `task-fx-*` branches |
+| OP-1.2 | Gateway plan | Create GitHub App; create `staging`/`production` environments; supply secrets (never in chat) |
+| OP-1.3 | Gateway plan | Supply attestation root fingerprints and per-environment signing keys |
 | OP-2.1 | Stage 2.3 | Run the pin-capture commands against the deployed host; confirm backup pin |
 | OP-3.1 | Stage 3.1 | Authorize and merge the build-file PR |
 | OP-7.1 | Stage 7.1 | Generate and back up the release signing key offline; install as environment secret |
@@ -503,8 +473,8 @@ Path shorthand: `M/` = `app/src/main/kotlin/com/inscopelabs/buildengine/`, `T/` 
 | IMPLEMENTATION-PLAN | T6-201 (device checklist), T6-202 (README), T6-203 (architecture doc `lab` row) | 7.2, 0.2, 5.5 |
 | IMPLEMENTATION-PLAN | Decision P4 (BOM drift) | 0.2 |
 | IMPLEMENTATION-PLAN | Missing reports for Stages 2.4 and 3.1 | 0.2 (status table marks "re-verify") |
-| V0.6.0-BUILD-PLAN | OC-0 (schemas, DTO divergence check, matrix mirror) | 1.2, 6.4 |
-| V0.6.0-BUILD-PLAN | OC-1 (Gateway A real, lockfile, no `\|\| true`) | 1.1–1.5 |
+| V0.6.0-BUILD-PLAN | OC-0 (schemas, DTO divergence check, matrix mirror) | Gateway plan (schemas), 6.4 (Android DTO check) |
+| V0.6.0-BUILD-PLAN | OC-1 (Gateway A real, lockfile, no `\|\| true`) | Gateway plan |
 | V0.6.0-BUILD-PLAN | OC-2 (config, pins, preflight) | 2.1–2.4 |
 | V0.6.0-BUILD-PLAN | OC-3 (enrolment lifecycle; app side done per report) | Gate 2/3 verification, 3.5 |
 | V0.6.0-BUILD-PLAN | OC-4 (journal, outcome model, write use cases) | 3.1–3.4 |
@@ -514,17 +484,17 @@ Path shorthand: `M/` = `app/src/main/kotlin/com/inscopelabs/buildengine/`, `T/` 
 | V0.6.0-BUILD-PLAN | OC-9 | Non-blocking backlog |
 | Connectivity remediation | Stages 2–8 | 2.1 |
 | gateway-repair-ga reports | Missing `ENVIRONMENT` default question | BD-1.2 |
-| gateway-repair-ga reports | Contract `code` vs gateway `error` body | T1-201 |
+| gateway-repair-ga reports | Contract `code` vs gateway `error` body | Gateway plan |
 | gateway-repair-ga reports | Attestation `pathLen` and `keyUsage` interpretation against real Android chains; operator-supplied root fingerprints | 7.2 (real chain), OP-1.3 |
-| gateway-repair-ga reports | GW-6 conformance suites, halt/sync/doctor, transaction layer, GW-7 | 1.3–1.6 |
-| gateway-repair-ga reports | All "tsc/vitest unverified in-agent" | 1.1, G-04 |
+| gateway-repair-ga reports | GW-6 conformance suites, halt/sync/doctor, transaction layer, GW-7 | Gateway plan |
+| gateway-repair-ga reports | All "tsc/vitest unverified in-agent" | Gateway plan |
 | ADR 0007 (transport) | Pins and rotation procedure; release refused without them | 2.3, 7.1 |
 | ADR 0007 (tiers) / ADR 0012 after rename | Gateway tier policy per environment | BD-3.1, 3.5 |
 | ADR 0009 | Encrypted Room + WorkManager | 3.1–3.2 |
 | ADR 0010 | Runtime hostname validation; production host only after build-engine gate change | 2.2, X-5 |
-| ADR 0008 | Task-state transition operation; coverage matrix; Termux retirement | 1.4, 6.4, 8.4 |
-| Stage 4.2 report | Android-side tier handling done; gateway-side policy and docs to confirm | 1.5, 3.5 |
-| `cbridge-ci.yml` / `cbridge-deploy.yml` | `TODO` gates, V1–V12 before production | 1.1, 1.6 |
+| ADR 0008 | Task-state transition operation; coverage matrix; Termux retirement | Gateway plan, 6.4, 8.4 |
+| Stage 4.2 report | Android-side tier handling done; gateway-side policy and docs to confirm | Gateway plan, 3.5 |
+| `cbridge-ci.yml` / `cbridge-deploy.yml` | `TODO` gates, V1–V12 before production | Gateway plan |
 | `public/assets/aistudio/*` | Stray upload copies | 0.3 |
 
 ## Part G — Release gates summary
@@ -532,7 +502,7 @@ Path shorthand: `M/` = `app/src/main/kotlin/com/inscopelabs/buildengine/`, `T/` 
 | Gate | Exit criteria |
 |---|---|
 | 0 | BD-0.* closed; STATUS document; competing plans marked superseded |
-| 1 | Gateway A fully implemented, CI hard gates, live conformance archived on `test` and staging |
+| 1 | Not an Android gate. Gateway A is gated by its own plan; the operator records its result before authorizing Android stages that need a deployed gateway |
 | 2 | Configuration, pinning and preflight proven on the deployed host |
 | 3 | Write operations and crash-safe recovery proven against the controlled gateway |
 | 4 | Operator interface complete, no placeholders in `ui/` |
@@ -546,8 +516,8 @@ Path shorthand: `M/` = `app/src/main/kotlin/com/inscopelabs/buildengine/`, `T/` 
 | Risk | Mitigation |
 |---|---|
 | AI Studio silently overwrites out-of-band changes | One stage per run; Claude rebases open branches first; diff review; protected paths |
-| Gateway work "done" without ever running | Lockfile and hard CI first (Stage 1.1); stages close only on green CI |
-| False success report from a stub | T1-103 now; G-08; success only after head verification |
+| Two agents write the same files | AI Studio `app/**` only, gateway agent `gateway/**` only (G-12); pull `main` before each run |
+| False success report from a stub | G-08; success only after head verification |
 | Pin lockout or silent pin expiry | BD-2.1/2.2, rotation drill, release check on expiry |
 | Cross-environment capability replay | Per-environment keys (T2-204), per-environment credentials, environment equality check |
 | Lab code or HMAC signer reaching a release | BD-5.1, release check |
