@@ -4,7 +4,7 @@
  * for every path except GET /health.
  */
 
-import type { Env } from '../index';
+import type { Env } from '../runtime';
 import { errorResponse, operatorAuthResponse } from '../errors/respond';
 import { verifyOperatorToken } from '../auth/operator-token';
 import { parseGatewayConfig } from '../config/env';

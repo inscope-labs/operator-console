@@ -101,7 +101,7 @@ describe('T1-103 fail-closed stubs (Stage 1.1)', () => {
       expect(body.error).toBe('OPERATOR_AUTH');
     });
 
-    it('returns 400 when capability body is missing or invalid', async () => {
+    it('returns 501 NOT_IMPLEMENTED even when capability body is missing (early refusal)', async () => {
       const res = await dispatch(
         new Request('https://gw.test/tasks/task-1/publish', {
           method: 'POST',
@@ -114,10 +114,10 @@ describe('T1-103 fail-closed stubs (Stage 1.1)', () => {
         baseEnv(),
         ctx
       );
-      expect(res.status).toBe(400);
+      // Stage 1.1 early refusal: body is not interpreted; stub answers 501
+      expect(res.status).toBe(501);
       const body = (await res.json()) as { error: string; message: string };
-      expect(body.error).toBe('NETWORK');
-      expect(body.message).toMatch(/capability string required/);
+      expect(body.error).toBe('NOT_IMPLEMENTED');
     });
 
     it('returns 501 NOT_IMPLEMENTED (never 200) when capability and guards pass', async () => {

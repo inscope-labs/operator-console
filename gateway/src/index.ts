@@ -1,5 +1,5 @@
 /**
- * cbridge Worker entry point.
+ * Gateway A Worker entry point.
  * Sole enforcement point for the operator console.
  */
 
@@ -14,32 +14,12 @@ import { registerAdminRoutes } from './routes/admin';
 import { registerDecisionRoutes } from './routes/decisions';
 import { registerDoctorRoutes } from './routes/doctor';
 import { registerSyncRoutes } from './routes/sync';
-import { MultiRepoGitHubAdapter } from './adapter/multi-repo-adapter';
 import { NonceStore } from './durable-objects/nonce-store';
 import { EnrolmentRegistry } from './durable-objects/enrolment-registry';
 import './guards/register-core';
 
-export interface Env {
-  ENVIRONMENT?: string;
-  ALLOWED_AUTH_TIERS?: string;
-  ATTESTATION_MODE?: string;
-  ATTESTATION_ROOT_SHA256?: string;
-
-  SIGNING_KEYS: string;
-  OPERATOR_TOKEN: string;
-  REPOS: string;
-
-  GITHUB_APP_ID: string;
-  GITHUB_APP_PRIVATE_KEY: string;
-  GITHUB_APP_INSTALLATION_ID: string;
-
-  PLAN_DO: DurableObjectNamespace;
-  NONCE_STORE: DurableObjectNamespace;
-  ENROLMENT_REGISTRY: DurableObjectNamespace;
-  AUDIT_STREAM: DurableObjectNamespace;
-
-  __adapter?: MultiRepoGitHubAdapter;
-}
+export type { Env } from './runtime';
+export { getAdapter } from './runtime';
 
 registerHealthRoutes();
 registerStatusRoutes();
@@ -52,34 +32,10 @@ registerDecisionRoutes();
 registerDoctorRoutes();
 registerSyncRoutes();
 
-export async function getAdapter(env: Env): Promise<MultiRepoGitHubAdapter> {
-  if (env.__adapter) return env.__adapter;
-  if (
-    !env.REPOS ||
-    !env.GITHUB_APP_ID ||
-    !env.GITHUB_APP_PRIVATE_KEY ||
-    !env.GITHUB_APP_INSTALLATION_ID
-  ) {
-    throw new Error(
-      'adapter credentials incomplete — set REPOS, GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_APP_INSTALLATION_ID'
-    );
-  }
-  const adapter = await MultiRepoGitHubAdapter.create({
-    reposJson: env.REPOS,
-    secrets: {
-      appId: env.GITHUB_APP_ID,
-      privateKeyPem: env.GITHUB_APP_PRIVATE_KEY,
-      installationId: env.GITHUB_APP_INSTALLATION_ID,
-    },
-  });
-  env.__adapter = adapter;
-  return adapter;
-}
-
 export default {
   async fetch(
     request: Request,
-    env: Env,
+    env: import('./runtime').Env,
     ctx: ExecutionContext
   ): Promise<Response> {
     if (request.method === 'OPTIONS') {
