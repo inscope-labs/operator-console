@@ -46,15 +46,6 @@ export function isDecision(op: OperationType): boolean {
   return (DECISION_OPS as readonly string[]).includes(op);
 }
 
-export function isTaskScoped(op: OperationType): boolean {
-  return !(
-    (REPO_WIDE_OPS as readonly string[]).includes(op) ||
-    (LIGHT_OPS as readonly string[]).includes(op) ||
-    op === 'new' ||
-    op === 'new_plan'
-  );
-}
-
 export function allOperations(): readonly OperationType[] {
   return OPERATION_TYPES;
 }

@@ -21,7 +21,6 @@ export type OperationType =
   | 'order'
   | 'set'
   | 'new'
-  | 'new_plan'
   | 'sync'
   | 'doctor'
   | 'set_in_progress'
@@ -37,7 +36,6 @@ export const OPERATION_TYPES: readonly OperationType[] = [
   'order',
   'set',
   'new',
-  'new_plan',
   'sync',
   'doctor',
   'set_in_progress',
@@ -76,14 +74,5 @@ export interface SignedCapability {
 }
 
 export function isOperationType(value: string): value is OperationType {
-  const normalized = value.toLowerCase();
-  return (OPERATION_TYPES as readonly string[]).includes(normalized);
-}
-
-export function normalizeOperationType(value: string): OperationType {
-  const normalized = value.toLowerCase();
-  if (!isOperationType(normalized)) {
-    throw new Error(`UNKNOWN_OP: ${value}`);
-  }
-  return normalized as OperationType;
+  return (OPERATION_TYPES as readonly string[]).includes(value);
 }
