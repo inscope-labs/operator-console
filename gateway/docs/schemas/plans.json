@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inscope-labs.github.io/operator-console/gateway/schemas/plans.json",
+  "title": "Plans",
+  "definitions": {
+    "PlanSummary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "title", "status"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "type": "string" },
+        "taskCount": { "type": "integer" },
+        "completedTaskCount": { "type": "integer" },
+        "updatedAt": { "type": "integer" }
+      }
+    },
+    "PlanStatus": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "status"],
+      "properties": {
+        "id": { "type": "string" },
+        "status": { "type": "string" },
+        "halted": { "type": "boolean" },
+        "openBranches": { "type": "array", "items": { "type": "string" } },
+        "blockedTasks": { "type": "array", "items": { "type": "string" } },
+        "currentMilestone": { "type": "string" }
+      }
+    },
+    "ValidateResponse": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["valid", "planId"],
+      "properties": {
+        "valid": { "type": "boolean" },
+        "planId": { "type": "string" },
+        "errors": { "type": "array", "items": { "type": "string" } },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "RenderCheckResponse": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["ok", "planId"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "planId": { "type": "string" },
+        "renderIssues": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "GET /plans": {
+    "type": "array",
+    "items": { "$ref": "#/definitions/PlanSummary" }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inscope-labs.github.io/operator-console/gateway/schemas/health.json",
+  "title": "GET /health",
+  "oneOf": [
+    {
+      "title": "HealthOk",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["status", "environment", "version", "timestamp"],
+      "properties": {
+        "status": { "const": "ok" },
+        "environment": { "type": "string", "enum": ["test", "staging", "production"] },
+        "version": { "type": "string" },
+        "timestamp": { "type": "integer" }
+      }
+    },
+    {
+      "title": "HealthDegraded",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["status", "environment", "version", "timestamp", "config"],
+      "properties": {
+        "status": { "const": "degraded" },
+        "environment": { "type": ["string", "null"] },
+        "version": { "type": "string" },
+        "timestamp": { "type": "integer" },
+        "config": {
+          "type": "object",
+          "required": ["valid", "problems"],
+          "properties": {
+            "valid": { "const": false },
+            "problems": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    }
+  ]
+}

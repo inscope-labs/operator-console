@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inscope-labs.github.io/operator-console/gateway/schemas/decide.json",
+  "title": "Decide (optional for 0.6.0)",
+  "definitions": {
+    "DecideRequest": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["capability"],
+      "properties": {
+        "decision": { "type": "string" },
+        "rationale": { "type": "string" },
+        "scope": { "type": "string" },
+        "evidence": { "type": "string" },
+        "capability": { "type": "string", "minLength": 1 }
+      }
+    },
+    "DecideResponse": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["accepted", "operation", "auditRef"],
+      "properties": {
+        "accepted": { "const": true },
+        "operation": { "const": "DECIDE" },
+        "auditRef": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inscope-labs.github.io/operator-console/gateway/schemas/enrol.json",
+  "title": "Enrolment",
+  "definitions": {
+    "ChallengeResponse": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["challenge", "expiresAt"],
+      "properties": {
+        "challenge": { "type": "string" },
+        "expiresAt": { "type": "integer" }
+      }
+    },
+    "EnrollRequest": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["alias", "publicKey", "attestationChain", "challenge", "authTier"],
+      "properties": {
+        "alias": { "type": "string" },
+        "publicKey": { "type": "string" },
+        "attestationChain": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "challenge": { "type": "string" },
+        "authTier": { "type": "string", "enum": ["hardware_confirm", "in_app_confirm"] }
+      }
+    },
+    "EnrollResponse": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["kid", "status", "enrolledAt", "authTier"],
+      "properties": {
+        "kid": { "type": "string" },
+        "status": { "type": "string" },
+        "enrolledAt": { "type": "integer" },
+        "authTier": { "type": "string", "enum": ["hardware_confirm", "in_app_confirm"] }
+      }
+    },
+    "RotateRequest": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["oldKid", "newPublicKey", "attestationChain", "challenge", "authTier"],
+      "properties": {
+        "oldKid": { "type": "string" },
+        "newPublicKey": { "type": "string" },
+        "attestationChain": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "challenge": { "type": "string" },
+        "authTier": { "type": "string", "enum": ["hardware_confirm", "in_app_confirm"] }
+      }
+    },
+    "RotateResponse": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["kid", "status", "rotatedAt", "authTier"],
+      "properties": {
+        "kid": { "type": "string" },
+        "status": { "type": "string" },
+        "rotatedAt": { "type": "integer" },
+        "authTier": { "type": "string", "enum": ["hardware_confirm", "in_app_confirm"] }
+      }
+    }
+  }
+}

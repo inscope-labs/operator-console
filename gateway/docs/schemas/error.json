@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inscope-labs.github.io/operator-console/gateway/schemas/error.json",
+  "title": "GatewayErrorBody",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["error", "message", "request_id"],
+  "properties": {
+    "error": {
+      "type": "string",
+      "description": "Machine-readable ErrorCode from the frozen catalogue"
+    },
+    "message": {
+      "type": "string",
+      "description": "Human-readable summary; must not contain secrets"
+    },
+    "request_id": {
+      "type": "string",
+      "description": "Correlation id for the request"
+    }
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inscope-labs.github.io/operator-console/gateway/schemas/tasks.json",
+  "title": "Tasks",
+  "definitions": {
+    "TaskSummary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "planId", "title", "status"],
+      "properties": {
+        "id": { "type": "string" },
+        "planId": { "type": "string" },
+        "title": { "type": "string" },
+        "branch": { "type": "string" },
+        "status": { "type": "string" },
+        "headSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+      }
+    },
+    "PublishRequest": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["capability"],
+      "properties": {
+        "plan": { "type": "string" },
+        "task": { "type": "string" },
+        "branch": { "type": "string" },
+        "head": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "capability": { "type": "string", "minLength": 1 }
+      }
+    },
+    "UploadRequest": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["capability", "zipSha256", "zipBase64"],
+      "properties": {
+        "plan": { "type": "string" },
+        "task": { "type": "string" },
+        "branch": { "type": "string" },
+        "head": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "submissionId": { "type": "string" },
+        "zipSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "zipBase64": { "type": "string" },
+        "capability": { "type": "string", "minLength": 1 }
+      }
+    },
+    "ReconcileRequest": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["capability"],
+      "properties": {
+        "plan": { "type": "string" },
+        "task": { "type": "string" },
+        "branch": { "type": "string" },
+        "head": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "submissionId": { "type": "string" },
+        "capability": { "type": "string", "minLength": 1 }
+      }
+    },
+    "WriteSuccess": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["accepted", "operation", "branch", "headSha", "auditRef"],
+      "properties": {
+        "accepted": { "const": true },
+        "operation": { "type": "string" },
+        "branch": { "type": "string" },
+        "headSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "outcome": { "type": "string" },
+        "auditRef": { "type": "string" }
+      }
+    }
+  }
+}

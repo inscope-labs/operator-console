@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inscope-labs.github.io/operator-console/gateway/schemas/sync-doctor.json",
+  "title": "Sync and Doctor",
+  "definitions": {
+    "SyncRequest": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "branch": { "type": "string" }
+      }
+    },
+    "SyncResponse": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["status", "headSha", "inSync"],
+      "properties": {
+        "status": { "type": "string" },
+        "headSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "inSync": { "type": "boolean" }
+      }
+    },
+    "DoctorResponse": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["healthy", "checks"],
+      "properties": {
+        "healthy": { "type": "boolean" },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "passed"],
+            "properties": {
+              "name": { "type": "string" },
+              "passed": { "type": "boolean" },
+              "details": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
