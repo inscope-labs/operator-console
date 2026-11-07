@@ -3,7 +3,7 @@
  * Spec §9.3.
  */
 
-import { getAdapter } from '../index';
+import { getAdapter } from '../runtime';
 import { register, type RouteHandler } from './router';
 import { errorResponse } from '../errors/respond';
 
