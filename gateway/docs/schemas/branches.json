@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inscope-labs.github.io/operator-console/gateway/schemas/branches.json",
+  "title": "GET /branches/{name}/head",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["branch", "headSha"],
+  "properties": {
+    "branch": { "type": "string" },
+    "headSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+  }
+}

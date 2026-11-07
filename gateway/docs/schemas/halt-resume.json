@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inscope-labs.github.io/operator-console/gateway/schemas/halt-resume.json",
+  "title": "Halt and Resume",
+  "definitions": {
+    "HaltResumeRequest": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["branch", "head", "capability"],
+      "properties": {
+        "branch": { "const": "engine" },
+        "head": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "reason": { "type": "string" },
+        "capability": { "type": "string", "minLength": 1 }
+      }
+    },
+    "HaltResumeResponse": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["accepted", "operation", "branch", "headSha", "auditRef"],
+      "properties": {
+        "accepted": { "const": true },
+        "operation": { "type": "string", "enum": ["HALT", "RESUME"] },
+        "branch": { "const": "engine" },
+        "headSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "auditRef": { "type": "string" }
+      }
+    }
+  }
+}
