@@ -1,10 +1,12 @@
 /**
- * Enrolment registry Durable Object — GW-4.
+ * Enrolment registry Durable Object — GW-4 / Stage 2.2.
  * Spec §7 + addendum: challenges (single-use, TTL 300s) and enrolment records.
  * Internal fetch routes only — no public admin surface.
  *
  * Challenge is consumed on the first attestation attempt (success or failure).
- * Full attestation chain is never stored; challenge bytes are not retained after consume.
+ * Full attestation chain is never stored; challenge bytes are deleted after consume.
+ * Storage is the Durable Object's persistent storage — a new Worker isolate that
+ * binds to the same DO id observes the same records (restart survival).
  */
 
 import { ENROLL_CHALLENGE_TTL_SECONDS, type AuthTier } from '../config/constants';
@@ -49,13 +51,17 @@ export function toBase64Url(input: string): string {
   const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4));
   try {
     const raw = atob(b64 + pad);
-    let out = btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    return out;
+    return btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   } catch {
-    // already raw-ish; still coerce alphabet
     return cleaned.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
 }
+
+type Txn = {
+  get: <T>(key: string) => Promise<T | undefined>;
+  put: (key: string, value: unknown) => Promise<void>;
+  delete: (key: string) => Promise<boolean | void>;
+};
 
 export class EnrolmentRegistry implements DurableObject {
   constructor(private readonly state: DurableObjectState) {}
@@ -84,15 +90,34 @@ export class EnrolmentRegistry implements DurableObject {
       if (request.method === 'GET' && path === '/active') {
         return this.listActive();
       }
-      return error('NETWORK', `EnrolmentRegistry: no route ${request.method} ${path}`, 404);
+      return error(
+        'NETWORK',
+        `EnrolmentRegistry: no route ${request.method} ${path}`,
+        404
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'internal error';
       return error('NETWORK', msg, 500);
     }
   }
 
-  private async meta(): Promise<MetaState> {
-    const m = await this.state.storage.get<MetaState>('meta');
+  private async withTxn<T>(fn: (txn: Txn) => Promise<T>): Promise<T> {
+    const storage = this.state.storage as DurableObjectStorage & {
+      transaction?: (c: (txn: Txn) => Promise<T>) => Promise<T>;
+    };
+    if (typeof storage.transaction === 'function') {
+      return storage.transaction(fn);
+    }
+    return fn({
+      get: (k) => storage.get(k),
+      put: (k, v) => storage.put(k, v),
+      delete: (k) => storage.delete(k),
+    });
+  }
+
+  private async meta(txn?: Txn): Promise<MetaState> {
+    const get = txn?.get ?? ((k: string) => this.state.storage.get(k));
+    const m = await get<MetaState>('meta');
     return m ?? { nextKidSeq: 1 };
   }
 
@@ -118,7 +143,8 @@ export class EnrolmentRegistry implements DurableObject {
 
   /**
    * Atomically validate + consume a challenge.
-   * First attempt that reaches this path consumes it (success or failure upstream).
+   * First attempt consumes it; reuse or expiry → ENROLL_CHALLENGE_INVALID.
+   * Challenge record is deleted after successful consume (bytes not retained).
    */
   private async consumeChallenge(request: Request): Promise<Response> {
     let body: { challenge?: string; now?: number } = {};
@@ -132,13 +158,25 @@ export class EnrolmentRegistry implements DurableObject {
     }
     const now = body.now ?? Math.floor(Date.now() / 1000);
     const key = `challenge:${body.challenge}`;
-    const rec = await this.state.storage.get<ChallengeRecord>(key);
-    if (!rec || rec.consumed || rec.expiresAt < now) {
-      return error('ENROLL_CHALLENGE_INVALID', 'challenge unknown, expired, or used', 400);
+
+    let invalid = false;
+    await this.withTxn(async (txn) => {
+      const rec = await txn.get<ChallengeRecord>(key);
+      if (!rec || rec.consumed || rec.expiresAt < now) {
+        invalid = true;
+        return;
+      }
+      // Delete rather than leave a consumed flag — no challenge bytes retained.
+      await txn.delete(key);
+    });
+
+    if (invalid) {
+      return error(
+        'ENROLL_CHALLENGE_INVALID',
+        'challenge unknown, expired, or used',
+        400
+      );
     }
-    rec.consumed = true;
-    await this.state.storage.put(key, rec);
-    // Do not retain challenge bytes beyond the key; record keeps the string only until purge.
     return json({ ok: true });
   }
 
@@ -156,28 +194,39 @@ export class EnrolmentRegistry implements DurableObject {
       return error('NETWORK', 'invalid JSON', 400);
     }
     if (!body.alias || !body.publicKey || !body.authTier || !body.leafCertSha256) {
-      return error('NETWORK', 'alias, publicKey, authTier, leafCertSha256 required', 400);
+      return error(
+        'NETWORK',
+        'alias, publicKey, authTier, leafCertSha256 required',
+        400
+      );
     }
     const now = body.now ?? Math.floor(Date.now() / 1000);
-    const meta = await this.meta();
-    const kid = `k${meta.nextKidSeq}`;
-    meta.nextKidSeq += 1;
-    const record: EnrolmentRecord = {
-      kid,
-      alias: body.alias,
-      publicKey: toBase64Url(body.publicKey),
-      authTier: body.authTier,
-      status: 'active',
-      enrolledAt: now,
-      leafCertSha256: body.leafCertSha256.toLowerCase(),
-    };
-    await this.state.storage.put(`enrol:${kid}`, record);
-    await this.state.storage.put(`alias:${body.alias}:active`, kid);
-    await this.state.storage.put('meta', meta);
-    return json({ ok: true, kid, authTier: record.authTier });
+
+    let kid = '';
+    let authTier: AuthTier = body.authTier;
+    await this.withTxn(async (txn) => {
+      const meta = await this.meta(txn);
+      kid = `k${meta.nextKidSeq}`;
+      meta.nextKidSeq += 1;
+      const record: EnrolmentRecord = {
+        kid,
+        alias: body.alias!,
+        publicKey: toBase64Url(body.publicKey!),
+        authTier: body.authTier!,
+        status: 'active',
+        enrolledAt: now,
+        leafCertSha256: body.leafCertSha256!.toLowerCase(),
+      };
+      authTier = record.authTier;
+      await txn.put(`enrol:${kid}`, record);
+      await txn.put(`alias:${body.alias}:active`, kid);
+      await txn.put('meta', meta);
+    });
+
+    return json({ ok: true, kid, authTier });
   }
 
-  /** Retire oldKid and activate new enrolment in one transaction-like batch. */
+  /** Retire oldKid and activate new enrolment in one atomic batch. */
   private async rotate(request: Request): Promise<Response> {
     let body: {
       oldKid?: string;
@@ -193,32 +242,55 @@ export class EnrolmentRegistry implements DurableObject {
       return error('NETWORK', 'invalid JSON', 400);
     }
     if (!body.oldKid || !body.publicKey || !body.authTier || !body.leafCertSha256) {
-      return error('NETWORK', 'oldKid, publicKey, authTier, leafCertSha256 required', 400);
+      return error(
+        'NETWORK',
+        'oldKid, publicKey, authTier, leafCertSha256 required',
+        400
+      );
     }
     const now = body.now ?? Math.floor(Date.now() / 1000);
-    const old = await this.state.storage.get<EnrolmentRecord>(`enrol:${body.oldKid}`);
-    if (!old || old.status !== 'active') {
-      return error('NETWORK', 'old enrolment not active', 400);
+
+    type RotateOk = { kid: string; retiredKid: string; authTier: AuthTier };
+    let result: RotateOk | undefined;
+    let fail: string | undefined;
+
+    await this.withTxn(async (txn) => {
+      const old = await txn.get<EnrolmentRecord>(`enrol:${body.oldKid}`);
+      if (!old || old.status !== 'active') {
+        fail = 'old enrolment not active';
+        return;
+      }
+      const alias = body.alias ?? old.alias;
+      const meta = await this.meta(txn);
+      const kid = `k${meta.nextKidSeq}`;
+      meta.nextKidSeq += 1;
+      old.status = 'retired';
+      const neu: EnrolmentRecord = {
+        kid,
+        alias,
+        publicKey: toBase64Url(body.publicKey!),
+        authTier: body.authTier!,
+        status: 'active',
+        enrolledAt: now,
+        leafCertSha256: body.leafCertSha256!.toLowerCase(),
+      };
+      await txn.put(`enrol:${old.kid}`, old);
+      await txn.put(`enrol:${kid}`, neu);
+      await txn.put(`alias:${alias}:active`, kid);
+      await txn.put('meta', meta);
+      result = { kid, retiredKid: old.kid, authTier: neu.authTier };
+    });
+
+    if (fail !== undefined || result === undefined) {
+      return error('NETWORK', fail ?? 'rotate failed', 400);
     }
-    const alias = body.alias ?? old.alias;
-    const meta = await this.meta();
-    const kid = `k${meta.nextKidSeq}`;
-    meta.nextKidSeq += 1;
-    old.status = 'retired';
-    const neu: EnrolmentRecord = {
-      kid,
-      alias,
-      publicKey: toBase64Url(body.publicKey),
-      authTier: body.authTier,
-      status: 'active',
-      enrolledAt: now,
-      leafCertSha256: body.leafCertSha256.toLowerCase(),
-    };
-    await this.state.storage.put(`enrol:${old.kid}`, old);
-    await this.state.storage.put(`enrol:${kid}`, neu);
-    await this.state.storage.put(`alias:${alias}:active`, kid);
-    await this.state.storage.put('meta', meta);
-    return json({ ok: true, kid, retiredKid: old.kid, authTier: neu.authTier });
+    const ok: RotateOk = result;
+    return json({
+      ok: true,
+      kid: ok.kid,
+      retiredKid: ok.retiredKid,
+      authTier: ok.authTier,
+    });
   }
 
   private async lookup(kid: string): Promise<Response> {
@@ -230,7 +302,9 @@ export class EnrolmentRegistry implements DurableObject {
   }
 
   private async listActive(): Promise<Response> {
-    const all = await this.state.storage.list<EnrolmentRecord>({ prefix: 'enrol:' });
+    const all = await this.state.storage.list<EnrolmentRecord>({
+      prefix: 'enrol:',
+    });
     const active: EnrolmentRecord[] = [];
     for (const [, rec] of all) {
       if (rec.status === 'active') active.push(rec);
