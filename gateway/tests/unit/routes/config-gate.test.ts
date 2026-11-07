@@ -37,7 +37,7 @@ beforeEach(() => {
 });
 
 describe('config gate', () => {
-  it('GET /health succeeds with invalid ENVIRONMENT and reports problems', async () => {
+  it('GET /health succeeds with ENVIRONMENT=staging and reports environment', async () => {
     const res = await dispatch(
       new Request('https://gw.test/health'),
       env({ ENVIRONMENT: 'staging' }),
@@ -45,10 +45,46 @@ describe('config gate', () => {
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      ok: boolean;
+      status: string;
+      environment: string | null;
+      config?: { valid: boolean; problems: string[] };
+    };
+    expect(body.status).toBe('ok');
+    expect(body.environment).toBe('staging');
+    expect(body.config).toBeUndefined();
+  });
+
+  it('GET /health reports all three valid environments', async () => {
+    for (const name of ['test', 'staging', 'production'] as const) {
+      const res = await dispatch(
+        new Request('https://gw.test/health'),
+        env({ ENVIRONMENT: name }),
+        ctx
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        status: string;
+        environment: string | null;
+      };
+      expect(body.status).toBe('ok');
+      expect(body.environment).toBe(name);
+    }
+  });
+
+  it('GET /health succeeds with invalid ENVIRONMENT and reports problems', async () => {
+    const res = await dispatch(
+      new Request('https://gw.test/health'),
+      env({ ENVIRONMENT: 'lab' }),
+      ctx
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      status: string;
+      environment: string | null;
       config: { valid: boolean; problems: string[] };
     };
-    expect(body.ok).toBe(false);
+    expect(body.status).toBe('degraded');
+    expect(body.environment).toBeNull();
     expect(body.config.valid).toBe(false);
     expect(body.config.problems).toContain('ENVIRONMENT_INVALID');
   });
@@ -58,7 +94,7 @@ describe('config gate', () => {
       new Request('https://gw.test/status', {
         headers: { authorization: 'Bearer tok' },
       }),
-      env({ ENVIRONMENT: 'staging' }),
+      env({ ENVIRONMENT: 'lab' }),
       ctx
     );
     expect(res.status).toBe(503);
@@ -66,14 +102,16 @@ describe('config gate', () => {
     expect(body.error).toBe('CONFIG_INVALID');
   });
 
-  it('non-health route proceeds when config valid', async () => {
-    const res = await dispatch(
-      new Request('https://gw.test/status', {
-        headers: { authorization: 'Bearer tok' },
-      }),
-      env({ ENVIRONMENT: 'test' }),
-      ctx
-    );
-    expect(res.status).toBe(200);
+  it('non-health route proceeds when config valid (including staging)', async () => {
+    for (const name of ['test', 'staging', 'production'] as const) {
+      const res = await dispatch(
+        new Request('https://gw.test/status', {
+          headers: { authorization: 'Bearer tok' },
+        }),
+        env({ ENVIRONMENT: name }),
+        ctx
+      );
+      expect(res.status).toBe(200);
+    }
   });
 });
