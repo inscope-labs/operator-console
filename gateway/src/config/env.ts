@@ -2,8 +2,12 @@
  * Typed, validated gateway configuration (zod).
  * Fail closed: invalid/missing config → CONFIG_INVALID for every route except /health.
  *
- * ENVIRONMENT: test | production only (contract 3.1).
+ * ENVIRONMENT: test | staging | production (Stage 1.2 / BD-1.1).
  * Lenient attestation is refused when ENVIRONMENT is production.
+ *
+ * Default auth-tier policy:
+ *   production  → hardware_confirm only
+ *   test/staging → hardware_confirm + in_app_confirm
  */
 
 import { z } from 'zod';
@@ -11,7 +15,7 @@ import type { AuthTier, AttestationMode, EnvironmentName } from './constants';
 import { AUTH_TIERS } from './constants';
 
 const AuthTierSchema = z.enum(['hardware_confirm', 'in_app_confirm']);
-const EnvironmentSchema = z.enum(['test', 'production']);
+const EnvironmentSchema = z.enum(['test', 'staging', 'production']);
 const AttestationModeSchema = z.enum(['strict', 'lenient']);
 
 const HexSha256Schema = z

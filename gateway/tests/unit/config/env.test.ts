@@ -16,6 +16,20 @@ describe('parseGatewayConfig', () => {
     const r = parseGatewayConfig({ ENVIRONMENT: 'test' });
     expect(r.ok).toBe(true);
     if (r.ok) {
+      expect(r.config.environment).toBe('test');
+      expect(r.config.allowedAuthTiers).toEqual([
+        'hardware_confirm',
+        'in_app_confirm',
+      ]);
+    }
+  });
+
+  it('accepts ENVIRONMENT=staging and defaults both tiers', () => {
+    const r = parseGatewayConfig({ ENVIRONMENT: 'staging' });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.config.environment).toBe('staging');
+      expect(r.config.attestationMode).toBe('strict');
       expect(r.config.allowedAuthTiers).toEqual([
         'hardware_confirm',
         'in_app_confirm',
@@ -24,7 +38,13 @@ describe('parseGatewayConfig', () => {
   });
 
   it('rejects unknown ENVIRONMENT', () => {
-    const r = parseGatewayConfig({ ENVIRONMENT: 'staging' });
+    const r = parseGatewayConfig({ ENVIRONMENT: 'lab' });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.problems).toContain('ENVIRONMENT_INVALID');
+  });
+
+  it('rejects empty ENVIRONMENT', () => {
+    const r = parseGatewayConfig({ ENVIRONMENT: '' });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.problems).toContain('ENVIRONMENT_INVALID');
   });
@@ -43,6 +63,15 @@ describe('parseGatewayConfig', () => {
   it('allows lenient in test', () => {
     const r = parseGatewayConfig({
       ENVIRONMENT: 'test',
+      ATTESTATION_MODE: 'lenient',
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.config.attestationMode).toBe('lenient');
+  });
+
+  it('allows lenient in staging', () => {
+    const r = parseGatewayConfig({
+      ENVIRONMENT: 'staging',
       ATTESTATION_MODE: 'lenient',
     });
     expect(r.ok).toBe(true);

@@ -4,7 +4,7 @@ Maps packages under `src/` to the cbridge specification and the GW-A repair work
 
 | Package | Spec / stage | Notes |
 |---------|----------------|-------|
-| `config/` | GW-2 | zod-validated env; `ENVIRONMENT` ∈ {test, production}; lenient attestation refused in production |
+| `config/` | GW-2 / Stage 1.2 | zod-validated env; `ENVIRONMENT` ∈ {test, staging, production}; lenient attestation refused in production |
 | `capability/` | §8 | ctxop-v1; Model B preferred; tier is a property of the kid, not the wire |
 | `adapter/` | §11 | MultiRepoGitHubAdapter |
 | `guards/` | §10 | G1, G3, G4, G13 wired; remaining guards later |
@@ -18,6 +18,16 @@ Maps packages under `src/` to the cbridge specification and the GW-A repair work
 ## Configuration fail-closed
 
 `parseGatewayConfig` runs at the start of each request (via router). On failure, every path except `GET /health` returns **503 CONFIG_INVALID**. `/health` reports problem *classes* only (no secret values).
+
+## Environments (Stage 1.2 / BD-1.1)
+
+| Environment | Default auth tiers | Lenient attestation | Intended use |
+|-------------|--------------------|---------------------|--------------|
+| `test` | `hardware_confirm`, `in_app_confirm` | Allowed | Local / throwaway; Lab HMAC may be accepted |
+| `staging` | `hardware_confirm`, `in_app_confirm` | Allowed | Pre-production verification against real GitHub App + Durable Objects |
+| `production` | `hardware_confirm` only | **Refused** | Live operator control surface |
+
+`ALLOWED_AUTH_TIERS` and `ATTESTATION_MODE` may override the defaults (except that lenient mode is always refused in production). Keys and operator credentials must be distinct per environment; a capability minted in one environment is not valid in another.
 
 ## Enrolment registry (planned)
 
