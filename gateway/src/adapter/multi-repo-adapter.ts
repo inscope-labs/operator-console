@@ -16,6 +16,8 @@ import { GitHubClient } from './github-client';
 import { ConsumerHandle } from './handles/consumer';
 import { ProductHandle } from './handles/product';
 import { ReadOnlyHandle } from './handles/read-only';
+import { runSequentialSteps } from './transaction';
+import { getSharedRateCoordinator } from './rate-coordinator';
 
 export type RepoKey = 'consumer' | 'product' | `read_only:${string}`;
 
@@ -158,13 +160,16 @@ export class MultiRepoGitHubAdapter {
   }
 
   async rateBudget(): Promise<RateBudget> {
-    // Placeholder until rate-coordinator is wired; GitHub returns headers per call.
+    const snap = getSharedRateCoordinator().getSnapshot();
+    if (snap) {
+      return { remaining: snap.remaining, reset: snap.reset };
+    }
+    // No observation yet — report a healthy default; real headers update the coordinator.
     return { remaining: 5000, reset: Math.floor(Date.now() / 1000) + 3600 };
   }
 
-  async transaction(_steps: TransactionStep[]): Promise<TransactionResult> {
-    // Phase 2
-    throw new Error('transaction executor not yet implemented');
+  async transaction(steps: TransactionStep[]): Promise<TransactionResult> {
+    return runSequentialSteps(steps);
   }
 
   /** Expose token expiry for /admin/status diagnostics (never the token). */
