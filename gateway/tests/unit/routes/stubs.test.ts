@@ -86,7 +86,7 @@ describe('T1-103 fail-closed stubs (Stage 1.1)', () => {
     expect(paths.some((p) => p.includes('sync'))).toBe(true);
   });
 
-  describe('POST /tasks/:id/publish', () => {
+  describe('POST /tasks/:id/publish (Stage 3.2 live)', () => {
     it('requires operator token (returns 401 when missing)', async () => {
       const res = await dispatch(
         new Request('https://gw.test/tasks/task-1/publish', {
@@ -101,7 +101,7 @@ describe('T1-103 fail-closed stubs (Stage 1.1)', () => {
       expect(body.error).toBe('OPERATOR_AUTH');
     });
 
-    it('returns 501 NOT_IMPLEMENTED even when capability body is missing (early refusal)', async () => {
+    it('refuses missing capability with BAD_ENCODING (no longer 501 stub)', async () => {
       const res = await dispatch(
         new Request('https://gw.test/tasks/task-1/publish', {
           method: 'POST',
@@ -114,50 +114,9 @@ describe('T1-103 fail-closed stubs (Stage 1.1)', () => {
         baseEnv(),
         ctx
       );
-      // Stage 1.1 early refusal: body is not interpreted; stub answers 501
-      expect(res.status).toBe(501);
-      const body = (await res.json()) as { error: string; message: string };
-      expect(body.error).toBe('NOT_IMPLEMENTED');
-    });
-
-    it('returns 501 NOT_IMPLEMENTED (never 200) when capability and guards pass', async () => {
-      const now = Math.floor(Date.now() / 1000);
-      const cap: OperatorCapability = {
-        version: CAPABILITY_VERSION,
-        kid: 'k_lab',
-        exp: now + 120,
-        order: 'ord-1',
-        plan: 'plan-1',
-        task: 'task-1',
-        op: 'publish',
-        branch: 'task-task-1',
-        head: TEST_HEAD,
-        nonce: 'nonce-publish-test-1',
-      };
-
-      const unsignedWire = encodeCapability(cap);
-      const sig = await signHmac(unsignedWire, TEST_SECRET);
-      const signedWire = `${unsignedWire}.${sig}`;
-
-      const res = await dispatch(
-        new Request('https://gw.test/tasks/task-1/publish', {
-          method: 'POST',
-          headers: {
-            authorization: 'Bearer test-token',
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({ capability: signedWire }),
-        }),
-        baseEnv(),
-        ctx
-      );
-
-      // Must be 501 NOT_IMPLEMENTED, NEVER 200
-      expect(res.status).toBe(501);
-      const body = (await res.json()) as { error: string; message: string; request_id: string };
-      expect(body.error).toBe('NOT_IMPLEMENTED');
-      expect(body.message).toBe('publish transaction not yet implemented');
-      expect(body.request_id).toBeTruthy();
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toBe('BAD_ENCODING');
     });
   });
 

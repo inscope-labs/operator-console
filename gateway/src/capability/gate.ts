@@ -31,6 +31,8 @@ export interface GateOptions {
   resolveKey: VerifyContext['resolveKey'];
   now?: number;
   expectedBranch?: string;
+  /** Lab only: permit HMAC (Model A) keys. Default false. */
+  allowModelA?: boolean;
 }
 
 /**
@@ -44,6 +46,7 @@ export async function gateCapability(
     now: opts.now ?? Math.floor(Date.now() / 1000),
     resolveKey: opts.resolveKey,
     expectedBranch: opts.expectedBranch,
+    allowModelA: opts.allowModelA,
   });
 
   if (!verifyResult.ok) {
