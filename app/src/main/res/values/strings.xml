@@ -31,7 +31,7 @@
     <string name="settings_gateway_url_placeholder">https://gateway.example.com</string>
     <string name="settings_gateway_url_saved">Gateway base URL saved.</string>
     <string name="settings_gateway_url_cleared">Gateway base URL cleared.</string>
-    <string name="settings_gateway_url_invalid">That URL is empty or uses a reserved placeholder host. Enter a real gateway base URL.</string>
+    <string name="settings_gateway_url_invalid">Invalid gateway URL. Release builds require HTTPS with no credentials. In debug, HTTP is permitted only for 10.0.2.2 or localhost.</string>
 
     <string name="settings_test_connection">Test connection</string>
     <string name="settings_health_heading">Last successful health</string>
@@ -154,6 +154,7 @@
     <string name="connection_not_configured">Not configured — tap to open Settings</string>
     <string name="connection_unreachable">Unreachable — test connection in Settings</string>
     <string name="connection_connected_test">Connected (test)</string>
+    <string name="connection_connected_staging">Connected (staging)</string>
     <string name="connection_connected_production">Connected (production)</string>
     <string name="connection_connected_other">Connected (%1$s)</string>
 

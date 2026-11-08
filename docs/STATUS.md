@@ -36,7 +36,7 @@ Reference plan of record: [`RELEASE-PLAN.md`](../RELEASE-PLAN.md).
 | Stage 1.4 | CI Hardening (Fail-Closed) & Lockfile (T1-101, T1-102) | not started | no | no | no | **no** | Package lockfile, removal of `|| true`, workflow rename to gateway-*.yml |
 | Stage 1.5 | Phase 1 Completion Report & Sign-off | not started | no | no | no | **no** | Gate 1 completion report (Appendix A template) |
 | **Phase 2** | **Android Transport & Connectivity** | | | | | | Gate 2 open |
-| Stage 2.1 | Connectivity Remediation (BaseUrlStore, no init dial) | scaffold | partially | yes | no | **no** | Stage 1 of remediation merged; stages 2–8 pending |
+| Stage 2.1 | Connectivity Remediation (BaseUrlStore, no init dial, timeouts, redirects, response cap) | **implemented** | yes | yes | no | **yes** | Stages 2–8 implemented: idle init, BaseUrlStore injection & URL validation, health snapshot persistence, staging banner, redacted activity log, redirect refusal, response size cap; 302 unit tests passing |
 | Stage 2.2 | Environment Safety (per-env keys & slots) | not started | no | no | no | **no** | Enrolment key namespacing by environment required |
 | Stage 2.3 | Certificate Pinning & Expiry Rules | scaffold | no | yes | no | **no** | `CertificatePinning.kt` throws TODO; `gateway.invalid` in config |
 | Stage 2.4 | Preflight Screen & Failure Vocabulary | scaffold | no | yes | no | **no** | Needs TLS/pinning, auth, stale, and policy failure states |

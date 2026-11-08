@@ -49,6 +49,21 @@ class ConnectionStatusRepositoryImplTest {
     }
 
     @Test
+    fun `connected staging when health snapshot is staging`() {
+        val snapshot = GatewayHealthSnapshot(
+            status = "ok",
+            environment = "staging",
+            version = "2.0.0",
+            timestampMillis = 1000L,
+            probedAtEpochSeconds = 10L,
+        )
+        val status = deriveConnectionStatus("https://gateway.example.com", snapshot)
+        assertTrue(status is ConnectionStatus.Connected)
+        assertEquals("staging", (status as ConnectionStatus.Connected).environment)
+        assertEquals("2.0.0", status.version)
+    }
+
+    @Test
     fun `connected production when health snapshot is production`() {
         val snapshot = GatewayHealthSnapshot(
             status = "ok",

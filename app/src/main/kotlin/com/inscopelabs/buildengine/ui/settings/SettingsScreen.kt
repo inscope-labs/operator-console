@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -107,7 +108,9 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 exportText = { viewModel.gatewayActivityExportText() },
             )
 
-            state.error?.let { error ->
+            state.customError?.let { customMessage ->
+                ErrorBanner(message = customMessage)
+            } ?: state.error?.let { error ->
                 ErrorBanner(message = stringResource(error.messageRes))
             }
             state.healthError?.let { message ->
@@ -149,7 +152,7 @@ private fun GatewaySection(
             onValueChange = onDraftChange,
             label = { Text(stringResource(R.string.settings_gateway_url_label)) },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag("settings_gateway_url_input"),
             textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
             placeholder = {
                 Text(stringResource(R.string.settings_gateway_url_placeholder))
@@ -163,12 +166,16 @@ private fun GatewaySection(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            OutlinedButton(onClick = onSave) {
+            OutlinedButton(
+                onClick = onSave,
+                modifier = Modifier.testTag("settings_gateway_save_button"),
+            ) {
                 Text(stringResource(R.string.action_save))
             }
             TextButton(
                 onClick = onClear,
                 enabled = state.gatewayBaseUrl.isNotEmpty(),
+                modifier = Modifier.testTag("settings_gateway_clear_button"),
             ) {
                 Text(stringResource(R.string.action_clear))
             }
@@ -177,7 +184,7 @@ private fun GatewaySection(
         OutlinedButton(
             onClick = onTestConnection,
             enabled = state.gatewayConfigured && !state.healthTesting,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag("settings_test_connection_button"),
         ) {
             if (state.healthTesting) {
                 CircularProgressIndicator(
@@ -249,7 +256,7 @@ private fun CredentialSection(
             label = { Text(stringResource(R.string.settings_credential_field_label)) },
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag("settings_credential_input"),
         )
         Text(
             text = stringResource(R.string.settings_credential_help),
@@ -262,12 +269,14 @@ private fun CredentialSection(
             OutlinedButton(
                 onClick = onSave,
                 enabled = draft.isNotBlank(),
+                modifier = Modifier.testTag("settings_credential_save_button"),
             ) {
                 Text(stringResource(R.string.action_save))
             }
             TextButton(
                 onClick = onClear,
                 enabled = state.credentialConfigured,
+                modifier = Modifier.testTag("settings_credential_clear_button"),
             ) {
                 Text(stringResource(R.string.action_clear))
             }

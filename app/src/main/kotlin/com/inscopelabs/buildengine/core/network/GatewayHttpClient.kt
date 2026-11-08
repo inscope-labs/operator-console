@@ -31,6 +31,21 @@ class GatewayHttpClient(
     private val activityLog: GatewayActivityLog? = null,
 ) {
 
+    /**
+     * Secondary constructor that injects [GatewayBaseUrlStore] directly.
+     */
+    constructor(
+        client: HttpClient,
+        baseUrlStore: com.inscopelabs.buildengine.data.local.GatewayBaseUrlStore,
+        credentials: OperatorCredentialProvider = OperatorCredentialProvider { null },
+        activityLog: GatewayActivityLog? = null,
+    ) : this(
+        client = client,
+        baseUrlProvider = GatewayBaseUrlProvider { baseUrlStore.current() },
+        credentials = credentials,
+        activityLog = activityLog,
+    )
+
     suspend fun get(path: String): String = request("GET", path, body = null)
 
     suspend fun post(path: String, body: String): String = request("POST", path, body)
@@ -40,6 +55,7 @@ class GatewayHttpClient(
      *
      * @throws GatewayHttpException if the gateway refused with a non-2xx status.
      * @throws GatewayNotConfiguredException if the base URL is unset or a placeholder.
+     * @throws GatewayProtocolException if response exceeds size cap or redirects.
      */
     suspend fun request(method: String, path: String, body: String?): String {
         val baseUrl = baseUrlProvider.baseUrl()
@@ -61,7 +77,51 @@ class GatewayHttpClient(
                 }
             }
 
+            // Refuse unexpected redirects: client must not follow redirects to foreign hosts
+            if (response.status.value in 300..399) {
+                record(
+                    method,
+                    path,
+                    GatewayActivityEvent.Outcome.REFUSED,
+                    statusCode = response.status.value,
+                    detail = "unexpected redirect refused",
+                )
+                throw GatewayHttpException(
+                    statusCode = response.status.value,
+                    body = null,
+                    message = "the gateway attempted an unexpected redirect (${response.status.value}), which is refused by policy",
+                )
+            }
+
+            // Check Content-Length header against response-size cap
+            val contentLength = response.headers[HttpHeaders.ContentLength]?.toLongOrNull()
+            if (contentLength != null && contentLength > MAX_RESPONSE_BYTES) {
+                record(
+                    method,
+                    path,
+                    GatewayActivityEvent.Outcome.PROTOCOL_ERROR,
+                    statusCode = response.status.value,
+                    detail = "response size exceeds limit ($contentLength > $MAX_RESPONSE_BYTES bytes)",
+                )
+                throw GatewayProtocolException(
+                    "the gateway response exceeded maximum allowed size ($contentLength > $MAX_RESPONSE_BYTES bytes)",
+                )
+            }
+
             val payload = response.bodyAsText()
+            if (payload.toByteArray(Charsets.UTF_8).size > MAX_RESPONSE_BYTES) {
+                record(
+                    method,
+                    path,
+                    GatewayActivityEvent.Outcome.PROTOCOL_ERROR,
+                    statusCode = response.status.value,
+                    detail = "response body exceeds limit",
+                )
+                throw GatewayProtocolException(
+                    "the gateway response body exceeded maximum allowed size of $MAX_RESPONSE_BYTES bytes",
+                )
+            }
+
             if (!response.status.isSuccess()) {
                 record(
                     method,
@@ -83,6 +143,8 @@ class GatewayHttpClient(
             )
             payload
         } catch (error: GatewayNotConfiguredException) {
+            throw error
+        } catch (error: GatewayProtocolException) {
             throw error
         } catch (error: GatewayHttpException) {
             throw error
@@ -111,6 +173,11 @@ class GatewayHttpClient(
             )
             throw error
         }
+    }
+
+    companion object {
+        /** Maximum permitted response size from the gateway (2 MiB). */
+        const val MAX_RESPONSE_BYTES: Long = 2 * 1024 * 1024L
     }
 
     private fun record(

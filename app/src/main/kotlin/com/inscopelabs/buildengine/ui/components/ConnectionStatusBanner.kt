@@ -55,6 +55,8 @@ fun ConnectionStatusBanner(
             val envLabel = when {
                 status.environment.equals("test", ignoreCase = true) ->
                     stringResource(R.string.connection_connected_test)
+                status.environment.equals("staging", ignoreCase = true) ->
+                    stringResource(R.string.connection_connected_staging)
                 status.environment.equals("production", ignoreCase = true) ->
                     stringResource(R.string.connection_connected_production)
                 else ->

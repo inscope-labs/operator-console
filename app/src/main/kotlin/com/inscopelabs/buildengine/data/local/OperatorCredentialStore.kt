@@ -60,8 +60,11 @@ import java.security.GeneralSecurityException
  * credential that cannot be written is a problem the operator must see.
  */
 class OperatorCredentialStore(
-    private val context: Context,
+    private val context: Context? = null,
+    preferences: SharedPreferences? = null,
 ) {
+
+    constructor(context: Context) : this(context, null)
 
     /**
      * The encrypted preferences, created on first use.
@@ -69,7 +72,9 @@ class OperatorCredentialStore(
      * Lazy, because building the master key reads the Keystore, and the app should
      * not pay for a credential store it has not used yet.
      */
-    private val preferences: SharedPreferences by lazy { createEncryptedPreferences(context) }
+    private val preferences: SharedPreferences by lazy {
+        preferences ?: createEncryptedPreferences(checkNotNull(context) { "Context must be provided if preferences is null" })
+    }
 
     /**
      * Stores the gateway-scoped operator credential.

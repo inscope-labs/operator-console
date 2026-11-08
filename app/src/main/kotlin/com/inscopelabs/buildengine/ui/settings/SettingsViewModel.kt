@@ -52,6 +52,7 @@ data class SettingsState(
     val gatewayActivityEvents: List<GatewayActivityEvent> = emptyList(),
     val notice: SettingsNotice? = null,
     val error: SettingsError? = null,
+    val customError: String? = null,
 )
 
 enum class SettingsNotice {
@@ -115,21 +116,32 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun saveGatewayBaseUrl(url: String) {
+    fun saveGatewayBaseUrl(url: String, isDebug: Boolean = com.inscopelabs.buildengine.BuildConfig.DEBUG) {
         viewModelScope.launch(Dispatchers.IO) {
             val trimmed = url.trim().trimEnd('/')
-            if (trimmed.isNotEmpty() && !GatewayEndpoints.isConfigured(trimmed)) {
-                publish { it.copy(notice = null, error = SettingsError.GATEWAY_URL_INVALID) }
-                return@launch
+            if (trimmed.isNotEmpty()) {
+                val validation = GatewayEndpoints.validateUrl(trimmed, isDebug = isDebug)
+                if (!validation.isValid) {
+                    val reason = (validation as? GatewayEndpoints.UrlValidationResult.Invalid)?.reason
+                    publish {
+                        it.copy(
+                            notice = null,
+                            error = SettingsError.GATEWAY_URL_INVALID,
+                            customError = reason,
+                        )
+                    }
+                    return@launch
+                }
             }
             gatewayBaseUrlStore.save(trimmed)
             val effective = gatewayBaseUrlStore.read()
             publish {
                 it.copy(
                     gatewayBaseUrl = effective,
-                    gatewayConfigured = GatewayEndpoints.isConfigured(effective),
+                    gatewayConfigured = GatewayEndpoints.isConfigured(effective, isDebug = isDebug),
                     notice = SettingsNotice.GATEWAY_URL_SAVED,
                     error = null,
+                    customError = null,
                 )
             }
         }
@@ -148,6 +160,7 @@ class SettingsViewModel @Inject constructor(
                     healthError = null,
                     notice = SettingsNotice.GATEWAY_URL_CLEARED,
                     error = null,
+                    customError = null,
                 )
             }
         }

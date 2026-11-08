@@ -60,8 +60,11 @@ object NetworkModule {
     @Singleton
     fun provideHttpClient(config: MtlsConfig): HttpClient = HttpClient(OkHttp) {
         expectSuccess = false
+        followRedirects = false
         engine {
             config {
+                followRedirects(false)
+                followSslRedirects(false)
                 connectTimeout(CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
                 readTimeout(SOCKET_TIMEOUT_MS, TimeUnit.MILLISECONDS)
                 writeTimeout(SOCKET_TIMEOUT_MS, TimeUnit.MILLISECONDS)

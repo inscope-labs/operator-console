@@ -78,6 +78,12 @@ class GatewayBaseUrlStore(
         }
     }
 
+    /**
+     * Validates [url] against the console gateway URL policy.
+     */
+    fun validate(url: String, isDebug: Boolean = true): GatewayEndpoints.UrlValidationResult =
+        GatewayEndpoints.validateUrl(url, isDebug = isDebug)
+
     /** Removes the stored base URL (debug default may still apply). */
     suspend fun clear() {
         dataStore.edit { preferences ->

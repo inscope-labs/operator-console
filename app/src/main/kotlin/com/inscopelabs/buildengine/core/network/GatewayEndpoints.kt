@@ -25,27 +25,98 @@ object GatewayEndpoints {
      * Hostnames that must never be dialled. RFC 2606 `.invalid` and empty mean
      * "not configured", not "try DNS".
      */
-    private val UNCONFIGURED_HOST_MARKERS = listOf(
+    val UNCONFIGURED_HOST_MARKERS = listOf(
         "gateway.invalid",
         "example.invalid",
         "invalid",
     )
 
     /**
+     * Local hosts permitted for cleartext HTTP in debug builds only.
+     */
+    val ALLOWED_CLEARTEXT_HOSTS = setOf(
+        "10.0.2.2",
+        "localhost",
+        "127.0.0.1",
+    )
+
+    /** Result of validating a candidate gateway base URL. */
+    sealed class UrlValidationResult {
+        data object Valid : UrlValidationResult()
+        data class Invalid(val reason: String) : UrlValidationResult()
+
+        val isValid: Boolean get() = this is Valid
+    }
+
+    /**
+     * Validates [baseUrl] against console network policy.
+     *
+     * - Must not be blank.
+     * - Must be valid URI syntax without query or fragment.
+     * - Must specify http:// or https://.
+     * - Credentials in URL (userInfo) are strictly prohibited.
+     * - Host must not be blank or a reserved placeholder (*.invalid).
+     * - Cleartext HTTP is forbidden in release builds (HTTPS required).
+     * - In debug builds, cleartext HTTP is permitted ONLY for local test hosts (10.0.2.2, localhost).
+     */
+    fun validateUrl(baseUrl: String, isDebug: Boolean = true): UrlValidationResult {
+        val trimmed = baseUrl.trim()
+        if (trimmed.isEmpty()) {
+            return UrlValidationResult.Invalid("Gateway URL cannot be blank")
+        }
+
+        val uri = try {
+            java.net.URI(trimmed)
+        } catch (_: Exception) {
+            return UrlValidationResult.Invalid("Invalid URL format")
+        }
+
+        val scheme = uri.scheme?.lowercase()
+        if (scheme == null || (scheme != "https" && scheme != "http")) {
+            return UrlValidationResult.Invalid("URL must specify http:// or https://")
+        }
+
+        if (!uri.userInfo.isNullOrEmpty()) {
+            return UrlValidationResult.Invalid("URL must not contain credentials (user:password@)")
+        }
+
+        val host = uri.host?.lowercase()
+        if (host.isNullOrBlank()) {
+            return UrlValidationResult.Invalid("URL must have a valid host")
+        }
+
+        if (UNCONFIGURED_HOST_MARKERS.any { host == it || host.endsWith(".$it") }) {
+            return UrlValidationResult.Invalid("URL must not use a reserved placeholder host")
+        }
+
+        if (!uri.query.isNullOrEmpty()) {
+            return UrlValidationResult.Invalid("Gateway base URL must not contain query parameters")
+        }
+
+        if (!uri.fragment.isNullOrEmpty()) {
+            return UrlValidationResult.Invalid("Gateway base URL must not contain a fragment (#)")
+        }
+
+        val isLocalCleartext = host in ALLOWED_CLEARTEXT_HOSTS
+        if (scheme == "http") {
+            if (!isDebug) {
+                return UrlValidationResult.Invalid("Cleartext HTTP is forbidden in release builds (HTTPS required)")
+            } else if (!isLocalCleartext) {
+                return UrlValidationResult.Invalid(
+                    "Cleartext HTTP is only allowed for local test hosts (10.0.2.2, localhost) in debug builds",
+                )
+            }
+        }
+
+        return UrlValidationResult.Valid
+    }
+
+    /**
      * Whether [baseUrl] is a host the console is allowed to open a socket to.
      * Placeholder / blank URLs are treated as not configured.
      */
-    fun isConfigured(baseUrl: String = BASE_URL): Boolean {
-        val trimmed = baseUrl.trim()
-        if (trimmed.isEmpty()) return false
-        val host = try {
-            java.net.URI(trimmed).host?.lowercase()
-        } catch (_: Exception) {
-            null
-        } ?: return false
-        if (host.isBlank()) return false
-        if (UNCONFIGURED_HOST_MARKERS.any { host == it || host.endsWith(".$it") }) return false
-        return true
+    fun isConfigured(baseUrl: String = BASE_URL, isDebug: Boolean = true): Boolean {
+        return validateUrl(baseUrl, isDebug = isDebug).isValid
     }
 
     const val HEALTH: String = "/health"
