@@ -46,7 +46,7 @@ describe('encodeCapability', () => {
 
 describe('decodeCapability', () => {
   it('rejects wrong field count', () => {
-    expect(() => decodeCapability('ctxop-v1\nonly-two')).toThrow(/field count/);
+    expect(() => decodeCapability('ctxop-v1\nonly-two')).toThrow(/BAD_FIELD_COUNT/);
   });
 
   it('rejects unknown version', () => {

@@ -56,6 +56,8 @@ export async function gateCapability(
       BRANCH_MISMATCH: 'BRANCH_MISMATCH',
       BRANCH_INVALID: 'BRANCH_INVALID',
       MALFORMED: 'BAD_ENCODING',
+      BAD_FIELD_COUNT: 'BAD_FIELD_COUNT',
+      BAD_ENCODING: 'BAD_ENCODING',
     };
     return {
       ok: false,

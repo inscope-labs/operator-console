@@ -48,13 +48,18 @@ export function encodeCapability(cap: OperatorCapability): string {
 /**
  * Decode an LF-separated message into an OperatorCapability.
  * Does not verify the signature — that is the responsibility of verify.ts.
- * Throws on malformed input (wrong field count, invalid op, non-numeric exp, …).
+ * Throws on malformed input with a catalogue-aligned prefix when possible:
+ *   BAD_FIELD_COUNT | BAD_ENCODING | UNKNOWN_OP | BRANCH_INVALID
  */
 export function decodeCapability(message: string): OperatorCapability {
+  if (message.includes('\r')) {
+    throw new Error('BAD_ENCODING: CR characters are not permitted');
+  }
+
   const lines = message.split('\n');
   if (lines.length !== FIELD_COUNT) {
     throw new Error(
-      `ctxop-v1 field count mismatch: expected ${FIELD_COUNT}, got ${lines.length}`
+      `BAD_FIELD_COUNT: expected ${FIELD_COUNT}, got ${lines.length}`
     );
   }
 
@@ -62,14 +67,14 @@ export function decodeCapability(message: string): OperatorCapability {
     lines;
 
   if (version !== CAPABILITY_VERSION) {
-    throw new Error(`unsupported capability version: ${version}`);
+    throw new Error(`BAD_ENCODING: unsupported capability version: ${version}`);
   }
   if (!kid || !/^[A-Za-z0-9_]{1,16}$/.test(kid)) {
-    throw new Error(`invalid kid: ${kid}`);
+    throw new Error(`BAD_ENCODING: invalid kid`);
   }
   const exp = Number(expRaw);
   if (!Number.isInteger(exp) || exp <= 0) {
-    throw new Error(`invalid exp: ${expRaw}`);
+    throw new Error(`BAD_ENCODING: invalid exp`);
   }
   if (!isOperationType(opRaw)) {
     throw new Error(`UNKNOWN_OP: ${opRaw}`);
@@ -78,10 +83,10 @@ export function decodeCapability(message: string): OperatorCapability {
     throw new Error(`BRANCH_INVALID: ${branch}`);
   }
   if (!/^[0-9a-f]{40}$/i.test(head)) {
-    throw new Error(`invalid head SHA: ${head}`);
+    throw new Error(`BAD_ENCODING: invalid head SHA`);
   }
   if (!nonce) {
-    throw new Error('missing nonce');
+    throw new Error('BAD_ENCODING: missing nonce');
   }
 
   return {
@@ -106,9 +111,12 @@ export function splitSignedCapability(raw: string): {
   message: string;
   signature: string;
 } {
+  if (raw.includes('\r')) {
+    throw new Error('BAD_ENCODING: CR characters are not permitted');
+  }
   const idx = raw.lastIndexOf('\n');
   if (idx <= 0) {
-    throw new Error('malformed signed capability: no signature separator');
+    throw new Error('BAD_ENCODING: no signature separator');
   }
   return {
     message: raw.slice(0, idx),
