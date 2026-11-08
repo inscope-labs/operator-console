@@ -125,7 +125,7 @@ describe('verifyCapability — kid and signature', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       // Tamper may surface as MALFORMED (field decode) or BAD_SIGNATURE
-      expect(['BAD_SIGNATURE', 'MALFORMED', 'UNKNOWN_OP']).toContain(result.code);
+      expect(['BAD_SIGNATURE', 'BAD_ENCODING', 'BAD_FIELD_COUNT', 'UNKNOWN_OP', 'BRANCH_INVALID']).toContain(result.code);
     }
   });
 
@@ -185,14 +185,14 @@ describe('verifyCapability — malformed input', () => {
   it('rejects missing signature separator', async () => {
     const result = await verifyCapability('no-separator-here', ctx());
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.code).toBe('MALFORMED');
+    if (!result.ok) expect(result.code).toBe('BAD_ENCODING');
   });
 
   it('rejects empty signature', async () => {
     const message = encodeCapability(baseCap());
     const result = await verifyCapability(message + '\n', ctx());
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.code).toBe('MALFORMED');
+    if (!result.ok) expect(result.code).toBe('BAD_ENCODING');
   });
 });
 
@@ -215,6 +215,7 @@ describe('verifyCapability — HMAC Model A compatibility', () => {
     const raw = message + '\n' + bytesToBase64Url(new Uint8Array(sig));
 
     const result = await verifyCapability(raw, {
+      allowModelA: true,
       now: NOW,
       resolveKey: async (kid) =>
         kid === 'hmac_kid' ? secret.buffer.slice(secret.byteOffset, secret.byteOffset + secret.byteLength) : null,

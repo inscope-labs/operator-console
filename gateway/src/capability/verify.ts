@@ -1,9 +1,13 @@
 /**
  * Capability verification — signature, TTL, kid, nonce-scope binding.
- * Spec §8. Model B (recommended under D-a): console signs with the device
- * key; gateway verifies against the enrolled public key selected by kid.
+ * Spec §8. Stage 2.4 edge cases.
  *
- * Fail closed on every ambiguous case.
+ * **Model B (production default):** console signs with the enrolled device key;
+ * gateway verifies against the public key selected by kid. `resolveKey` must
+ * return a `CryptoKey`. HMAC (Model A) is only accepted when
+ * `VerifyContext.allowModelA === true` (Lab / unit tests).
+ *
+ * Fail closed on every ambiguous case. Clock is injectable via `ctx.now`.
  */
 
 import {
@@ -22,7 +26,8 @@ export type VerifyFailure =
   | 'UNKNOWN_OP'
   | 'BRANCH_MISMATCH'
   | 'BRANCH_INVALID'
-  | 'MALFORMED';
+  | 'BAD_FIELD_COUNT'
+  | 'BAD_ENCODING';
 
 export interface VerifyOk {
   ok: true;
@@ -43,8 +48,8 @@ export interface VerifyContext {
   now: number;
   /**
    * Resolve a public key by kid.
-   * Model B: CryptoKey (ECDSA P-256 or Ed25519) for the enrolled device.
-   * Model A (compat): ArrayBuffer HMAC secret.
+   * Model B (default): CryptoKey for the enrolled device.
+   * Model A (opt-in via allowModelA): ArrayBuffer HMAC secret.
    * Returns null if the kid is unknown or retired.
    */
   resolveKey: (kid: string) => Promise<CryptoKey | ArrayBuffer | null>;
@@ -53,12 +58,17 @@ export interface VerifyContext {
    * When supplied, a mismatch yields BRANCH_MISMATCH.
    */
   expectedBranch?: string;
+  /**
+   * When true, ArrayBuffer HMAC keys are accepted (Model A).
+   * Default false — production path is Model B only.
+   */
+  allowModelA?: boolean;
 }
 
 /**
  * Verify a raw capability string (message + signature).
  * Does not check nonce replay — that is the responsibility of the nonce store.
- * Does not perform the hard ref (HEAD) check — that belongs on the write path.
+ * Does not perform the hard ref (HEAD) check — that belongs on the write path (G13).
  */
 export async function verifyCapability(
   raw: string,
@@ -68,12 +78,17 @@ export async function verifyCapability(
   let signature: string;
   try {
     ({ message, signature } = splitSignedCapability(raw));
-  } catch {
-    return { ok: false, code: 'MALFORMED', message: 'cannot split signature' };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return {
+      ok: false,
+      code: msg.startsWith('BAD_ENCODING') ? 'BAD_ENCODING' : 'BAD_ENCODING',
+      message: msg,
+    };
   }
 
   if (!signature) {
-    return { ok: false, code: 'MALFORMED', message: 'empty signature' };
+    return { ok: false, code: 'BAD_ENCODING', message: 'empty signature' };
   }
 
   let capability: OperatorCapability;
@@ -87,10 +102,16 @@ export async function verifyCapability(
     if (msg.startsWith('BRANCH_INVALID')) {
       return { ok: false, code: 'BRANCH_INVALID', message: msg };
     }
-    return { ok: false, code: 'MALFORMED', message: msg };
+    if (msg.startsWith('BAD_FIELD_COUNT')) {
+      return { ok: false, code: 'BAD_FIELD_COUNT', message: msg };
+    }
+    if (msg.startsWith('BAD_ENCODING')) {
+      return { ok: false, code: 'BAD_ENCODING', message: msg };
+    }
+    return { ok: false, code: 'BAD_ENCODING', message: msg };
   }
 
-  // TTL bounds
+  // TTL bounds (injectable clock; ±CLOCK_SKEW_SECONDS tolerance)
   const ttl = capability.exp - ctx.now;
   if (ttl > MAX_TTL_SECONDS + CLOCK_SKEW_SECONDS) {
     return {
@@ -126,6 +147,15 @@ export async function verifyCapability(
     };
   }
 
+  // Model A (HMAC) is opt-in only.
+  if (key instanceof ArrayBuffer && ctx.allowModelA !== true) {
+    return {
+      ok: false,
+      code: 'BAD_SIGNATURE',
+      message: 'Model A HMAC keys are disabled; use enrolled device key (Model B)',
+    };
+  }
+
   const signatureValid = await verifySignature(message, signature, key);
   if (!signatureValid) {
     return {
@@ -145,11 +175,9 @@ export async function verifyCapability(
 /**
  * Cryptographic verification.
  * - CryptoKey → ECDSA P-256 (SHA-256) or Ed25519 (algorithm from key).
- * - ArrayBuffer → HMAC-SHA256 (Model A compatibility).
+ * - ArrayBuffer → HMAC-SHA256 (Model A compatibility, allowModelA only).
  * Signature is base64url (no padding).
  */
-
-/** DER ECDSA-Sig-Value SEQUENCE { r, s } → fixed-width r||s (IEEE P1363). */
 function ecdsaDerToRaw(derSig: Uint8Array, coordLen: number): Uint8Array {
   // Minimal DER parse for SEQUENCE of two INTEGERs
   if (derSig.length < 8 || derSig[0] !== 0x30) {
