@@ -1,13 +1,14 @@
 /**
- * Ordered guard runner G1–G16.
- * Spec §10. Every write path must pass the full applicable set.
- * Guards are pure with respect to the request; they receive a typed context
- * and return a result. Fail closed — any throw or non-ok result aborts.
+ * Ordered guard runner G1–G15 (authoritative set for Gateway A).
+ * Spec §10 + GATEWAY-A-COMPLETION-PLAN Stage 2.3.
+ *
+ * Registration order is insertion order. Modules call registerPublishGuard
+ * in the sequence: G1 → G3 → G4 → G5 → G6 → G7 → G8 → G11 → G13 → G14 → G15.
  */
 
 import type { OperatorCapability } from '../capability/types';
-import type { ErrorCode } from '../errors/catalogue';
 import type { ConsumerHandle } from '../adapter/handles/consumer';
+import type { ErrorCode } from '../errors/catalogue';
 
 export interface GuardContext {
   capability: OperatorCapability;
@@ -26,6 +27,11 @@ export interface GuardContext {
   };
   /** Halt marker present? */
   haltActive?: boolean;
+  /** Upload path: submission id and whether it already exists. */
+  submissionId?: string;
+  submissionExists?: boolean;
+  /** Raw unified diff or concatenated blob text for secret scanning (G11). */
+  diffText?: string;
 }
 
 export interface GuardOk {
@@ -42,15 +48,11 @@ export type GuardResult = GuardOk | GuardErr;
 
 export type Guard = (ctx: GuardContext) => Promise<GuardResult>;
 
-/**
- * Ordered list of guards that apply to publish (the strongest path).
- * Registration order is insertion order; modules call registerPublishGuard
- * in the sequence G1 → G3 → G4 → G13 (and later G5–G16).
- */
 const PUBLISH_GUARDS: { name: string; run: Guard }[] = [];
 
 /**
  * Run the ordered guard set. Returns the first failure or { ok: true }.
+ * Empty set fails closed.
  */
 export async function runGuards(
   ctx: GuardContext,
@@ -72,35 +74,15 @@ export async function runGuards(
   return { ok: true };
 }
 
-/**
- * Register a guard into the publish set.
- * Call from individual g*.ts modules at load time.
- */
 export function registerPublishGuard(name: string, run: Guard): void {
-  // Avoid duplicate names if the module is evaluated twice.
   if (PUBLISH_GUARDS.some((g) => g.name === name)) return;
   PUBLISH_GUARDS.push({ name, run });
 }
 
-/** Test helper. */
 export function listPublishGuards(): string[] {
   return PUBLISH_GUARDS.map((g) => g.name);
 }
 
-/** Test helper. */
 export function clearPublishGuards(): void {
   PUBLISH_GUARDS.length = 0;
-}
-
-/**
- * Load the core publish guards (G1, G3, G4, G13).
- * Side-effect import — call once from the Worker entry or publish route module.
- */
-export function loadCorePublishGuards(): void {
-  // Dynamic-style static imports so registration runs.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  void import('./g1-private');
-  void import('./g3-branch-shape');
-  void import('./g4-branch-exists');
-  void import('./g13-exact-sha');
 }
