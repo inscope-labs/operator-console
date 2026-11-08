@@ -109,6 +109,40 @@ class OperatorCredentialStoreTest {
         assertEquals(setOf(PreferencesKeys.OPERATOR_CREDENTIAL), PreferencesKeys.SECRET_KEYS)
     }
 
+    // --- Per-environment slots (T2-202) -----------------------------------------
+
+    @Test
+    fun `per-environment credential slots are strictly isolated and never reused`() {
+        val prefs = com.inscopelabs.buildengine.testutil.FakeSharedPreferences()
+        val storeWithPrefs = OperatorCredentialStore(preferences = prefs)
+
+        val stagingCred = "gw_op_staging_secret_credential_123"
+        val prodCred = "gw_op_prod_secret_credential_456"
+
+        storeWithPrefs.save(stagingCred, environment = "staging")
+
+        // Reading staging returns the saved credential
+        assertEquals(stagingCred, storeWithPrefs.read(environment = "staging"))
+
+        // Reading production or test returns null (NEVER reuses staging credential)
+        org.junit.Assert.assertNull(storeWithPrefs.read(environment = "production"))
+        org.junit.Assert.assertNull(storeWithPrefs.read(environment = "test"))
+
+        // Save production credential
+        storeWithPrefs.save(prodCred, environment = "production")
+        assertEquals(prodCred, storeWithPrefs.read(environment = "production"))
+        assertEquals(stagingCred, storeWithPrefs.read(environment = "staging"))
+
+        // Clear staging does not affect production
+        storeWithPrefs.clear(environment = "staging")
+        org.junit.Assert.assertNull(storeWithPrefs.read(environment = "staging"))
+        assertEquals(prodCred, storeWithPrefs.read(environment = "production"))
+
+        // clearAll clears everything
+        storeWithPrefs.clearAll()
+        org.junit.Assert.assertNull(storeWithPrefs.read(environment = "production"))
+    }
+
     private fun assertRefused(credential: String) {
         val thrown = runCatching { store.save(credential) }.exceptionOrNull()
         assertTrue(

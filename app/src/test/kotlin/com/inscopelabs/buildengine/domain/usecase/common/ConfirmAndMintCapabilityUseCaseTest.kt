@@ -378,4 +378,82 @@ class ConfirmAndMintCapabilityUseCaseTest {
             assertTrue(e.message?.contains("does not match") == true)
         }
     }
+
+    // --- Environment Safety (T2-201, T2-204) ------------------------------------
+
+    @Test
+    fun `returns EnvironmentMismatch when expected environment differs from gateway reported environment`() = runTest {
+        val taskRepository = FakeTaskRepository().apply {
+            branchResult = { AppResult.Success(TaskBranch(name = validBranch, headSha = validHead)) }
+        }
+        val verifyBranchHead = VerifyBranchHeadUseCase(taskRepository)
+
+        val useCase = ConfirmAndMintCapabilityUseCase(
+            capabilityMinter = minter,
+            biometricGate = BiometricGate(authenticator = { _, _ -> true }),
+            verifyBranchHeadUseCase = verifyBranchHead,
+            expectedEnvironmentProvider = { "production" },
+            reportedEnvironmentProvider = { "test" },
+            clock = fixedClock,
+        )
+
+        val result = useCase(validRequest)
+        assertEquals(MintResult.EnvironmentMismatch(expected = "production", reported = "test"), result)
+
+        try {
+            useCase.mintOrThrow(validRequest)
+            fail("Expected EnvironmentMismatchException")
+        } catch (e: EnvironmentMismatchException) {
+            assertTrue(e.message?.contains("Environment mismatch") == true)
+        }
+    }
+
+    @Test
+    fun `returns EnvironmentMismatch when gateway health has not been probed`() = runTest {
+        val taskRepository = FakeTaskRepository().apply {
+            branchResult = { AppResult.Success(TaskBranch(name = validBranch, headSha = validHead)) }
+        }
+        val verifyBranchHead = VerifyBranchHeadUseCase(taskRepository)
+
+        val useCase = ConfirmAndMintCapabilityUseCase(
+            capabilityMinter = minter,
+            biometricGate = BiometricGate(authenticator = { _, _ -> true }),
+            verifyBranchHeadUseCase = verifyBranchHead,
+            expectedEnvironmentProvider = { "staging" },
+            reportedEnvironmentProvider = { null },
+            clock = fixedClock,
+        )
+
+        val result = useCase(validRequest)
+        assertEquals(MintResult.EnvironmentMismatch(expected = "staging", reported = "(unprobed)"), result)
+    }
+
+    @Test
+    fun `key enrolled for staging is refused when targeting production`() = runTest {
+        val taskRepository = FakeTaskRepository().apply {
+            branchResult = { AppResult.Success(TaskBranch(name = validBranch, headSha = validHead)) }
+        }
+        val verifyBranchHead = VerifyBranchHeadUseCase(taskRepository)
+
+        val prefs = FakeSharedPreferences()
+        val store = DeviceEnrollmentStore(preferences = prefs)
+        // Enroll key strictly for staging
+        store.recordPending("k_stg", "op_staging_host", "pubStg", 1700000000L, AuthTier.IN_APP_CONFIRM.wireValue, environment = "staging")
+        store.activate("k_stg", 1700000000L)
+
+        // Console expected & reported are production
+        val useCase = ConfirmAndMintCapabilityUseCase(
+            capabilityMinter = minter,
+            biometricGate = BiometricGate(),
+            verifyBranchHeadUseCase = verifyBranchHead,
+            enrollmentStore = store,
+            expectedEnvironmentProvider = { "production" },
+            reportedEnvironmentProvider = { "production" },
+            clock = fixedClock,
+        )
+
+        val inAppReq = validRequest.copy(typedHeadConfirmation = validHead.take(7))
+        val result = useCase(inAppReq)
+        assertEquals(MintResult.NotEnrolled, result)
+    }
 }

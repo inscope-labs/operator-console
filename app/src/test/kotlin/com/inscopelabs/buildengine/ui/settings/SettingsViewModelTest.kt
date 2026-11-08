@@ -341,4 +341,82 @@ class SettingsViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    // --- Environment safety & credential isolation (T2-201, T2-202, T2-203) -----
+
+    @Test
+    fun `switching expected environment switches credential slot and never reuses credentials`() = runTest {
+        val viewModel = createViewModel()
+        viewModel.uiState.test {
+            skipItems(1) // Initial state
+
+            // 1. Switch to staging
+            viewModel.saveExpectedEnvironment("staging")
+            val stgState = awaitItem()
+            assertTrue(stgState is UiState.Success)
+            assertEquals("staging", (stgState as UiState.Success).data.expectedEnvironment)
+            assertFalse(stgState.data.credentialConfigured)
+
+            // 2. Save credential for staging
+            viewModel.saveCredential("gw_op_staging_cred_123")
+            val savedStg = awaitItem()
+            assertTrue((savedStg as UiState.Success).data.credentialConfigured)
+
+            // 3. Switch to production
+            viewModel.saveExpectedEnvironment("production")
+            val prodState = awaitItem()
+            assertTrue(prodState is UiState.Success)
+            assertEquals("production", (prodState as UiState.Success).data.expectedEnvironment)
+            // MUST NOT reuse staging's credential!
+            assertFalse((prodState as UiState.Success).data.credentialConfigured)
+
+            // 4. Switch back to staging -> staging credential is still configured
+            viewModel.saveExpectedEnvironment("staging")
+            val backToStg = awaitItem()
+            assertTrue((backToStg as UiState.Success).data.credentialConfigured)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `testConnection detects environment mismatch between expected and reported environment`() = runTest {
+        val serverUrl = server.url("/").toString().trimEnd('/')
+        baseUrlStore.save(serverUrl)
+        baseUrlStore.saveExpectedEnvironment("production")
+
+        // Gateway returns "test" instead of expected "production"
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""{"status":"ok","environment":"test","version":"2.0.0","timestamp":1700000000}""")
+        )
+
+        val viewModel = createViewModel()
+        viewModel.uiState.test {
+            viewModel.testConnection()
+
+            var matchedState: SettingsState? = null
+            while (true) {
+                val item = awaitItem()
+                if (item is UiState.Success && item.data.healthSnapshot?.environment == "test") {
+                    matchedState = item.data
+                    break
+                }
+            }
+
+            assertNotNull(matchedState)
+            val state = checkNotNull(matchedState)
+            assertFalse(state.healthTesting)
+            assertEquals("test", state.healthSnapshot?.environment)
+            assertEquals("production", state.expectedEnvironment)
+
+            // Environment mismatch must be flagged!
+            assertTrue(state.environmentMismatch)
+            assertNotNull(state.environmentMismatchMessage)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }

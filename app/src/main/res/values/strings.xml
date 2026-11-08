@@ -157,6 +157,13 @@
     <string name="connection_connected_staging">Connected (staging)</string>
     <string name="connection_connected_production">Connected (production)</string>
     <string name="connection_connected_other">Connected (%1$s)</string>
+    <string name="connection_environment_mismatch">Environment mismatch (expected %1$s, gateway is %2$s)</string>
+
+    <!-- Environment safety (Stage 2.2) -->
+    <string name="settings_expected_env_label">Expected environment</string>
+    <string name="settings_expected_env_help">Configured expected environment must match the gateway reported environment. Mismatches disable all privileged actions (T2-201).</string>
+    <string name="settings_env_mismatch_warning">Environment mismatch: configured expected environment is \"%1$s\", but gateway reports \"%2$s\". All privileged actions are disabled.</string>
+    <string name="settings_expected_env_saved">Expected environment saved.</string>
 
     <!-- Diagnostics / gateway activity log (Stage 6) -->
     <string name="settings_diagnostics_heading">Diagnostics</string>

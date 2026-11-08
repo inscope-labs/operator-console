@@ -11,6 +11,8 @@ import com.inscopelabs.buildengine.core.crypto.DeviceKeyManager
 import com.inscopelabs.buildengine.core.crypto.StrongBoxSupport
 import com.inscopelabs.buildengine.core.security.DeviceAttestation
 import com.inscopelabs.buildengine.data.enrollment.DeviceEnrollmentStore
+import com.inscopelabs.buildengine.data.local.GatewayBaseUrlStore
+import com.inscopelabs.buildengine.data.local.HealthSnapshotStore
 import com.inscopelabs.buildengine.data.remote.GatewayApi
 import com.inscopelabs.buildengine.domain.usecase.enrollment.EnrollDeviceUseCase
 import com.inscopelabs.buildengine.domain.usecase.enrollment.ReportDevicePostureUseCase
@@ -59,6 +61,8 @@ object UseCaseModule {
         deviceKeyManager: DeviceKeyManager,
         enrollmentStore: DeviceEnrollmentStore,
         clock: com.inscopelabs.buildengine.core.time.Clock,
+        baseUrlStore: GatewayBaseUrlStore,
+        healthSnapshotStore: HealthSnapshotStore,
     ): ConfirmAndMintCapabilityUseCase =
         ConfirmAndMintCapabilityUseCase(
             capabilityMinter = capabilityMinter,
@@ -67,6 +71,8 @@ object UseCaseModule {
             deviceKeyManager = deviceKeyManager,
             enrollmentStore = enrollmentStore,
             clock = clock,
+            baseUrlStore = baseUrlStore,
+            healthSnapshotStore = healthSnapshotStore,
         )
 
     @Provides

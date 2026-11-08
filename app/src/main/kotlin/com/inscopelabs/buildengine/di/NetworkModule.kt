@@ -100,7 +100,7 @@ object NetworkModule {
     ): GatewayHttpClient = GatewayHttpClient(
         client = client,
         baseUrlProvider = GatewayBaseUrlProvider { baseUrlStore.current() },
-        credentials = OperatorCredentialProvider { credentialStore.read() },
+        credentials = OperatorCredentialProvider { credentialStore.read(baseUrlStore.expectedEnvironment()) },
         activityLog = activityLog,
     )
 

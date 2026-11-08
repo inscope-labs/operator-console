@@ -88,6 +88,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 onSave = { viewModel.saveGatewayBaseUrl(gatewayDraft) },
                 onClear = { viewModel.clearGatewayBaseUrl() },
                 onTestConnection = { viewModel.testConnection() },
+                onSetExpectedEnvironment = { viewModel.saveExpectedEnvironment(it) },
             )
             CredentialSection(
                 state = current,
@@ -108,6 +109,9 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 exportText = { viewModel.gatewayActivityExportText() },
             )
 
+            state.environmentMismatchMessage?.let { mismatchMsg ->
+                ErrorBanner(message = mismatchMsg)
+            }
             state.customError?.let { customMessage ->
                 ErrorBanner(message = customMessage)
             } ?: state.error?.let { error ->
@@ -135,6 +139,7 @@ private fun GatewaySection(
     onSave: () -> Unit,
     onClear: () -> Unit,
     onTestConnection: () -> Unit,
+    onSetExpectedEnvironment: (String) -> Unit,
 ) {
     SettingsCard(title = stringResource(R.string.settings_gateway_heading)) {
         LabelAndValue(
@@ -179,6 +184,45 @@ private fun GatewaySection(
             ) {
                 Text(stringResource(R.string.action_clear))
             }
+        }
+
+        // Expected Environment selector (T2-201)
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = stringResource(R.string.settings_expected_env_label),
+                style = MaterialTheme.typography.labelMedium,
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth().testTag("settings_expected_env_selector"),
+            ) {
+                listOf("test", "staging", "production").forEach { env ->
+                    val isSelected = state.expectedEnvironment.equals(env, ignoreCase = true)
+                    if (isSelected) {
+                        androidx.compose.material3.Button(
+                            onClick = { onSetExpectedEnvironment(env) },
+                            modifier = Modifier.testTag("settings_env_${env}_selected"),
+                        ) {
+                            Text(env)
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = { onSetExpectedEnvironment(env) },
+                            modifier = Modifier.testTag("settings_env_${env}_button"),
+                        ) {
+                            Text(env)
+                        }
+                    }
+                }
+            }
+            Text(
+                text = stringResource(R.string.settings_expected_env_help),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+
+        if (state.environmentMismatch && state.environmentMismatchMessage != null) {
+            ErrorBanner(message = state.environmentMismatchMessage)
         }
 
         OutlinedButton(
@@ -241,7 +285,7 @@ private fun CredentialSection(
 ) {
     SettingsCard(title = stringResource(R.string.settings_credential_heading)) {
         LabelAndValue(
-            label = stringResource(R.string.settings_credential_state_label),
+            label = "${stringResource(R.string.settings_credential_state_label)} (${state.expectedEnvironment})",
             value = stringResource(
                 if (state.credentialConfigured) {
                     R.string.settings_credential_configured
@@ -438,6 +482,7 @@ private val SettingsNotice.messageRes: Int
         SettingsNotice.CREDENTIAL_CLEARED -> R.string.settings_credential_cleared
         SettingsNotice.GATEWAY_URL_SAVED -> R.string.settings_gateway_url_saved
         SettingsNotice.GATEWAY_URL_CLEARED -> R.string.settings_gateway_url_cleared
+        SettingsNotice.EXPECTED_ENV_SAVED -> R.string.settings_expected_env_saved
         SettingsNotice.HEALTH_OK -> R.string.settings_health_ok
         SettingsNotice.SESSION_STARTED -> R.string.settings_session_started
         SettingsNotice.SESSION_ENDED -> R.string.settings_session_ended

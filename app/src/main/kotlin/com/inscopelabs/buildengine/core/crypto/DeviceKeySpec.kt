@@ -45,4 +45,31 @@ data class DeviceKeySpec(
         result = 31 * result + (attestationChallenge?.contentHashCode() ?: 0)
         return result
     }
+
+    companion object {
+        /**
+         * Derives a canonical Keystore alias namespaced by environment and host (`op_<env>_<host>`).
+         *
+         * Per ADR 0007 / B.4 item 1 and T2-204:
+         * Isolation must come from a separate Keystore key per environment and host so a capability
+         * captured on staging is never valid or signable on production.
+         */
+        fun deriveAlias(environment: String, host: String): String {
+            val cleanEnv = environment.lowercase().trim().replace(Regex("[^a-z0-9]"), "")
+            require(cleanEnv.isNotEmpty()) { "Environment must not be blank" }
+
+            val cleanHost = host.trim()
+                .removePrefix("https://")
+                .removePrefix("http://")
+                .substringBefore('/')
+                .substringBefore(':')
+                .lowercase()
+                .replace(Regex("[^a-z0-9]"), "_")
+                .trim('_')
+
+            val raw = if (cleanHost.isEmpty()) "op_${cleanEnv}" else "op_${cleanEnv}_${cleanHost}"
+            // Android Keystore alias max length is 64 characters per Keystore & DeviceEnrollmentStore validation
+            return if (raw.length > 64) raw.take(64).trimEnd('_') else raw
+        }
+    }
 }

@@ -27,4 +27,13 @@ sealed interface ConnectionStatus {
         val environment: String,
         val version: String = "",
     ) : ConnectionStatus
+
+    /**
+     * Gateway is reachable, but reported environment does not match configured expected environment.
+     * Privileged actions are disabled per T2-201.
+     */
+    data class EnvironmentMismatch(
+        val expected: String,
+        val reported: String,
+    ) : ConnectionStatus
 }

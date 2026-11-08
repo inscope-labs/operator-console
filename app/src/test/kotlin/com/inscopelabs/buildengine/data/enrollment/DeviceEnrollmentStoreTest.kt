@@ -139,4 +139,56 @@ class DeviceEnrollmentStoreTest {
         assertEquals("hardware_confirm", store.authTierFor("k_tier"))
         assertEquals("hardware_confirm", store.activeRecord()?.authTier)
     }
+
+    // --- Per-environment enrollment & refusal (T2-204 / B.4 item 1) -------------
+
+    @Test
+    fun `a key enrolled for staging is never offered for production`() {
+        val now = 1700000000L
+        store.recordPending(
+            kid = "k_stg",
+            keyAlias = "op_staging_gateway_local",
+            publicKeyBase64 = "pub_staging_123",
+            now = now,
+            authTier = "hardware_confirm",
+            environment = "staging",
+        )
+        store.activate("k_stg", now)
+
+        val stagingRecord = store.activeRecord(environment = "staging")
+        assertNotNull(stagingRecord)
+        assertEquals("k_stg", stagingRecord?.kid)
+        assertEquals("staging", stagingRecord?.environment)
+        assertEquals("staging", store.environmentFor("k_stg"))
+
+        // Cross-environment refusal: staging key must NEVER be offered for production or test
+        assertNull(store.activeRecord(environment = "production"))
+        assertNull(store.activeKid(environment = "production"))
+        assertNull(store.activeRecord(environment = "test"))
+        assertNull(store.activeKid(environment = "test"))
+    }
+
+    @Test
+    fun `per-environment active keys coexist without cross-contamination`() {
+        val now = 1700000000L
+        // Enrol staging key
+        store.recordPending("k_stg", "op_staging_host", "pub_stg", now, "hardware_confirm", "staging")
+        store.activate("k_stg", now)
+
+        // Enrol prod key
+        store.recordPending("k_prd", "op_production_host", "pub_prd", now + 1, "hardware_confirm", "production")
+        store.activate("k_prd", now + 1)
+
+        // Enrol test key
+        store.recordPending("k_tst", "op_test_host", "pub_tst", now + 2, "hardware_confirm", "test")
+        store.activate("k_tst", now + 2)
+
+        assertEquals("k_stg", store.activeRecord(environment = "staging")?.kid)
+        assertEquals("k_prd", store.activeRecord(environment = "production")?.kid)
+        assertEquals("k_tst", store.activeRecord(environment = "test")?.kid)
+
+        assertEquals("k_stg", store.activeKid(environment = "staging"))
+        assertEquals("k_prd", store.activeKid(environment = "production"))
+        assertEquals("k_tst", store.activeKid(environment = "test"))
+    }
 }

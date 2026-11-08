@@ -30,6 +30,7 @@ sealed interface MintResult {
     data object NotEnrolled : MintResult
     data object ExpiredWhileConfirming : MintResult
     data class TierNotAllowed(val reason: String = "Auth tier not allowed") : MintResult
+    data class EnvironmentMismatch(val expected: String, val reported: String) : MintResult
 }
 
 /** Thrown when remote branch head SHA has drifted. */
@@ -37,6 +38,9 @@ class HeadDriftException(message: String) : Exception(message)
 
 /** Thrown when operator biometric authorization was cancelled or failed. */
 class BiometricAuthException(message: String) : Exception(message)
+
+/** Thrown when expected environment does not match gateway reported environment. */
+class EnvironmentMismatchException(message: String) : IllegalStateException(message)
 
 /**
  * The single path by which a capability comes into existence.
@@ -58,6 +62,10 @@ class ConfirmAndMintCapabilityUseCase(
     private val deviceKeyManager: DeviceKeyManager? = null,
     private val enrollmentStore: DeviceEnrollmentStore? = null,
     private val clock: Clock? = null,
+    private val baseUrlStore: com.inscopelabs.buildengine.data.local.GatewayBaseUrlStore? = null,
+    private val healthSnapshotStore: com.inscopelabs.buildengine.data.local.HealthSnapshotStore? = null,
+    private val expectedEnvironmentProvider: (() -> String)? = null,
+    private val reportedEnvironmentProvider: (() -> String?)? = null,
     private val signatureEngineProvider: () -> Signature = {
         Signature.getInstance("SHA256withECDSA")
     },
@@ -67,6 +75,18 @@ class ConfirmAndMintCapabilityUseCase(
         request: OperationRequest,
         policy: BiometricPolicy = BiometricPolicy(),
     ): MintResult {
+        // Step 0: Check Environment Safety (T2-201)
+        val expectedEnv = expectedEnvironmentProvider?.invoke()
+            ?: baseUrlStore?.expectedEnvironment()
+        val reportedEnv = reportedEnvironmentProvider?.invoke()
+            ?: healthSnapshotStore?.read()?.environment
+
+        if (expectedEnv != null && (reportedEnv == null || !expectedEnv.equals(reportedEnv, ignoreCase = true))) {
+            return MintResult.EnvironmentMismatch(
+                expected = expectedEnv,
+                reported = reportedEnv ?: "(unprobed)",
+            )
+        }
         // Step 1: Verify branch head if branch/task and head are present
         if (verifyBranchHeadUseCase != null) {
             val target = request.scope.branch.ifEmpty { request.task }
@@ -88,7 +108,7 @@ class ConfirmAndMintCapabilityUseCase(
         onShowSummary?.invoke(request)
 
         // Step 3: Determine enrollment & tier
-        val activeRecord = enrollmentStore?.activeRecord()
+        val activeRecord = enrollmentStore?.activeRecord(expectedEnv)
         if (enrollmentStore != null && activeRecord == null) {
             return MintResult.NotEnrolled
         }
@@ -210,5 +230,9 @@ class ConfirmAndMintCapabilityUseCase(
             throw IllegalStateException("Confirmation expired while processing.")
         is MintResult.TierNotAllowed ->
             throw GeneralSecurityException("Auth tier not allowed: ${res.reason}")
+        is MintResult.EnvironmentMismatch ->
+            throw EnvironmentMismatchException(
+                "Environment mismatch: configured expected environment '${res.expected}' does not match gateway reported environment '${res.reported}'. All privileged actions are disabled."
+            )
     }
 }

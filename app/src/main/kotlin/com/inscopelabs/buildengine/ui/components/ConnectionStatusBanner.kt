@@ -70,6 +70,13 @@ fun ConnectionStatusBanner(
                 tag = "connection_connected",
             )
         }
+        is ConnectionStatus.EnvironmentMismatch -> BannerVisual(
+            container = MaterialTheme.colorScheme.errorContainer,
+            content = MaterialTheme.colorScheme.onErrorContainer,
+            icon = Icons.Default.Warning,
+            label = stringResource(R.string.connection_environment_mismatch, status.expected, status.reported),
+            tag = "connection_environment_mismatch",
+        )
     }
 
     Surface(

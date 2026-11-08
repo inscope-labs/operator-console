@@ -77,7 +77,7 @@ class OperatorCredentialStore(
     }
 
     /**
-     * Stores the gateway-scoped operator credential.
+     * Stores the gateway-scoped operator credential in the specified [environment] slot.
      *
      * @throws IllegalArgumentException if the credential is empty, or if it looks like
      *   a repository credential. Both are refusals, not repairs: the store does not
@@ -85,7 +85,7 @@ class OperatorCredentialStore(
      *   operator's paste is either the credential they meant to present or it is not
      *   the console's business.
      */
-    fun save(credential: String) {
+    fun save(credential: String, environment: String = PreferencesKeys.DEFAULT_ENVIRONMENT) {
         val value = credential.trim()
         require(value.isNotEmpty()) {
             "the operator credential is empty; the console presents no credential rather than an empty one"
@@ -95,18 +95,24 @@ class OperatorCredentialStore(
                 "GitHub credential of any kind (ADR 0002) and the gateway's credential is " +
                 "gateway-scoped"
         }
-        preferences.edit().putString(PreferencesKeys.OPERATOR_CREDENTIAL, value).apply()
+        val slotKey = PreferencesKeys.operatorCredentialKey(environment)
+        preferences.edit()
+            .putString(slotKey, value)
+            .apply()
     }
 
     /**
-     * The stored credential, or `null` when there is none.
+     * The stored credential for [environment], or `null` when there is none.
      *
      * Returns `null` rather than throwing when the stored value can no longer be
      * decrypted — a Keystore key invalidated by a lock-screen change leaves an
      * unreadable value behind, and "not configured" is the honest report.
+     *
+     * Per T2-202: switching environment never reuses another environment's credential.
      */
-    fun read(): String? = try {
-        preferences.getString(PreferencesKeys.OPERATOR_CREDENTIAL, null)
+    fun read(environment: String = PreferencesKeys.DEFAULT_ENVIRONMENT): String? = try {
+        val slotKey = PreferencesKeys.operatorCredentialKey(environment)
+        preferences.getString(slotKey, null)
     } catch (_: GeneralSecurityException) {
         null
     } catch (_: IOException) {
@@ -114,15 +120,28 @@ class OperatorCredentialStore(
     }
 
     /**
-     * Deletes the stored credential.
+     * Deletes the stored credential for [environment].
      *
      * This is a local deletion. It is not a revocation: the credential stays valid at
      * the gateway until the gateway's own rotation or expiry policy acts on it, and
      * that surface is the gateway's, not this store's (ADR 0002 lists the operator
      * credential as "rotatable; revocable server-side at any time").
      */
-    fun clear() {
-        preferences.edit().remove(PreferencesKeys.OPERATOR_CREDENTIAL).apply()
+    fun clear(environment: String = PreferencesKeys.DEFAULT_ENVIRONMENT) {
+        val slotKey = PreferencesKeys.operatorCredentialKey(environment)
+        preferences.edit().remove(slotKey).apply()
+    }
+
+    /**
+     * Deletes credentials across all known environment slots and legacy storage.
+     */
+    fun clearAll() {
+        preferences.edit()
+            .remove(PreferencesKeys.OPERATOR_CREDENTIAL)
+            .remove(PreferencesKeys.operatorCredentialKey("test"))
+            .remove(PreferencesKeys.operatorCredentialKey("staging"))
+            .remove(PreferencesKeys.operatorCredentialKey("production"))
+            .apply()
     }
 
     companion object {

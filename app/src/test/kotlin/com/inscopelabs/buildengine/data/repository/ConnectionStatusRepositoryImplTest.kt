@@ -76,4 +76,24 @@ class ConnectionStatusRepositoryImplTest {
         assertTrue(status is ConnectionStatus.Connected)
         assertEquals("production", (status as ConnectionStatus.Connected).environment)
     }
+
+    @Test
+    fun `environment mismatch when expected environment differs from reported snapshot environment`() {
+        val snapshot = GatewayHealthSnapshot(
+            status = "ok",
+            environment = "test",
+            version = "1.0.0",
+            timestampMillis = 1000L,
+            probedAtEpochSeconds = 10L,
+        )
+        val status = deriveConnectionStatus(
+            baseUrl = "https://gateway.example.com",
+            snapshot = snapshot,
+            expectedEnvironment = "production",
+        )
+        assertEquals(
+            ConnectionStatus.EnvironmentMismatch(expected = "production", reported = "test"),
+            status,
+        )
+    }
 }

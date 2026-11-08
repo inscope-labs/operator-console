@@ -38,6 +38,7 @@ import kotlinx.coroutines.launch
 data class SettingsState(
     val gatewayBaseUrl: String,
     val gatewayConfigured: Boolean,
+    val expectedEnvironment: String = "test",
     /** Last successful health probe, or null if none / cleared after failure. */
     val healthSnapshot: GatewayHealthSnapshot? = null,
     /** True while a health probe is in flight. */
@@ -45,6 +46,8 @@ data class SettingsState(
     /** Failure message from the last Test connection attempt. */
     val healthError: String? = null,
     val credentialConfigured: Boolean,
+    val environmentMismatch: Boolean = false,
+    val environmentMismatchMessage: String? = null,
     val session: OperatorSession?,
     /** When true, gateway exchanges are recorded in the activity log. */
     val gatewayActivityLogEnabled: Boolean = false,
@@ -60,6 +63,7 @@ enum class SettingsNotice {
     CREDENTIAL_CLEARED,
     GATEWAY_URL_SAVED,
     GATEWAY_URL_CLEARED,
+    EXPECTED_ENV_SAVED,
     HEALTH_OK,
     SESSION_STARTED,
     SESSION_ENDED,
@@ -99,19 +103,54 @@ class SettingsViewModel @Inject constructor(
     fun refresh() {
         viewModelScope.launch(Dispatchers.IO) {
             val baseUrl = gatewayBaseUrlStore.read()
-            val configured = credentialStore.read() != null
+            val expectedEnv = gatewayBaseUrlStore.readExpectedEnvironment()
+            val configured = credentialStore.read(expectedEnv) != null
             val snapshot = healthSnapshotStore.read()
             val logEnabled = DiagnosticPreferences.isGatewayActivityLogEnabled(appContext)
             activityLog.isEnabled = logEnabled
+
+            val mismatch = snapshot != null && snapshot.environment.isNotEmpty() && !snapshot.environment.equals(expectedEnv, ignoreCase = true)
+            val mismatchMessage = if (mismatch) formatMismatchMessage(expectedEnv, snapshot.environment) else null
+
             publish {
                 it.copy(
                     gatewayBaseUrl = baseUrl,
                     gatewayConfigured = GatewayEndpoints.isConfigured(baseUrl),
+                    expectedEnvironment = expectedEnv,
                     healthSnapshot = snapshot,
                     credentialConfigured = configured,
+                    environmentMismatch = mismatch,
+                    environmentMismatchMessage = mismatchMessage,
                     gatewayActivityLogEnabled = logEnabled,
                     gatewayActivityEvents = activityLog.events.value,
                 )
+            }
+        }
+    }
+
+    fun saveExpectedEnvironment(environment: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                gatewayBaseUrlStore.saveExpectedEnvironment(environment)
+                val expectedEnv = gatewayBaseUrlStore.readExpectedEnvironment()
+                val configured = credentialStore.read(expectedEnv) != null
+                val snapshot = healthSnapshotStore.read()
+                val mismatch = snapshot != null && snapshot.environment.isNotEmpty() && !snapshot.environment.equals(expectedEnv, ignoreCase = true)
+                val mismatchMessage = if (mismatch) formatMismatchMessage(expectedEnv, snapshot.environment) else null
+
+                publish {
+                    it.copy(
+                        expectedEnvironment = expectedEnv,
+                        credentialConfigured = configured,
+                        environmentMismatch = mismatch,
+                        environmentMismatchMessage = mismatchMessage,
+                        notice = SettingsNotice.EXPECTED_ENV_SAVED,
+                        error = null,
+                        customError = null,
+                    )
+                }
+            } catch (e: IllegalArgumentException) {
+                publish { it.copy(notice = null, customError = e.message) }
             }
         }
     }
@@ -158,6 +197,8 @@ class SettingsViewModel @Inject constructor(
                     gatewayConfigured = GatewayEndpoints.isConfigured(effective),
                     healthSnapshot = null,
                     healthError = null,
+                    environmentMismatch = false,
+                    environmentMismatchMessage = null,
                     notice = SettingsNotice.GATEWAY_URL_CLEARED,
                     error = null,
                     customError = null,
@@ -187,11 +228,18 @@ class SettingsViewModel @Inject constructor(
                         probedAtEpochSeconds = clock.nowEpochSeconds(),
                     )
                     healthSnapshotStore.save(snapshot)
+                    val expectedEnv = gatewayBaseUrlStore.readExpectedEnvironment()
+                    val mismatch = snapshot.environment.isNotEmpty() && !snapshot.environment.equals(expectedEnv, ignoreCase = true)
+                    val mismatchMessage = if (mismatch) formatMismatchMessage(expectedEnv, snapshot.environment) else null
+
                     publish {
                         it.copy(
+                            expectedEnvironment = expectedEnv,
                             healthTesting = false,
                             healthSnapshot = snapshot,
                             healthError = null,
+                            environmentMismatch = mismatch,
+                            environmentMismatchMessage = mismatchMessage,
                             notice = SettingsNotice.HEALTH_OK,
                         )
                     }
@@ -203,6 +251,8 @@ class SettingsViewModel @Inject constructor(
                             healthTesting = false,
                             healthSnapshot = null,
                             healthError = result.message,
+                            environmentMismatch = false,
+                            environmentMismatchMessage = null,
                             notice = null,
                         )
                     }
@@ -214,7 +264,8 @@ class SettingsViewModel @Inject constructor(
     fun saveCredential(credential: String) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                credentialStore.save(credential)
+                val currentEnv = gatewayBaseUrlStore.readExpectedEnvironment()
+                credentialStore.save(credential, currentEnv)
                 publish {
                     it.copy(
                         credentialConfigured = true,
@@ -239,7 +290,8 @@ class SettingsViewModel @Inject constructor(
     fun clearCredential() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                credentialStore.clear()
+                val currentEnv = gatewayBaseUrlStore.readExpectedEnvironment()
+                credentialStore.clear(currentEnv)
                 publish {
                     it.copy(
                         credentialConfigured = false,
@@ -310,11 +362,18 @@ class SettingsViewModel @Inject constructor(
     /** Redacted activity log text for system share sheet. */
     fun gatewayActivityExportText(): String = activityLog.exportText()
 
+    private fun formatMismatchMessage(expected: String, reported: String): String = try {
+        appContext.getString(com.inscopelabs.buildengine.R.string.settings_env_mismatch_warning, expected, reported)
+    } catch (_: Exception) {
+        "Environment mismatch: configured expected environment '$expected' does not match gateway reported environment '$reported'. All privileged actions are disabled."
+    }
+
     private fun publish(transform: (SettingsState) -> SettingsState) {
         _uiState.update { current ->
             val base = (current as? UiState.Success)?.data ?: SettingsState(
                 gatewayBaseUrl = "",
                 gatewayConfigured = false,
+                expectedEnvironment = "test",
                 credentialConfigured = false,
                 session = null,
             )

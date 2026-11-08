@@ -29,11 +29,17 @@ class GatewayBaseUrlStore(
 ) {
 
     private val key = stringPreferencesKey(PreferencesKeys.GATEWAY_BASE_URL)
+    private val expectedEnvKey = stringPreferencesKey(PreferencesKeys.EXPECTED_ENVIRONMENT)
 
     /** Emits the effective base URL (stored, else debug default, else empty). */
     val baseUrlFlow: Flow<String> = dataStore.data
         .catch { emit(androidx.datastore.preferences.core.emptyPreferences()) }
         .map { preferences -> resolve(preferences[key]) }
+
+    /** Emits the configured expected environment (test, staging, or production). Default is "test". */
+    val expectedEnvironmentFlow: Flow<String> = dataStore.data
+        .catch { emit(androidx.datastore.preferences.core.emptyPreferences()) }
+        .map { preferences -> resolveEnvironment(preferences[expectedEnvKey]) }
 
     /**
      * The effective base URL for transport.
@@ -84,6 +90,41 @@ class GatewayBaseUrlStore(
     fun validate(url: String, isDebug: Boolean = true): GatewayEndpoints.UrlValidationResult =
         GatewayEndpoints.validateUrl(url, isDebug = isDebug)
 
+    /**
+     * The configured expected environment for transport/verification (blocking).
+     */
+    fun expectedEnvironment(): String = try {
+        runBlocking {
+            val stored = dataStore.data.first()[expectedEnvKey]
+            resolveEnvironment(stored)
+        }
+    } catch (_: Exception) {
+        PreferencesKeys.DEFAULT_ENVIRONMENT
+    }
+
+    /** Suspend read of the configured expected environment. */
+    suspend fun readExpectedEnvironment(): String = try {
+        val stored = dataStore.data.first()[expectedEnvKey]
+        resolveEnvironment(stored)
+    } catch (_: Exception) {
+        PreferencesKeys.DEFAULT_ENVIRONMENT
+    }
+
+    /**
+     * Persists [environment] as the expected environment.
+     *
+     * Refuses any environment outside [ALLOWED_ENVIRONMENTS].
+     */
+    suspend fun saveExpectedEnvironment(environment: String) {
+        val normalized = environment.trim().lowercase()
+        require(normalized in ALLOWED_ENVIRONMENTS) {
+            "Expected environment '$environment' is not allowed (must be test, staging, or production)"
+        }
+        dataStore.edit { preferences ->
+            preferences[expectedEnvKey] = normalized
+        }
+    }
+
     /** Removes the stored base URL (debug default may still apply). */
     suspend fun clear() {
         dataStore.edit { preferences ->
@@ -97,5 +138,15 @@ class GatewayBaseUrlStore(
         val debug = debugDefault?.trim()?.trimEnd('/').orEmpty()
         if (debug.isNotEmpty()) return debug
         return ""
+    }
+
+    private fun resolveEnvironment(stored: String?): String {
+        val candidate = stored?.trim()?.lowercase().orEmpty()
+        if (candidate in ALLOWED_ENVIRONMENTS) return candidate
+        return PreferencesKeys.DEFAULT_ENVIRONMENT
+    }
+
+    companion object {
+        val ALLOWED_ENVIRONMENTS: Set<String> = setOf("test", "staging", "production")
     }
 }

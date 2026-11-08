@@ -70,6 +70,12 @@ object PreferencesKeys {
     /** The device key's public half, base64. Public by definition. */
     const val DEVICE_PUBLIC_KEY: String = "device_public_key"
 
+    /** The expected gateway environment (test|staging|production). */
+    const val EXPECTED_ENVIRONMENT: String = "expected_environment"
+
+    /** Default expected environment when none is explicitly configured. */
+    const val DEFAULT_ENVIRONMENT: String = "test"
+
     /**
      * The gateway-scoped operator credential.
      *
@@ -77,6 +83,10 @@ object PreferencesKeys {
      * grants no repository access whatsoever. It is the only secret in this file.
      */
     const val OPERATOR_CREDENTIAL: String = "operator_credential"
+
+    /** Derives a per-environment operator credential key slot. */
+    fun operatorCredentialKey(environment: String): String =
+        "operator_credential.${environment.lowercase().trim()}"
 
     /**
      * The keys whose values are secret, and therefore the only keys that belong in
@@ -96,6 +106,7 @@ object PreferencesKeys {
             SELECTED_REPOSITORY,
             SELECTED_PLAN,
             GATEWAY_BASE_URL,
+            EXPECTED_ENVIRONMENT,
             HEALTH_STATUS,
             HEALTH_ENVIRONMENT,
             HEALTH_VERSION,

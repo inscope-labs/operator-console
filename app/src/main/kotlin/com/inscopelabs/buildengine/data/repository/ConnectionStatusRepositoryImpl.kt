@@ -27,8 +27,9 @@ class ConnectionStatusRepositoryImpl @Inject constructor(
     override val status: Flow<ConnectionStatus> = combine(
         baseUrlStore.baseUrlFlow,
         healthSnapshotStore.snapshotFlow,
-    ) { baseUrl, snapshot ->
-        deriveConnectionStatus(baseUrl, snapshot)
+        baseUrlStore.expectedEnvironmentFlow,
+    ) { baseUrl, snapshot, expectedEnv ->
+        deriveConnectionStatus(baseUrl, snapshot, expectedEnv)
     }
 }
 
@@ -38,9 +39,17 @@ class ConnectionStatusRepositoryImpl @Inject constructor(
 fun deriveConnectionStatus(
     baseUrl: String,
     snapshot: GatewayHealthSnapshot?,
+    expectedEnvironment: String? = null,
 ): ConnectionStatus = when {
     !GatewayEndpoints.isConfigured(baseUrl) -> ConnectionStatus.NotConfigured
     snapshot == null -> ConnectionStatus.Unreachable
+    expectedEnvironment != null &&
+        snapshot.environment.isNotEmpty() &&
+        !snapshot.environment.equals(expectedEnvironment, ignoreCase = true) ->
+        ConnectionStatus.EnvironmentMismatch(
+            expected = expectedEnvironment,
+            reported = snapshot.environment,
+        )
     else -> ConnectionStatus.Connected(
         environment = snapshot.environment.ifEmpty { "unknown" },
         version = snapshot.version,
