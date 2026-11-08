@@ -1,5 +1,5 @@
 /**
- * Task routes — publish (Stage 3.2), upload (Stage 3.3), reconcile stub.
+ * Task routes — publish (3.2), upload (3.3), reconcile (3.4).
  * Privileged writes: capability gate (nonce first) → rate → guards → mutate → audit
  */
 
@@ -422,14 +422,223 @@ const uploadHandler: RouteHandler = async (request, env, _ctx, params) => {
 };
 
 
-const notImplemented: RouteHandler = async (request) => {
+
+interface ReconcileBody {
+  plan?: string;
+  task?: string;
+  branch?: string;
+  head?: string;
+  capability?: string;
+  submissionId?: string;
+  prNumber?: number;
+  base?: string;
+}
+
+const reconcileHandler: RouteHandler = async (request, env, _ctx, params) => {
   const requestId = request.headers.get('x-request-id') ?? crypto.randomUUID();
-  return errorResponse(
-    'NOT_IMPLEMENTED',
-    'transaction not yet implemented',
+  const taskId = params.id ?? '';
+
+  let body: ReconcileBody;
+  try {
+    body = (await request.json()) as ReconcileBody;
+  } catch {
+    return errorResponse('NETWORK', 'invalid JSON body', requestId);
+  }
+
+  if (!body.capability || typeof body.capability !== 'string') {
+    return errorResponse('BAD_ENCODING', 'capability required', requestId);
+  }
+
+  const allowModelA = (env.ENVIRONMENT ?? 'test') !== 'production';
+  const gate = await gateCapability(env, {
+    rawCapability: body.capability,
+    expectedBranch: body.branch,
+    allowModelA,
+    resolveKey: async (kid) => {
+      const resolved = await resolveDeviceKey(env, kid);
+      return resolved ? resolved.key : null;
+    },
+  });
+  if (!gate.ok) {
+    return errorResponse(gate.code, gate.message, requestId);
+  }
+
+  const cap = gate.capability;
+  if (cap.op !== 'reconcile') {
+    return errorResponse(
+      'UNKNOWN_OP',
+      `capability op must be reconcile for this route (got ${cap.op})`,
+      requestId
+    );
+  }
+  if (body.branch && body.branch !== cap.branch) {
+    return errorResponse(
+      'BRANCH_MISMATCH',
+      'body branch does not match capability branch',
+      requestId
+    );
+  }
+  if (body.head && body.head.toLowerCase() !== cap.head.toLowerCase()) {
+    return errorResponse(
+      'HEAD_MOVED',
+      'body head does not match capability head',
+      requestId
+    );
+  }
+
+  let adapter;
+  try {
+    adapter = await getAdapter(env);
+  } catch (e) {
+    return errorResponse(
+      'NETWORK',
+      e instanceof Error ? e.message : 'adapter unavailable',
+      requestId
+    );
+  }
+
+  const consumer = adapter.consumer();
+  const branch = cap.branch;
+  const base = body.base ?? 'main';
+
+  let liveHead = '';
+  let exists = false;
+  try {
+    const ref = await consumer.getRef(branch);
+    liveHead = ref.sha.toLowerCase();
+    exists = true;
+  } catch {
+    exists = false;
+  }
+
+  let changedPaths: string[] = [];
+  let deltaEmpty = true;
+  let hasMergeCommits = false;
+  let isAncestryOfMain = false;
+  let diffText = ' ';
+  try {
+    if (exists) {
+      const cmp = await consumer.compare(base, branch);
+      changedPaths = cmp.files;
+      deltaEmpty = cmp.aheadBy === 0;
+      hasMergeCommits = cmp.hasMergeCommits;
+      isAncestryOfMain = cmp.isAncestryOfBase;
+      diffText = changedPaths.join('\n') || ' ';
+    }
+  } catch (e) {
+    return errorResponse(
+      'NETWORK',
+      e instanceof Error ? e.message : 'compare failed',
+      requestId
+    );
+  }
+
+  const guardCtx: GuardContext = {
+    capability: cap,
+    consumer,
+    consumerIsPrivate: true,
+    branchMeta: {
+      exists,
+      head: liveHead || cap.head,
+      isAncestryOfMain,
+      hasMergeCommits,
+      changedPaths,
+      deltaEmpty,
+    },
+    haltActive: false,
+    diffText,
+  };
+
+  const outcome = await runWriteTransaction({
+    requestId,
+    op: 'reconcile',
+    plan: cap.plan,
+    task: cap.task || taskId,
+    branch,
+    head: cap.head,
+    guardCtx,
+    mutate: async () => {
+      try {
+        let prNumber = body.prNumber;
+        let prHead = '';
+        if (prNumber === undefined) {
+          const found = await consumer.findOpenPullForBranch(branch);
+          if (!found) {
+            return {
+              ok: false as const,
+              code: 'RECONCILE_REQUIRED' as const,
+              message: 'no open pull request found for branch',
+            };
+          }
+          prNumber = found.number;
+          prHead = found.headSha.toLowerCase();
+        }
+        if (prHead && prHead !== cap.head.toLowerCase() && prHead !== liveHead) {
+          // Soft check: prefer capability head; live branch tip is authoritative via G13
+        }
+        const merged = await consumer.mergePullRequest({
+          number: prNumber,
+          commitTitle: `reconcile ${cap.plan}/${cap.task}: ${branch}`,
+          mergeMethod: 'squash',
+        });
+        if (!merged.merged) {
+          return {
+            ok: false as const,
+            code: 'RECONCILE_REQUIRED' as const,
+            message: 'pull request could not be merged',
+          };
+        }
+        return {
+          ok: true as const,
+          result: {
+            prNumber,
+            mergeSha: merged.sha,
+            outcome: `MERGED:pr-${prNumber}`,
+          },
+        };
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        // GitHub 405/409 style merge conflicts surface as NETWORK with message
+        if (/not mergeable|Merge conflict|405|409/i.test(message)) {
+          return {
+            ok: false as const,
+            code: 'RECONCILE_REQUIRED' as const,
+            message,
+          };
+        }
+        return {
+          ok: false as const,
+          code: 'NETWORK' as const,
+          message,
+        };
+      }
+    },
+  });
+
+  if (!outcome.ok) {
+    return errorResponse(outcome.code, outcome.message, requestId);
+  }
+
+  const mutation = outcome.mutation as
+    | { outcome?: string; prNumber?: number; mergeSha?: string }
+    | undefined;
+
+  return json(
+    {
+      accepted: true,
+      operation: 'RECONCILE',
+      branch,
+      headSha: cap.head,
+      outcome: mutation?.outcome ?? 'MERGED',
+      auditRef: outcome.auditRef,
+      ...(mutation ? { result: mutation } : {}),
+    },
+    200,
     requestId
   );
 };
+
+
 
 export function registerTaskRoutes(): void {
   register('POST', '/tasks/:id/publish', publishHandler, {
@@ -440,7 +649,7 @@ export function registerTaskRoutes(): void {
     requiresOperatorToken: true,
     requiresCapability: true,
   });
-  register('POST', '/tasks/:id/reconcile', notImplemented, {
+  register('POST', '/tasks/:id/reconcile', reconcileHandler, {
     requiresOperatorToken: true,
     requiresCapability: true,
   });

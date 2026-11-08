@@ -279,30 +279,21 @@ describe('POST /tasks/:id/publish', () => {
     expect(body.error).toBe('BAD_ENCODING');
   });
 
-  it('reconcile remains 501; upload is live (no longer 501)', async () => {
-    const up = await dispatch(
-      new Request('https://gw.test/tasks/7/upload', {
-        method: 'POST',
-        headers: {
-          authorization: 'Bearer tok',
-          'content-type': 'application/json',
-        },
-        body: '{}',
-      }),
-      baseEnv(),
-      ctx
-    );
-    expect(up.status).not.toBe(501);
-
-    const rec = await dispatch(
-      new Request('https://gw.test/tasks/7/reconcile', {
-        method: 'POST',
-        headers: { authorization: 'Bearer tok' },
-        body: '{}',
-      }),
-      baseEnv(),
-      ctx
-    );
-    expect(rec.status).toBe(501);
+  it('upload and reconcile are live (no longer 501)', async () => {
+    for (const path of ['/tasks/7/upload', '/tasks/7/reconcile']) {
+      const res = await dispatch(
+        new Request(`https://gw.test${path}`, {
+          method: 'POST',
+          headers: {
+            authorization: 'Bearer tok',
+            'content-type': 'application/json',
+          },
+          body: '{}',
+        }),
+        baseEnv(),
+        ctx
+      );
+      expect(res.status).not.toBe(501);
+    }
   });
 });
