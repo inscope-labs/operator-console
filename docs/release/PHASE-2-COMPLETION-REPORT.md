@@ -111,7 +111,7 @@ Deferred to later phases (not Phase 2 residuals):
 
 ## 8. Operator sign-off
 
-- **Decision:** _pending operator review_
-- **Signed by:** 
-- **Date:** 
-- **Notes:** Phase 2 gate may be signed when this report is on `main` and Gateway CI is green on the merge SHA. Phase 3 may begin after sign-off.
+- **Decision:** PASS
+- **Signed by:** John Wendell 
+- **Date:** 2026-11-08
+- **Notes:** Reviewed Stages 2.1–2.4 evidence; Gateway CI green on merge SHA 630ffd52c3bab17b9fdcee0ae9325643dc2e7b1f. Phase 3 authorized.
