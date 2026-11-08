@@ -27,3 +27,6 @@ export type AuthTier = (typeof AUTH_TIERS)[number];
 /** Allowed deployment environments (Stage 1.2 / BD-1.1). */
 export type EnvironmentName = 'test' | 'staging' | 'production';
 export type AttestationMode = 'strict' | 'lenient';
+
+/** Maximum submission zip size (bytes). */
+export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;

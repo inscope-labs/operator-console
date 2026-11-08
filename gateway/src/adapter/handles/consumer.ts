@@ -158,4 +158,55 @@ export class ConsumerHandle {
     getSharedRateCoordinator().observeHeaders(headers);
     return { private: data.private, full_name: data.full_name };
   }
+
+  /**
+   * Create or update a file via the Contents API (upload submissions).
+   * Returns the blob SHA written.
+   */
+  async putFile(opts: {
+    path: string;
+    contentBytes: Uint8Array;
+    message: string;
+    branch: string;
+  }): Promise<{ contentSha: string; path: string }> {
+    // base64 encode for GitHub Contents API
+    let bin = '';
+    for (let i = 0; i < opts.contentBytes.length; i++) {
+      bin += String.fromCharCode(opts.contentBytes[i]);
+    }
+    const content = btoa(bin);
+    let existingSha: string | undefined;
+    try {
+      const existing = await this.getContents(opts.path, opts.branch);
+      if (existing.sha) existingSha = existing.sha;
+    } catch {
+      // new file
+    }
+    const body: Record<string, unknown> = {
+      message: opts.message,
+      content,
+      branch: opts.branch,
+    };
+    if (existingSha) body.sha = existingSha;
+    const { data, headers } = await this.client.request<{
+      content?: { sha?: string; path?: string };
+    }>('PUT', `/repos/${this.owner}/${this.name}/contents/${opts.path.replace(/^\//, '')}`, {
+      body,
+    });
+    getSharedRateCoordinator().observeHeaders(headers);
+    return {
+      contentSha: data.content?.sha ?? '',
+      path: data.content?.path ?? opts.path,
+    };
+  }
+
+  /** True when path exists on the given branch. */
+  async pathExists(path: string, ref?: string): Promise<boolean> {
+    try {
+      await this.getContents(path, ref);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }

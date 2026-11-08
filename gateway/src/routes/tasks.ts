@@ -1,7 +1,6 @@
 /**
- * Task routes — publish (Stage 3.2) + remaining stubs.
- * POST /tasks/:id/publish runs the privileged write pipeline:
- *   capability gate (nonce first) → rate → guards → createPullRequest → audit
+ * Task routes — publish (Stage 3.2), upload (Stage 3.3), reconcile stub.
+ * Privileged writes: capability gate (nonce first) → rate → guards → mutate → audit
  */
 
 import { register, type RouteHandler } from './router';
@@ -11,6 +10,10 @@ import { gateCapability } from '../capability/gate';
 import { resolveDeviceKey } from '../auth/device';
 import { runWriteTransaction } from '../adapter/transaction';
 import type { GuardContext } from '../guards/index';
+import {
+  validateUploadPayload,
+  submissionObjectPath,
+} from './upload-validate';
 import './../guards/register-core';
 
 interface PublishBody {
@@ -201,6 +204,224 @@ const publishHandler: RouteHandler = async (request, env, _ctx, params) => {
   );
 };
 
+
+interface UploadBody {
+  plan?: string;
+  task?: string;
+  branch?: string;
+  head?: string;
+  capability?: string;
+  submissionId?: string;
+  zipSha256?: string;
+  zipBase64?: string;
+  base?: string;
+}
+
+const uploadHandler: RouteHandler = async (request, env, _ctx, params) => {
+  const requestId = request.headers.get('x-request-id') ?? crypto.randomUUID();
+  const taskId = params.id ?? '';
+
+  let body: UploadBody;
+  try {
+    body = (await request.json()) as UploadBody;
+  } catch {
+    return errorResponse('NETWORK', 'invalid JSON body', requestId);
+  }
+
+  if (!body.capability || typeof body.capability !== 'string') {
+    return errorResponse('BAD_ENCODING', 'capability required', requestId);
+  }
+  if (!body.submissionId || typeof body.submissionId !== 'string') {
+    return errorResponse('BAD_ENCODING', 'submissionId required', requestId);
+  }
+
+  const payload = await validateUploadPayload({
+    zipBase64: body.zipBase64,
+    zipSha256: body.zipSha256,
+  });
+  if (!payload.ok) {
+    return errorResponse(payload.code, payload.message, requestId);
+  }
+
+  const allowModelA = (env.ENVIRONMENT ?? 'test') !== 'production';
+  const gate = await gateCapability(env, {
+    rawCapability: body.capability,
+    expectedBranch: body.branch,
+    allowModelA,
+    resolveKey: async (kid) => {
+      const resolved = await resolveDeviceKey(env, kid);
+      return resolved ? resolved.key : null;
+    },
+  });
+  if (!gate.ok) {
+    return errorResponse(gate.code, gate.message, requestId);
+  }
+
+  const cap = gate.capability;
+  if (cap.op !== 'upload' && cap.op !== 'publish') {
+    // Prefer upload op; publish-grade still acceptable if minted for same branch in lab
+    // but contract says upload — refuse unknown for this route when not upload
+  }
+  if (cap.op !== 'upload') {
+    return errorResponse(
+      'UNKNOWN_OP',
+      `capability op must be upload for this route (got ${cap.op})`,
+      requestId
+    );
+  }
+  if (body.branch && body.branch !== cap.branch) {
+    return errorResponse(
+      'BRANCH_MISMATCH',
+      'body branch does not match capability branch',
+      requestId
+    );
+  }
+  if (body.head && body.head.toLowerCase() !== cap.head.toLowerCase()) {
+    return errorResponse(
+      'HEAD_MOVED',
+      'body head does not match capability head',
+      requestId
+    );
+  }
+
+  let adapter;
+  try {
+    adapter = await getAdapter(env);
+  } catch (e) {
+    return errorResponse(
+      'NETWORK',
+      e instanceof Error ? e.message : 'adapter unavailable',
+      requestId
+    );
+  }
+
+  const consumer = adapter.consumer();
+  const branch = cap.branch;
+  const base = body.base ?? 'main';
+  const objectPath = submissionObjectPath(body.submissionId);
+
+  let liveHead = '';
+  let exists = false;
+  try {
+    const ref = await consumer.getRef(branch);
+    liveHead = ref.sha.toLowerCase();
+    exists = true;
+  } catch {
+    exists = false;
+  }
+
+  let changedPaths: string[] = [];
+  let deltaEmpty = true;
+  let hasMergeCommits = false;
+  let isAncestryOfMain = false;
+  let diffText = ' ';
+  try {
+    if (exists) {
+      const cmp = await consumer.compare(base, branch);
+      changedPaths = cmp.files;
+      deltaEmpty = cmp.aheadBy === 0;
+      hasMergeCommits = cmp.hasMergeCommits;
+      isAncestryOfMain = cmp.isAncestryOfBase;
+      diffText = changedPaths.join('\n') || ' ';
+    }
+  } catch (e) {
+    return errorResponse(
+      'NETWORK',
+      e instanceof Error ? e.message : 'compare failed',
+      requestId
+    );
+  }
+
+  let submissionExists = false;
+  try {
+    submissionExists = await consumer.pathExists(objectPath, branch);
+  } catch {
+    submissionExists = false;
+  }
+
+  const guardCtx: GuardContext = {
+    capability: cap,
+    consumer,
+    consumerIsPrivate: true,
+    branchMeta: {
+      exists,
+      head: liveHead || cap.head,
+      isAncestryOfMain,
+      hasMergeCommits,
+      changedPaths,
+      deltaEmpty,
+    },
+    haltActive: false,
+    diffText,
+    submissionId: body.submissionId,
+    submissionExists,
+  };
+
+  const outcome = await runWriteTransaction({
+    requestId,
+    op: 'upload',
+    plan: cap.plan,
+    task: cap.task || taskId,
+    branch,
+    head: cap.head,
+    guardCtx,
+    mutate: async () => {
+      try {
+        // Re-check existence inside mutation for race safety
+        const again = await consumer.pathExists(objectPath, branch);
+        if (again) {
+          return {
+            ok: false as const,
+            code: 'SUBMISSION_IMMUTABLE' as const,
+            message: 'submission id already recorded',
+          };
+        }
+        const written = await consumer.putFile({
+          path: objectPath,
+          contentBytes: payload.bytes,
+          message: `upload submission ${body.submissionId} for ${branch}`,
+          branch,
+        });
+        return {
+          ok: true as const,
+          result: {
+            submissionId: body.submissionId,
+            path: written.path,
+            contentSha: written.contentSha,
+            zipSha256: payload.sha256Hex,
+          },
+        };
+      } catch (e) {
+        return {
+          ok: false as const,
+          code: 'NETWORK' as const,
+          message: e instanceof Error ? e.message : String(e),
+        };
+      }
+    },
+  });
+
+  if (!outcome.ok) {
+    return errorResponse(outcome.code, outcome.message, requestId);
+  }
+
+  return json(
+    {
+      accepted: true,
+      operation: 'UPLOAD',
+      branch,
+      headSha: cap.head,
+      auditRef: outcome.auditRef,
+      ...(outcome.mutation && typeof outcome.mutation === 'object'
+        ? { result: outcome.mutation }
+        : {}),
+    },
+    200,
+    requestId
+  );
+};
+
+
 const notImplemented: RouteHandler = async (request) => {
   const requestId = request.headers.get('x-request-id') ?? crypto.randomUUID();
   return errorResponse(
@@ -215,8 +436,7 @@ export function registerTaskRoutes(): void {
     requiresOperatorToken: true,
     requiresCapability: true,
   });
-  // Upload / reconcile remain 501 until their stages.
-  register('POST', '/tasks/:id/upload', notImplemented, {
+  register('POST', '/tasks/:id/upload', uploadHandler, {
     requiresOperatorToken: true,
     requiresCapability: true,
   });
