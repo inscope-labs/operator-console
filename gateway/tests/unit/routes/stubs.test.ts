@@ -9,9 +9,6 @@ import { registerAdminRoutes } from '../../../src/routes/admin';
 import { registerDecisionRoutes } from '../../../src/routes/decisions';
 import { registerDoctorRoutes } from '../../../src/routes/doctor';
 import { registerSyncRoutes } from '../../../src/routes/sync';
-import { encodeCapability } from '../../../src/capability/codec';
-import { CAPABILITY_VERSION, type OperatorCapability } from '../../../src/capability/types';
-import { bytesToBase64Url } from '../../../src/capability/verify';
 import type { Env } from '../../../src/index';
 
 const ctx = {} as ExecutionContext;
@@ -19,18 +16,6 @@ const ctx = {} as ExecutionContext;
 const TEST_SECRET = 'lab-secret-for-stubs-test-32bytes!';
 const TEST_HEAD = 'a'.repeat(40);
 
-async function signHmac(content: string, secretStr: string): Promise<string> {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    enc.encode(secretStr),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(content));
-  return bytesToBase64Url(new Uint8Array(sig));
-}
 
 function baseEnv(over: Record<string, unknown> = {}): Env {
   const nonceStub = {
