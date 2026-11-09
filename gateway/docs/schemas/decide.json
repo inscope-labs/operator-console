@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://inscope-labs.github.io/operator-console/gateway/schemas/decide.json",
-  "title": "Decide (optional for 0.6.0)",
+  "title": "Decide (Stage 3.6 implemented)",
   "definitions": {
     "DecideRequest": {
       "type": "object",
@@ -9,6 +9,7 @@
       "required": ["capability"],
       "properties": {
         "decision": { "type": "string" },
+        "attribution": { "type": "string" },
         "rationale": { "type": "string" },
         "scope": { "type": "string" },
         "evidence": { "type": "string" },

@@ -136,20 +136,21 @@ describe('T1-103 fail-closed stubs (Stage 1.1)', () => {
       expect(body.error).toBe('NOT_IMPLEMENTED');
     });
 
-    it('POST /decisions/:id/decide returns 501', async () => {
+    it('POST /decisions/:id/decide is live (Stage 3.6; no longer 501)', async () => {
       const res = await dispatch(
         new Request('https://gw.test/decisions/dec-1/decide', {
           method: 'POST',
-          headers: { authorization: 'Bearer test-token' },
-          body: JSON.stringify({ decision: 'approved' }),
+          headers: {
+            authorization: 'Bearer test-token',
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({}),
         }),
         baseEnv(),
         ctx
       );
-      expect(res.status).toBe(501);
-      const body = (await res.json()) as { error: string; message: string };
-      expect(body.error).toBe('NOT_IMPLEMENTED');
-      expect(body.message).toMatch(/decide endpoint not yet implemented/);
+      expect(res.status).not.toBe(501);
+      expect(res.status).toBeGreaterThanOrEqual(400);
     });
 
     it('GET /doctor returns 501', async () => {
@@ -216,10 +217,6 @@ describe('T1-103 fail-closed stubs (Stage 1.1)', () => {
           headers: { authorization: 'Bearer test-token' },
         }),
         new Request('https://gw.test/admin/revoke', {
-          method: 'POST',
-          headers: { authorization: 'Bearer test-token' },
-        }),
-        new Request('https://gw.test/decisions/dec-1/decide', {
           method: 'POST',
           headers: { authorization: 'Bearer test-token' },
         }),
