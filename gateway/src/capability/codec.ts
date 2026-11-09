@@ -79,7 +79,8 @@ export function decodeCapability(message: string): OperatorCapability {
   if (!isOperationType(opRaw)) {
     throw new Error(`UNKNOWN_OP: ${opRaw}`);
   }
-  if (!/^task-[A-Za-z0-9._-]+$/.test(branch)) {
+  // Task branches for write ops; engine branch for halt/resume (contract §3.11–3.12).
+  if (branch !== 'engine' && !/^task-[A-Za-z0-9._-]+$/.test(branch)) {
     throw new Error(`BRANCH_INVALID: ${branch}`);
   }
   if (!/^[0-9a-f]{40}$/i.test(head)) {
