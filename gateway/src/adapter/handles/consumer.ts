@@ -209,4 +209,43 @@ export class ConsumerHandle {
       return false;
     }
   }
+
+  /**
+   * Find an open PR whose head ref is the given branch name.
+   */
+  async findOpenPullForBranch(branch: string): Promise<{ number: number; headSha: string } | null> {
+    const { data, headers } = await this.client.request<
+      Array<{ number: number; head: { ref: string; sha: string }; state: string }>
+    >(
+      'GET',
+      `/repos/${this.owner}/${this.name}/pulls?state=open&head=${encodeURIComponent(`${this.owner}:${branch}`)}&per_page=10`
+    );
+    getSharedRateCoordinator().observeHeaders(headers);
+    const list = Array.isArray(data) ? data : [];
+    const match = list.find((pr) => pr.head?.ref === branch || pr.head?.ref?.endsWith('/' + branch));
+    if (!match) return null;
+    return { number: match.number, headSha: match.head?.sha ?? '' };
+  }
+
+  /**
+   * Merge a pull request. Returns the merge commit SHA when successful.
+   */
+  async mergePullRequest(opts: {
+    number: number;
+    commitTitle?: string;
+    mergeMethod?: 'merge' | 'squash' | 'rebase';
+  }): Promise<{ merged: boolean; sha: string }> {
+    const { data, headers } = await this.client.request<{
+      merged: boolean;
+      sha: string;
+      message?: string;
+    }>('PUT', `/repos/${this.owner}/${this.name}/pulls/${opts.number}/merge`, {
+      body: {
+        commit_title: opts.commitTitle,
+        merge_method: opts.mergeMethod ?? 'squash',
+      },
+    });
+    getSharedRateCoordinator().observeHeaders(headers);
+    return { merged: !!data.merged, sha: data.sha ?? '' };
+  }
 }
