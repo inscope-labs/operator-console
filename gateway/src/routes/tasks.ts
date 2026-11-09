@@ -14,6 +14,7 @@ import {
   validateUploadPayload,
   submissionObjectPath,
 } from './upload-validate';
+import { isHalted } from '../halt/state';
 import './../guards/register-core';
 
 interface PublishBody {
@@ -137,6 +138,7 @@ const publishHandler: RouteHandler = async (request, env, _ctx, params) => {
     );
   }
 
+  const haltActive = await isHalted(env);
   const guardCtx: GuardContext = {
     capability: cap,
     consumer,
@@ -149,7 +151,7 @@ const publishHandler: RouteHandler = async (request, env, _ctx, params) => {
       changedPaths,
       deltaEmpty,
     },
-    haltActive: false,
+    haltActive,
     diffText: diffText || ' ',
   };
 
@@ -339,6 +341,7 @@ const uploadHandler: RouteHandler = async (request, env, _ctx, params) => {
     submissionExists = false;
   }
 
+  const haltActive = await isHalted(env);
   const guardCtx: GuardContext = {
     capability: cap,
     consumer,
@@ -351,7 +354,7 @@ const uploadHandler: RouteHandler = async (request, env, _ctx, params) => {
       changedPaths,
       deltaEmpty,
     },
-    haltActive: false,
+    haltActive,
     diffText,
     submissionId: body.submissionId,
     submissionExists,
@@ -533,6 +536,7 @@ const reconcileHandler: RouteHandler = async (request, env, _ctx, params) => {
     );
   }
 
+  const haltActive = await isHalted(env);
   const guardCtx: GuardContext = {
     capability: cap,
     consumer,
@@ -545,7 +549,7 @@ const reconcileHandler: RouteHandler = async (request, env, _ctx, params) => {
       changedPaths,
       deltaEmpty,
     },
-    haltActive: false,
+    haltActive,
     diffText,
   };
 

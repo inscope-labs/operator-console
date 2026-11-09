@@ -25,6 +25,9 @@ export interface Env {
   AUDIT_STREAM: DurableObjectNamespace;
 
   __adapter?: MultiRepoGitHubAdapter;
+  /** Unit-test override for global halt marker. */
+  __haltActive?: boolean;
+  HALT_STATE?: DurableObjectNamespace;
 }
 
 export async function getAdapter(env: Env): Promise<MultiRepoGitHubAdapter> {
