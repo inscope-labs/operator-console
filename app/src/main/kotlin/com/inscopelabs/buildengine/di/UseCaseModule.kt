@@ -188,6 +188,14 @@ object UseCaseModule {
         strongBoxSupport: StrongBoxSupport,
         deviceAttestation: DeviceAttestation,
         enrollmentStore: DeviceEnrollmentStore,
+        certificatePinning: com.inscopelabs.buildengine.core.security.CertificatePinning,
+        baseUrlStore: GatewayBaseUrlStore,
     ): ReportDevicePostureUseCase =
-        ReportDevicePostureUseCase(strongBoxSupport, deviceAttestation, enrollmentStore)
+        ReportDevicePostureUseCase(
+            strongBoxSupport = strongBoxSupport,
+            deviceAttestation = deviceAttestation,
+            enrollmentStore = enrollmentStore,
+            certificatePinning = certificatePinning,
+            baseUrlStore = baseUrlStore,
+        )
 }

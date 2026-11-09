@@ -8,6 +8,7 @@ import com.inscopelabs.buildengine.core.network.GatewayHttpClient
 import com.inscopelabs.buildengine.core.network.MtlsConfig
 import com.inscopelabs.buildengine.core.network.OperatorCredentialProvider
 import com.inscopelabs.buildengine.core.security.CertificatePinning
+import com.inscopelabs.buildengine.core.time.Clock
 import com.inscopelabs.buildengine.data.local.GatewayBaseUrlStore
 import com.inscopelabs.buildengine.data.local.OperatorCredentialStore
 import com.inscopelabs.buildengine.data.remote.GatewayApi
@@ -29,8 +30,8 @@ import javax.inject.Singleton
  * authenticated, not merely TLS. The client certificate and the pin set belong here.
  * mTLS remains deferred (ADR 0006); the bearer credential is the console's identity.
  *
- * Stage 7: connect/read/write/call timeouts so bad networks fail predictably instead
- * of hanging the UI thread's coroutine indefinitely.
+ * Stage 2.3: Certificate pinning (primary + backup pins, expiry check, release empty
+ * refusal) enforced on the OkHttp engine via CertificatePinner and Interceptor.
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -47,18 +48,27 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideCertificatePinning(): CertificatePinning = CertificatePinning()
+    fun provideCertificatePinning(clock: Clock): CertificatePinning = CertificatePinning(clock = clock)
 
     @Provides
     @Singleton
-    fun provideMtlsConfig(baseUrlStore: GatewayBaseUrlStore): MtlsConfig = MtlsConfig(
-        host = baseUrlStore.current().ifEmpty { GatewayEndpoints.BASE_URL },
-        pins = emptyList(),
-    )
+    fun provideMtlsConfig(
+        baseUrlStore: GatewayBaseUrlStore,
+        certificatePinning: CertificatePinning,
+    ): MtlsConfig {
+        val host = baseUrlStore.current().ifEmpty { GatewayEndpoints.BASE_URL }
+        return MtlsConfig(
+            host = host,
+            pins = certificatePinning.pinsFor(host),
+        )
+    }
 
     @Provides
     @Singleton
-    fun provideHttpClient(config: MtlsConfig): HttpClient = HttpClient(OkHttp) {
+    fun provideHttpClient(
+        config: MtlsConfig,
+        certificatePinning: CertificatePinning,
+    ): HttpClient = HttpClient(OkHttp) {
         expectSuccess = false
         followRedirects = false
         engine {
@@ -69,6 +79,8 @@ object NetworkModule {
                 readTimeout(SOCKET_TIMEOUT_MS, TimeUnit.MILLISECONDS)
                 writeTimeout(SOCKET_TIMEOUT_MS, TimeUnit.MILLISECONDS)
                 callTimeout(CALL_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                certificatePinner(certificatePinning.buildCertificatePinner())
+                addInterceptor(certificatePinning.asInterceptor())
             }
         }
         install(HttpTimeout) {
@@ -76,10 +88,6 @@ object NetworkModule {
             socketTimeoutMillis = SOCKET_TIMEOUT_MS
             requestTimeoutMillis = CALL_TIMEOUT_MS
         }
-        // SCAFFOLD: mTLS socket factory, certificate pinner and attestation header
-        // go here. See docs/adr/0003-mtls-to-gateway.md and ADR 0006 (deferred).
-        // Until mTLS is installed, the bearer operator credential is the sole
-        // identity on the gateway (docs/gateway-contract.md §1.2).
     }
 
     /**

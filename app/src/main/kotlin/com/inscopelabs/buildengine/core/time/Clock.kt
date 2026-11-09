@@ -15,6 +15,7 @@ import java.time.Instant
  */
 interface Clock {
     fun nowEpochSeconds(): Long
+    fun now(): Instant = Instant.ofEpochSecond(nowEpochSeconds())
 }
 
 class SystemClock : Clock {

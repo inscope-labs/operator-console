@@ -2,15 +2,20 @@ package com.inscopelabs.buildengine.domain.usecase.enrollment
 
 import com.inscopelabs.buildengine.core.crypto.StrongBoxSupport
 import com.inscopelabs.buildengine.core.security.AuthTier
+import com.inscopelabs.buildengine.core.security.CertificatePinning
 import com.inscopelabs.buildengine.core.security.DeviceAttestation
 import com.inscopelabs.buildengine.data.enrollment.DeviceEnrollmentStore
+import com.inscopelabs.buildengine.data.local.GatewayBaseUrlStore
 import com.inscopelabs.buildengine.domain.model.SecurityPosture
+import java.net.URI
 
 /** Returns measured local posture; unavailable measurements are never upgraded to true. */
 class ReportDevicePostureUseCase(
     private val strongBoxSupport: StrongBoxSupport,
     private val deviceAttestation: DeviceAttestation,
     private val enrollmentStore: DeviceEnrollmentStore? = null,
+    private val certificatePinning: CertificatePinning? = null,
+    private val baseUrlStore: GatewayBaseUrlStore? = null,
 ) {
     suspend operator fun invoke(keyAlias: String): SecurityPosture {
         val hardwareBacked = runCatching { strongBoxSupport.isHardwareBacked(keyAlias) }.getOrDefault(false)
@@ -21,18 +26,29 @@ class ReportDevicePostureUseCase(
         val activeTierStr = enrollmentStore?.activeRecord()?.authTier
         val authTier = activeTierStr?.let { AuthTier.fromWireValue(it) }
 
+        val isPinned = certificatePinning?.let { pinning ->
+            val url = baseUrlStore?.current().orEmpty()
+            val host = if (url.isNotEmpty()) {
+                runCatching { URI(url).host }.getOrNull() ?: url
+            } else {
+                "qnuralink.workers.dev"
+            }
+            pinning.isPinned(host)
+        } ?: false
+
         val summary = buildString {
             append(if (hardwareBacked) "Hardware-backed key" else "Software-backed or unverified key")
             append(" · security level: ").append(securityLevel)
             append(" · StrongBox ").append(if (strongBoxAvailable) "available" else "unavailable")
             append(" · key attestation ").append(if (keyAttested) "present" else "unavailable")
+            append(" · certificate pinning ").append(if (isPinned) "active" else "disabled")
             append(" · Play Integrity deferred")
         }
         return SecurityPosture(
             hardwareBacked = hardwareBacked,
             strongBoxAvailable = strongBoxAvailable,
             attested = keyAttested,
-            pinned = false,
+            pinned = isPinned,
             summary = summary,
             securityLevel = securityLevel,
             playIntegrityAvailable = false,
