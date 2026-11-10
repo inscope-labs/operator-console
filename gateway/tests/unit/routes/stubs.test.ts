@@ -153,63 +153,7 @@ describe('T1-103 fail-closed stubs (Stage 1.1)', () => {
       expect(res.status).toBeGreaterThanOrEqual(400);
     });
 
-    it('GET /doctor returns 501', async () => {
-      const res = await dispatch(
-        new Request('https://gw.test/doctor', {
-          method: 'GET',
-          headers: { authorization: 'Bearer test-token' },
-        }),
-        baseEnv(),
-        ctx
-      );
-      expect(res.status).toBe(501);
-      const body = (await res.json()) as { error: string; message: string };
-      expect(body.error).toBe('NOT_IMPLEMENTED');
-      expect(body.message).toMatch(/doctor endpoint not yet implemented/);
-    });
-
-    it('POST /doctor returns 501', async () => {
-      const res = await dispatch(
-        new Request('https://gw.test/doctor', {
-          method: 'POST',
-          headers: { authorization: 'Bearer test-token' },
-        }),
-        baseEnv(),
-        ctx
-      );
-      expect(res.status).toBe(501);
-      const body = (await res.json()) as { error: string };
-      expect(body.error).toBe('NOT_IMPLEMENTED');
-    });
-
-    it('POST /sync returns 501', async () => {
-      const res = await dispatch(
-        new Request('https://gw.test/sync', {
-          method: 'POST',
-          headers: { authorization: 'Bearer test-token' },
-        }),
-        baseEnv(),
-        ctx
-      );
-      expect(res.status).toBe(501);
-      const body = (await res.json()) as { error: string; message: string };
-      expect(body.error).toBe('NOT_IMPLEMENTED');
-      expect(body.message).toMatch(/sync endpoint not yet implemented/);
-    });
-
-    it('GET /verify-main returns 501', async () => {
-      const res = await dispatch(
-        new Request('https://gw.test/verify-main', {
-          method: 'GET',
-          headers: { authorization: 'Bearer test-token' },
-        }),
-        baseEnv(),
-        ctx
-      );
-      expect(res.status).toBe(501);
-      const body = (await res.json()) as { error: string };
-      expect(body.error).toBe('NOT_IMPLEMENTED');
-    });
+    // Stage 4.2: /doctor, /sync, /verify-main implemented — covered in sync-doctor.test.ts
 
     it('asserts no stub route returns 2xx', async () => {
       const stubRequests = [
@@ -220,16 +164,7 @@ describe('T1-103 fail-closed stubs (Stage 1.1)', () => {
           method: 'POST',
           headers: { authorization: 'Bearer test-token' },
         }),
-        new Request('https://gw.test/doctor', {
-          headers: { authorization: 'Bearer test-token' },
-        }),
-        new Request('https://gw.test/sync', {
-          method: 'POST',
-          headers: { authorization: 'Bearer test-token' },
-        }),
-        new Request('https://gw.test/verify-main', {
-          headers: { authorization: 'Bearer test-token' },
-        }),
+        // Stage 4.2: /doctor, /sync, /verify-main implemented — no longer stubs
       ];
 
       for (const req of stubRequests) {
