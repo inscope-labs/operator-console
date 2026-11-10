@@ -15,6 +15,7 @@ import {
   submissionObjectPath,
 } from './upload-validate';
 import { isHalted } from '../halt/state';
+import { nextTasks } from '../plan/client';
 import './../guards/register-core';
 
 interface PublishBody {
@@ -644,7 +645,25 @@ const reconcileHandler: RouteHandler = async (request, env, _ctx, params) => {
 
 
 
+
+const tasksNextHandler: RouteHandler = async (request, env) => {
+  const requestId = request.headers.get('x-request-id') ?? crypto.randomUUID();
+  try {
+    const tasks = await nextTasks(env);
+    return json(tasks, 200, requestId);
+  } catch (e) {
+    return errorResponse(
+      'NETWORK',
+      e instanceof Error ? e.message : String(e),
+      requestId
+    );
+  }
+};
+
 export function registerTaskRoutes(): void {
+  register('GET', '/tasks/next', tasksNextHandler, {
+    requiresOperatorToken: true,
+  });
   register('POST', '/tasks/:id/publish', publishHandler, {
     requiresOperatorToken: true,
     requiresCapability: true,

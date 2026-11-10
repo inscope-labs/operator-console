@@ -18,6 +18,7 @@ import { registerHaltRoutes } from './routes/halt';
 import { NonceStore } from './durable-objects/nonce-store';
 import { EnrolmentRegistry } from './durable-objects/enrolment-registry';
 import { HaltState } from './durable-objects/halt-state';
+import { PlanDO } from './durable-objects/plan-do';
 import './guards/register-core';
 
 export type { Env } from './runtime';
@@ -57,4 +58,4 @@ export default {
   },
 };
 
-export { NonceStore, EnrolmentRegistry, HaltState };
+export { NonceStore, EnrolmentRegistry, HaltState, PlanDO };

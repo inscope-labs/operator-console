@@ -19,7 +19,7 @@ export interface Env {
   GITHUB_APP_PRIVATE_KEY: string;
   GITHUB_APP_INSTALLATION_ID: string;
 
-  PLAN_DO: DurableObjectNamespace;
+  PLAN_DO?: DurableObjectNamespace;
   NONCE_STORE: DurableObjectNamespace;
   ENROLMENT_REGISTRY: DurableObjectNamespace;
   AUDIT_STREAM: DurableObjectNamespace;
