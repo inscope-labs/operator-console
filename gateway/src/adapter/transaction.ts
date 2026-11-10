@@ -25,6 +25,7 @@ import {
   type RateCoordinator,
 } from './rate-coordinator';
 import type { TransactionResult, TransactionStep } from './multi-repo-adapter';
+import type { Env } from '../runtime';
 
 export type WritePhase = 'rate' | 'guards' | 'mutate' | 'audit';
 
@@ -55,6 +56,8 @@ export interface WriteTransactionInput {
   mutate: () => Promise<WriteMutationResult>;
   now?: number;
   rate?: RateCoordinator;
+  /** When set, audit records are also appended to AuditStream. */
+  env?: Env;
 }
 
 export interface WriteTransactionSuccess {
@@ -91,6 +94,7 @@ export async function runWriteTransaction(
   const rateCheck = rate.check(now);
   if (!rateCheck.ok) {
     const audit = emitAudit({
+      env: input.env,
       requestId: input.requestId,
       op: input.op,
       outcome: 'refused',
@@ -115,6 +119,7 @@ export async function runWriteTransaction(
   const guardResult: GuardResult = await runGuards(input.guardCtx);
   if (!guardResult.ok) {
     const audit = emitAudit({
+      env: input.env,
       requestId: input.requestId,
       op: input.op,
       outcome: 'refused',
@@ -143,6 +148,7 @@ export async function runWriteTransaction(
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     const audit = emitAudit({
+      env: input.env,
       requestId: input.requestId,
       op: input.op,
       outcome: 'error',
@@ -166,6 +172,7 @@ export async function runWriteTransaction(
 
   if (!mutation.ok) {
     const audit = emitAudit({
+      env: input.env,
       requestId: input.requestId,
       op: input.op,
       outcome: 'refused',
@@ -189,6 +196,7 @@ export async function runWriteTransaction(
 
   // 4. Audit success
   const audit = emitAudit({
+    env: input.env,
     requestId: input.requestId,
     op: input.op,
     outcome: 'accepted',
