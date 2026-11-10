@@ -136,3 +136,64 @@ export async function lookupKid(
   };
   return body.record;
 }
+
+export async function listActiveEnrolments(env: Env): Promise<
+  Array<{
+    kid: string;
+    alias: string;
+    authTier: AuthTier;
+    status: string;
+    enrolledAt: number;
+  }>
+> {
+  const res = await doFetch(env, '/active');
+  if (!res.ok) {
+    throw new Error(`list active failed: ${res.status}`);
+  }
+  const body = (await res.json()) as {
+    records?: Array<{
+      kid: string;
+      alias: string;
+      authTier: AuthTier;
+      status: string;
+      enrolledAt: number;
+      publicKey?: string;
+    }>;
+  };
+  return (body.records ?? []).map((r) => ({
+    kid: r.kid,
+    alias: r.alias,
+    authTier: r.authTier,
+    status: r.status,
+    enrolledAt: r.enrolledAt,
+  }));
+}
+
+export async function revokeEnrolment(
+  env: Env,
+  kid: string,
+  reason?: string,
+  now?: number
+): Promise<{ revoked: true; kid: string; revokedAt: number } | { error: string; message: string; status: number }> {
+  const res = await doFetch(env, '/revoke', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ kid, reason, now }),
+  });
+  if (res.status === 404) {
+    return { error: 'UNKNOWN_KID', message: 'enrolment not found', status: 404 };
+  }
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    return {
+      error: 'NETWORK',
+      message: `revoke failed: ${res.status} ${t.slice(0, 80)}`,
+      status: res.status,
+    };
+  }
+  const body = (await res.json()) as {
+    kid: string;
+    revokedAt: number;
+  };
+  return { revoked: true, kid: body.kid, revokedAt: body.revokedAt };
+}

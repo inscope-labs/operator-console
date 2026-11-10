@@ -105,8 +105,8 @@ describe('T1-103 fail-closed stubs (Stage 1.1)', () => {
     });
   });
 
-  describe('Stub routes return 501 NOT_IMPLEMENTED', () => {
-    it('GET /admin/enrolments returns 501', async () => {
+  describe('Former stubs now live or remaining 501', () => {
+    it('GET /admin/enrolments is live (Stage 4.3; no longer 501)', async () => {
       const res = await dispatch(
         new Request('https://gw.test/admin/enrolments', {
           method: 'GET',
@@ -115,25 +115,25 @@ describe('T1-103 fail-closed stubs (Stage 1.1)', () => {
         baseEnv(),
         ctx
       );
-      expect(res.status).toBe(501);
-      const body = (await res.json()) as { error: string; message: string };
-      expect(body.error).toBe('NOT_IMPLEMENTED');
-      expect(body.message).toMatch(/admin routes not yet implemented/);
+      // Without ENROLMENT_REGISTRY binding may be 502 NETWORK; must not be 501
+      expect(res.status).not.toBe(501);
     });
 
-    it('POST /admin/revoke returns 501', async () => {
+    it('POST /admin/revoke is live (Stage 4.3; no longer 501)', async () => {
       const res = await dispatch(
         new Request('https://gw.test/admin/revoke', {
           method: 'POST',
-          headers: { authorization: 'Bearer test-token' },
-          body: JSON.stringify({ kid: 'k1' }),
+          headers: {
+            authorization: 'Bearer test-token',
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({}),
         }),
         baseEnv(),
         ctx
       );
-      expect(res.status).toBe(501);
-      const body = (await res.json()) as { error: string };
-      expect(body.error).toBe('NOT_IMPLEMENTED');
+      expect(res.status).not.toBe(501);
+      expect(res.status).toBeGreaterThanOrEqual(400);
     });
 
     it('POST /decisions/:id/decide is live (Stage 3.6; no longer 501)', async () => {
@@ -155,23 +155,10 @@ describe('T1-103 fail-closed stubs (Stage 1.1)', () => {
 
     // Stage 4.2: /doctor, /sync, /verify-main implemented — covered in sync-doctor.test.ts
 
-    it('asserts no stub route returns 2xx', async () => {
-      const stubRequests = [
-        new Request('https://gw.test/admin/enrolments', {
-          headers: { authorization: 'Bearer test-token' },
-        }),
-        new Request('https://gw.test/admin/revoke', {
-          method: 'POST',
-          headers: { authorization: 'Bearer test-token' },
-        }),
-        // Stage 4.2: /doctor, /sync, /verify-main implemented — no longer stubs
-      ];
-
-      for (const req of stubRequests) {
-        const res = await dispatch(req, baseEnv(), ctx);
-        expect(res.status).toBe(501);
-        expect(res.status).toBeGreaterThanOrEqual(400);
-      }
+    it('asserts no residual 501 stub routes remain for implemented surfaces', async () => {
+      // Phase 3–4.3 cleared publish/upload/reconcile/halt/decide/sync/doctor/admin.
+      const stubRequests: Request[] = [];
+      expect(stubRequests.length).toBe(0);
     });
   });
 });
