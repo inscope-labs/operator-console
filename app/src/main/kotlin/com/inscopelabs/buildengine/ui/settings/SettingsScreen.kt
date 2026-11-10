@@ -44,7 +44,10 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
 @Composable
-fun SettingsScreen(modifier: Modifier = Modifier) {
+fun SettingsScreen(
+    modifier: Modifier = Modifier,
+    onNavigateToPreflight: () -> Unit = {},
+) {
     val viewModel: SettingsViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsState()
     val state = (uiState as? UiState.Success)?.data
@@ -89,6 +92,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 onClear = { viewModel.clearGatewayBaseUrl() },
                 onTestConnection = { viewModel.testConnection() },
                 onSetExpectedEnvironment = { viewModel.saveExpectedEnvironment(it) },
+                onNavigateToPreflight = onNavigateToPreflight,
             )
             CredentialSection(
                 state = current,
@@ -140,6 +144,7 @@ private fun GatewaySection(
     onClear: () -> Unit,
     onTestConnection: () -> Unit,
     onSetExpectedEnvironment: (String) -> Unit,
+    onNavigateToPreflight: () -> Unit = {},
 ) {
     SettingsCard(title = stringResource(R.string.settings_gateway_heading)) {
         LabelAndValue(
@@ -238,6 +243,13 @@ private fun GatewaySection(
             } else {
                 Text(stringResource(R.string.settings_test_connection))
             }
+        }
+
+        OutlinedButton(
+            onClick = onNavigateToPreflight,
+            modifier = Modifier.fillMaxWidth().testTag("settings_preflight_button"),
+        ) {
+            Text(stringResource(R.string.settings_run_preflight))
         }
 
         state.healthSnapshot?.let { snapshot ->

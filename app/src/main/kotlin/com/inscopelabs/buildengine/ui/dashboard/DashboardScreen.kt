@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AltRoute
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -66,6 +67,7 @@ fun DashboardScreen(
     onNavigateToTask: (String) -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onNavigateToPlans: () -> Unit = {},
+    onNavigateToPreflight: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsState()
 
@@ -79,6 +81,15 @@ fun DashboardScreen(
                     titleContentColor = MaterialTheme.colorScheme.onSurface,
                 ),
                 actions = {
+                    IconButton(
+                        onClick = onNavigateToPreflight,
+                        modifier = Modifier.testTag("dashboard_preflight_button"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FactCheck,
+                            contentDescription = stringResource(R.string.preflight_title),
+                        )
+                    }
                     IconButton(
                         onClick = { viewModel.refresh() },
                         modifier = Modifier.testTag("dashboard_refresh_button"),

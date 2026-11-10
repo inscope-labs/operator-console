@@ -19,8 +19,7 @@ import java.util.Locale
  *
  * Responsibilities:
  * - Log every uncaught Java/Kotlin exception to logcat.
- * - Persist crash reports to internal storage safely with log rotation.
- * - Dynamically forward crashes to pluggable reporters via CrashReporterManager.
+ * - Persist crash reports to internal storage safely with log rotation (local redacted diagnostics).
  * - Chained to Android's default exception handler to ensure standard system crash behavior.
  */
 class GlobalExceptionHandler(
@@ -89,9 +88,6 @@ class GlobalExceptionHandler(
 
             // Persist the crash report to crash_logs.txt (for error screens)
             writeCrashLog(crashReport)
-
-            // Send crash dynamically to pluggable crash reporters (e.g. Firebase)
-            CrashReporterManager.reportCrash(thread, throwable)
 
             launchErrorActivity(throwable, crashReport, referenceCode)
         } catch (e: Exception) {

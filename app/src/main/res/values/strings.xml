@@ -174,4 +174,16 @@
     <string name="settings_gateway_activity_clear">Clear log</string>
     <string name="settings_gateway_activity_share_subject">Operator Console gateway activity</string>
     <string name="settings_gateway_activity_share_title">Share activity log</string>
+
+    <!-- Stage 2.4 / T2-401 Preflight screen -->
+    <string name="preflight_title">Preflight Verification</string>
+    <string name="preflight_run_checks">Run All Checks</string>
+    <string name="preflight_overall_pass">All Systems Operational</string>
+    <string name="preflight_overall_fail">Preflight Failed — Action Required</string>
+    <string name="preflight_running">Running Preflight Checks…</string>
+    <string name="preflight_pending">Preflight Checks Pending</string>
+    <string name="preflight_action_settings">Configure in Settings</string>
+    <string name="preflight_action_enrolment">Enrol Device Key</string>
+    <string name="settings_run_preflight">Run Preflight Checks</string>
+    <string name="action_back">Back</string>
 </resources>

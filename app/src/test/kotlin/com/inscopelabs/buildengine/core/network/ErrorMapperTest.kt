@@ -141,4 +141,70 @@ class ErrorMapperTest {
             mapper.stateFor(ErrorMapper.GATEWAY_ENVIRONMENT_MISMATCH, 403),
         )
     }
+
+    // -- Extended failure vocabulary (T2-402 / Guide §4.3) --
+
+    @Test
+    fun `mapTlsPinning produces tls_pinning code`() {
+        val failure = mapper.mapTlsPinning("pin mismatch")
+        assertEquals(GatewayFailureState.TLS_PINNING.code, failure.code)
+        assertEquals("pin mismatch", failure.message)
+    }
+
+    @Test
+    fun `mapAuth produces auth code`() {
+        val failure = mapper.mapAuth("credential expired")
+        assertEquals(GatewayFailureState.AUTH.code, failure.code)
+        assertEquals("credential expired", failure.message)
+    }
+
+    @Test
+    fun `mapStale produces stale code`() {
+        val failure = mapper.mapStale("branch moved")
+        assertEquals(GatewayFailureState.STALE.code, failure.code)
+        assertEquals("branch moved", failure.message)
+    }
+
+    @Test
+    fun `mapPolicyRefused produces policy_refused code`() {
+        val failure = mapper.mapPolicyRefused("guard G14 failed")
+        assertEquals(GatewayFailureState.POLICY_REFUSED.code, failure.code)
+        assertEquals("guard G14 failed", failure.message)
+    }
+
+    @Test
+    fun `distinct failure vocabulary items have unique codes`() {
+        val codes = setOf(
+            GatewayFailureState.NOT_CONFIGURED.code,
+            GatewayFailureState.UNREACHABLE.code,
+            GatewayFailureState.TLS_PINNING.code,
+            GatewayFailureState.AUTH.code,
+            GatewayFailureState.STALE.code,
+            GatewayFailureState.POLICY_REFUSED.code,
+        )
+        assertEquals(6, codes.size)
+    }
+
+    @Test
+    fun `mapException correctly classifies SSLPeerUnverifiedException as tls_pinning`() {
+        val sslEx = javax.net.ssl.SSLPeerUnverifiedException("Certificate pinning failure")
+        val failure = mapper.mapException(sslEx)
+        assertEquals(GatewayFailureState.TLS_PINNING.code, failure.code)
+        assertEquals("Certificate pinning failure", failure.message)
+    }
+
+    @Test
+    fun `mapException correctly classifies GatewayNotConfiguredException`() {
+        val notConfigured = GatewayNotConfiguredException("URL unset")
+        val failure = mapper.mapException(notConfigured)
+        assertEquals(GatewayFailureState.NOT_CONFIGURED.code, failure.code)
+    }
+
+    @Test
+    fun `mapException correctly classifies UnknownHostException as unreachable`() {
+        val dnsEx = java.net.UnknownHostException("gw.example.com")
+        val failure = mapper.mapException(dnsEx)
+        assertEquals(GatewayFailureState.UNREACHABLE.code, failure.code)
+        assertTrue(failure.message.contains("could not be resolved"))
+    }
 }

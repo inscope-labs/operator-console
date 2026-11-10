@@ -28,6 +28,7 @@ import com.inscopelabs.buildengine.core.network.dto.UploadRequestDto
 import com.inscopelabs.buildengine.core.result.AppResult
 import java.io.IOException
 import java.net.UnknownHostException
+import javax.net.ssl.SSLPeerUnverifiedException
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -138,6 +139,8 @@ class GatewayRepository(
         AppResult.Success(decode(httpClient.get(GatewayEndpoints.health())))
     } catch (error: GatewayNotConfiguredException) {
         errorMapper.mapNotConfigured(error.message)
+    } catch (error: SSLPeerUnverifiedException) {
+        errorMapper.mapTlsPinning(error.message)
     } catch (error: UnknownHostException) {
         errorMapper.mapUnreachable(
             error.message?.let { "the gateway host could not be resolved: $it" }

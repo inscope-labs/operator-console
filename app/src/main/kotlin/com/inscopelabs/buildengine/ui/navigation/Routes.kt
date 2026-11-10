@@ -14,6 +14,7 @@ object Routes {
     const val DECISION: String = "decision/{decisionId}"
     const val ENROLLMENT: String = "enrollment"
     const val SETTINGS: String = "settings"
+    const val PREFLIGHT: String = "preflight"
 
     fun planDetail(planId: String): String = "plans/$planId"
 

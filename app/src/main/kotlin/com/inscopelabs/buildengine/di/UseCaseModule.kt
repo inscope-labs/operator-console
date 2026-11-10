@@ -198,4 +198,25 @@ object UseCaseModule {
             certificatePinning = certificatePinning,
             baseUrlStore = baseUrlStore,
         )
+
+    @Provides
+    @Singleton
+    fun provideRunPreflightUseCase(
+        baseUrlStore: GatewayBaseUrlStore,
+        gatewayRepository: com.inscopelabs.buildengine.data.remote.GatewayRepository,
+        certificatePinning: com.inscopelabs.buildengine.core.security.CertificatePinning,
+        credentialStore: com.inscopelabs.buildengine.data.local.OperatorCredentialStore,
+        clock: com.inscopelabs.buildengine.core.time.Clock,
+        enrollmentStore: DeviceEnrollmentStore,
+        reportDevicePostureUseCase: ReportDevicePostureUseCase,
+    ): com.inscopelabs.buildengine.domain.usecase.preflight.RunPreflightUseCase =
+        com.inscopelabs.buildengine.domain.usecase.preflight.RunPreflightUseCase(
+            baseUrlStore = baseUrlStore,
+            gatewayRepository = gatewayRepository,
+            certificatePinning = certificatePinning,
+            credentialStore = credentialStore,
+            clock = clock,
+            enrollmentStore = enrollmentStore,
+            reportDevicePostureUseCase = reportDevicePostureUseCase,
+        )
 }

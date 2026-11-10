@@ -24,6 +24,15 @@ import kotlinx.serialization.json.Json
  *   issues a `RESUME`.
  */
 enum class GatewayFailureState(val code: String) {
+    /** Distinct failure vocabulary per Guide §4.3 / Stage 2.4 (T2-402). */
+    NOT_CONFIGURED("not_configured"),
+    UNREACHABLE("unreachable"),
+    TLS_PINNING("tls_pinning"),
+    AUTH("auth"),
+    STALE("stale"),
+    POLICY_REFUSED("policy_refused"),
+
+    // Specific refusal and protocol states
     SCOPE_REFUSED("scope_refused"),
     REPLAYED("replayed"),
     HEAD_DRIFTED("head_drifted"),
@@ -36,10 +45,6 @@ enum class GatewayFailureState(val code: String) {
     CONFLICT("conflict"),
     RATE_LIMITED("rate_limited"),
     GATEWAY_ERROR("gateway_error"),
-    /** Base URL is a placeholder or empty — no socket was opened. */
-    NOT_CONFIGURED("not_configured"),
-    /** DNS, TCP, or other transport failure before an HTTP status. */
-    UNREACHABLE("unreachable"),
     UNKNOWN("unknown"),
 }
 
@@ -148,6 +153,18 @@ class ErrorMapper {
     }
 
     private fun defaultMessage(state: GatewayFailureState): String = when (state) {
+        GatewayFailureState.NOT_CONFIGURED ->
+            "the gateway is not configured — set a base URL in Settings before connecting"
+        GatewayFailureState.UNREACHABLE ->
+            "the gateway could not be reached — check the host, network, and DNS"
+        GatewayFailureState.TLS_PINNING ->
+            "certificate pinning or TLS verification failed — check host certificate and pin set"
+        GatewayFailureState.AUTH ->
+            "the gateway did not accept the console's credential"
+        GatewayFailureState.STALE ->
+            "the branch state or capability has expired or drifted — refresh before retrying"
+        GatewayFailureState.POLICY_REFUSED ->
+            "the gateway policy checks refused the operation"
         GatewayFailureState.SCOPE_REFUSED -> "the gateway refused the scope of the operation"
         GatewayFailureState.REPLAYED -> "the capability has already been used"
         GatewayFailureState.HEAD_DRIFTED -> "the branch has moved since the capability was minted"
@@ -160,13 +177,8 @@ class ErrorMapper {
         GatewayFailureState.CONFLICT -> "the operation conflicts with the gateway's current state"
         GatewayFailureState.RATE_LIMITED -> "the gateway is rate limiting the console"
         GatewayFailureState.GATEWAY_ERROR -> "the gateway failed to handle the request"
-        GatewayFailureState.NOT_CONFIGURED ->
-            "the gateway is not configured — set a base URL in Settings before connecting"
-        GatewayFailureState.UNREACHABLE ->
-            "the gateway could not be reached — check the host, network, and DNS"
         GatewayFailureState.UNKNOWN -> "the gateway refused the operation"
     }
-
 
     /** Failure when the console has no real gateway URL configured. */
     fun mapNotConfigured(message: String? = null): AppResult.Failure =
@@ -175,12 +187,54 @@ class ErrorMapper {
             message = message ?: defaultMessage(GatewayFailureState.NOT_CONFIGURED),
         )
 
-    /** Failure when the transport cannot reach the host (DNS, TCP, TLS handshake). */
+    /** Failure when the transport cannot reach the host (DNS, TCP, timeout). */
     fun mapUnreachable(message: String? = null): AppResult.Failure =
         AppResult.Failure(
             code = GatewayFailureState.UNREACHABLE.code,
             message = message ?: defaultMessage(GatewayFailureState.UNREACHABLE),
         )
+
+    /** Failure when certificate pinning, TLS handshake, or pin set expiry fails (T2-402). */
+    fun mapTlsPinning(message: String? = null): AppResult.Failure =
+        AppResult.Failure(
+            code = GatewayFailureState.TLS_PINNING.code,
+            message = message ?: defaultMessage(GatewayFailureState.TLS_PINNING),
+        )
+
+    /** Failure when operator credential is missing, invalid, or expired (T2-402). */
+    fun mapAuth(message: String? = null): AppResult.Failure =
+        AppResult.Failure(
+            code = GatewayFailureState.AUTH.code,
+            message = message ?: defaultMessage(GatewayFailureState.AUTH),
+        )
+
+    /** Failure when capability or target branch HEAD has moved or expired (T2-402). */
+    fun mapStale(message: String? = null): AppResult.Failure =
+        AppResult.Failure(
+            code = GatewayFailureState.STALE.code,
+            message = message ?: defaultMessage(GatewayFailureState.STALE),
+        )
+
+    /** Failure when gateway guards or engine policy refuse the operation (T2-402). */
+    fun mapPolicyRefused(message: String? = null): AppResult.Failure =
+        AppResult.Failure(
+            code = GatewayFailureState.POLICY_REFUSED.code,
+            message = message ?: defaultMessage(GatewayFailureState.POLICY_REFUSED),
+        )
+
+    /** Maps a transport exception to the appropriate distinct failure state (T2-402). */
+    fun mapException(throwable: Throwable): AppResult.Failure = when (throwable) {
+        is javax.net.ssl.SSLPeerUnverifiedException -> mapTlsPinning(throwable.message)
+        is GatewayNotConfiguredException -> mapNotConfigured(throwable.message)
+        is java.net.UnknownHostException -> mapUnreachable("the gateway host could not be resolved: ${throwable.message}")
+        is java.io.IOException -> mapUnreachable(throwable.message)
+        is GatewayHttpException -> map(throwable.statusCode, throwable.body)
+        is GatewayProtocolException -> mapProtocolFailure(throwable.message ?: "the gateway response was malformed")
+        else -> AppResult.Failure(
+            code = GatewayFailureState.UNKNOWN.code,
+            message = throwable.message ?: "unknown gateway communication failure",
+        )
+    }
 
     companion object {
         // -- the gateway's error registry (docs/gateway-contract.md §4.1) --

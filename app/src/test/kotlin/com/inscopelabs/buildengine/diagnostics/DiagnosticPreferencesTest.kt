@@ -16,16 +16,16 @@ class DiagnosticPreferencesTest {
     }
 
     @Test
-    fun `remote reporting is disabled by default`() {
-        assertFalse(DiagnosticPreferences.isRemoteReportingEnabled(context))
+    fun `gateway activity log is disabled by default`() {
+        assertFalse(DiagnosticPreferences.isGatewayActivityLogEnabled(context))
     }
 
     @Test
-    fun `setRemoteReportingEnabled updates preference value`() {
-        DiagnosticPreferences.setRemoteReportingEnabled(context, true)
-        assertTrue(DiagnosticPreferences.isRemoteReportingEnabled(context))
+    fun `setGatewayActivityLogEnabled updates preference value`() {
+        DiagnosticPreferences.setGatewayActivityLogEnabled(context, true)
+        assertTrue(DiagnosticPreferences.isGatewayActivityLogEnabled(context))
 
-        DiagnosticPreferences.setRemoteReportingEnabled(context, false)
-        assertFalse(DiagnosticPreferences.isRemoteReportingEnabled(context))
+        DiagnosticPreferences.setGatewayActivityLogEnabled(context, false)
+        assertFalse(DiagnosticPreferences.isGatewayActivityLogEnabled(context))
     }
 }

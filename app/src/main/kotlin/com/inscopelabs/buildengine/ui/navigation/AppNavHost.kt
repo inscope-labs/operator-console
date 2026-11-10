@@ -12,6 +12,7 @@ import com.inscopelabs.buildengine.ui.decision.DecisionScreen
 import com.inscopelabs.buildengine.ui.enrollment.EnrollmentScreen
 import com.inscopelabs.buildengine.ui.plans.PlanDetailScreen
 import com.inscopelabs.buildengine.ui.plans.PlanListScreen
+import com.inscopelabs.buildengine.ui.preflight.PreflightScreen
 import com.inscopelabs.buildengine.ui.publish.PublishConfirmScreen
 import com.inscopelabs.buildengine.ui.publish.PublishProgressScreen
 import com.inscopelabs.buildengine.ui.settings.SettingsScreen
@@ -29,6 +30,7 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 onNavigateToTask = { taskId -> navController.navigate(Routes.taskDetail(taskId)) },
                 onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
                 onNavigateToPlans = { navController.navigate(Routes.PLANS) },
+                onNavigateToPreflight = { navController.navigate(Routes.PREFLIGHT) },
             )
         }
         composable(Routes.PLANS) {
@@ -80,7 +82,16 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
             EnrollmentScreen()
         }
         composable(Routes.SETTINGS) {
-            SettingsScreen()
+            SettingsScreen(
+                onNavigateToPreflight = { navController.navigate(Routes.PREFLIGHT) },
+            )
+        }
+        composable(Routes.PREFLIGHT) {
+            PreflightScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
+                onNavigateToEnrollment = { navController.navigate(Routes.ENROLLMENT) },
+            )
         }
     }
 }

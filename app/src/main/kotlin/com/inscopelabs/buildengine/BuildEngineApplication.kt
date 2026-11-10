@@ -7,7 +7,6 @@ import com.inscopelabs.buildengine.boot.BootGuard
 import com.inscopelabs.buildengine.boot.BootRoute
 import com.inscopelabs.buildengine.boot.RecoveryActivity
 import com.inscopelabs.buildengine.diagnostics.CrashActivity
-import com.inscopelabs.buildengine.diagnostics.CrashReporterManager
 import com.inscopelabs.buildengine.diagnostics.GlobalExceptionHandler
 import com.inscopelabs.buildengine.diagnostics.UserFacingErrorActivity
 import com.inscopelabs.buildengine.domain.repository.SessionRepository
@@ -65,7 +64,6 @@ class BuildEngineApplication : Application() {
 
         BootGuard.stageStart("app_init")
         try {
-            CrashReporterManager.initialize(this)
             Thread.setDefaultUncaughtExceptionHandler(GlobalExceptionHandler(this))
 
             applicationScope.launch {

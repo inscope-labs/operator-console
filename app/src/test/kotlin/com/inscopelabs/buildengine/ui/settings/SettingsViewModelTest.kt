@@ -266,10 +266,12 @@ class SettingsViewModelTest {
             skipItems(1)
             viewModel.testConnection()
 
-            skipItems(1) // testing
-            val result = awaitItem()
-            assertTrue(result is UiState.Success)
-            val state = (result as UiState.Success).data
+            var state: SettingsState
+            do {
+                val item = awaitItem()
+                assertTrue(item is UiState.Success)
+                state = (item as UiState.Success).data
+            } while (state.healthTesting)
             assertFalse(state.healthTesting)
             assertNull(state.healthSnapshot)
             assertNotNull(state.healthError)

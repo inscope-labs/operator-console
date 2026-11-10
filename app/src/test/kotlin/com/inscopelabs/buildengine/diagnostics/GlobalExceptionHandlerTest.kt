@@ -23,7 +23,6 @@ class GlobalExceptionHandlerTest {
     fun setUp() {
         filesDir = tempFolder.newFolder("files")
         context = FakeContext(baseDir = filesDir)
-        CrashReporterManager.initialize(context)
     }
 
     @Test
