@@ -208,6 +208,7 @@ const decideHandler: RouteHandler = async (request, env, _ctx, params) => {
   };
 
   const outcome = await runWriteTransaction({
+    env,
     requestId,
     op: 'decide',
     plan,

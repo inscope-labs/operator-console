@@ -157,6 +157,7 @@ const publishHandler: RouteHandler = async (request, env, _ctx, params) => {
   };
 
   const outcome = await runWriteTransaction({
+    env,
     requestId,
     op: 'publish',
     plan: cap.plan,
@@ -362,6 +363,7 @@ const uploadHandler: RouteHandler = async (request, env, _ctx, params) => {
   };
 
   const outcome = await runWriteTransaction({
+    env,
     requestId,
     op: 'upload',
     plan: cap.plan,
@@ -555,6 +557,7 @@ const reconcileHandler: RouteHandler = async (request, env, _ctx, params) => {
   };
 
   const outcome = await runWriteTransaction({
+    env,
     requestId,
     op: 'reconcile',
     plan: cap.plan,
