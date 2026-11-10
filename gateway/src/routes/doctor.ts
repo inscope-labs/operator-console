@@ -8,7 +8,6 @@ import { getAdapter } from '../runtime';
 import { isHalted } from '../halt/state';
 import { parseGatewayConfig } from '../config/env';
 import { register, type RouteHandler } from './router';
-import { errorResponse } from '../errors/respond';
 
 const json = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), {
@@ -22,8 +21,7 @@ interface DoctorCheck {
   details?: string;
 }
 
-const getDoctor: RouteHandler = async (request, env) => {
-  const requestId = request.headers.get('x-request-id') ?? crypto.randomUUID();
+const getDoctor: RouteHandler = async (_request, env) => {
   const checks: DoctorCheck[] = [];
 
   // 1. Config validity (already gated by router, but surface it)
