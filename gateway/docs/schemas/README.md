@@ -13,7 +13,7 @@ Machine-readable request/response shapes for Gateway A endpoints listed in
 | `enrol.json` | enrol challenge, enrol, rotate |
 | `halt-resume.json` | `POST /halt`, `POST /resume` |
 | `sync-doctor.json` | `POST /sync`, `GET /doctor` |
-| `decide.json` | Decide (may remain 501 for 0.6.0) |
+| `decide.json` | Decide (Stage 3.6 implemented) |
 
 Conformance vectors under `docs/fixtures/vectors/` and client DTOs should
 reference these schemas. Schemas use draft 2020-12 and allow
