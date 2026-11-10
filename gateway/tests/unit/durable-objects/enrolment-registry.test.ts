@@ -355,3 +355,38 @@ describe('EnrolmentRegistry restart survival (DO storage semantics)', () => {
     expect(b2.kid).toBe('k2');
   });
 });
+
+describe('EnrolmentRegistry revoke', () => {
+  it('revokes an active enrolment', async () => {
+    const { registry } = reg();
+    const now = 1_700_000_000;
+    await registry.fetch(
+      new Request('https://do/enroll', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          alias: 'dev',
+          publicKey: 'cHVibGlj',
+          authTier: 'hardware_confirm',
+          leafCertSha256: 'ab'.repeat(32),
+          now,
+        }),
+      })
+    );
+    const list = await registry.fetch(new Request('https://do/active'));
+    const listed = (await list.json()) as { records: Array<{ kid: string }> };
+    expect(listed.records.length).toBe(1);
+    const kid = listed.records[0].kid;
+    const rev = await registry.fetch(
+      new Request('https://do/revoke', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ kid, reason: 'test', now }),
+      })
+    );
+    expect(rev.status).toBe(200);
+    const list2 = await registry.fetch(new Request('https://do/active'));
+    const listed2 = (await list2.json()) as { records: unknown[] };
+    expect(listed2.records.length).toBe(0);
+  });
+});

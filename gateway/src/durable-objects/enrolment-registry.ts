@@ -90,6 +90,9 @@ export class EnrolmentRegistry implements DurableObject {
       if (request.method === 'GET' && path === '/active') {
         return this.listActive();
       }
+      if (request.method === 'POST' && path === '/revoke') {
+        return this.revoke(request);
+      }
       return error(
         'NETWORK',
         `EnrolmentRegistry: no route ${request.method} ${path}`,
@@ -299,6 +302,45 @@ export class EnrolmentRegistry implements DurableObject {
       return error('UNKNOWN_KID', 'enrolment not found', 404);
     }
     return json({ ok: true, record: rec });
+  }
+
+
+  private async revoke(request: Request): Promise<Response> {
+    let body: { kid?: string; reason?: string; now?: number };
+    try {
+      body = (await request.json()) as typeof body;
+    } catch {
+      return error('NETWORK', 'invalid JSON body', 400);
+    }
+    if (!body.kid || typeof body.kid !== 'string') {
+      return error('NETWORK', 'kid required', 400);
+    }
+    const now = body.now ?? Math.floor(Date.now() / 1000);
+    let found = false;
+    await this.withTxn(async (txn) => {
+      const rec = await txn.get<EnrolmentRecord>(`enrol:${body.kid}`);
+      if (!rec) return;
+      found = true;
+      if (rec.status === 'retired') return;
+      rec.status = 'retired';
+      await txn.put(`enrol:${body.kid}`, rec);
+      // Clear alias active pointer if it still points at this kid
+      const aliasKey = `alias:${rec.alias}:active`;
+      const activeKid = await txn.get<string>(aliasKey);
+      if (activeKid === body.kid) {
+        await txn.delete(aliasKey);
+      }
+    });
+    if (!found) {
+      return error('UNKNOWN_KID', 'enrolment not found', 404);
+    }
+    return json({
+      ok: true,
+      revoked: true,
+      kid: body.kid,
+      revokedAt: now,
+      reason: body.reason,
+    });
   }
 
   private async listActive(): Promise<Response> {
