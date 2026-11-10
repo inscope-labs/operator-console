@@ -91,8 +91,7 @@ Deferred (tracked, not Phase 4 residuals):
 
 ## 6. Operator sign-off
 
-- **Decision:** _pending operator_
-- **Signed by:** 
-- **Date:** 
-- **Notes:** Phase 4 read/diagnostic/admin surface complete for 0.6.0. Phase 5 (audit stream + residual primitives) and Phase 6 (staging) remain.
-
+- **Decision:** PASS
+- **Signed by:** John Wendell 
+- **Date:** 2026-11-10
+- **Notes:** Reviewed Stages 4.1–4.3 evidence; Gateway CI green on merge SHA 3918645d43f3466d0915eb6a14941045e18f1610. Phase 5 authorized.
