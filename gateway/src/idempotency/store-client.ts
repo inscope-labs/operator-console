@@ -4,6 +4,7 @@
 
 import type { Env } from '../runtime';
 import type { OperationRecord, OperationStatus } from './types';
+import { PENDING_TIMEOUT_SECONDS } from './types';
 
 /** Process-local map: credentialHash -> id -> record */
 const memory = new Map<string, Map<string, OperationRecord>>();
@@ -60,6 +61,16 @@ async function memoryFetch(
         });
       }
       if (existing.status === 'pending') {
+        // Match DO: stale pending is marked failed so client can recover
+        if (now - existing.timestamp > PENDING_TIMEOUT_SECONDS) {
+          existing.status = 'failed';
+          existing.code = 'NETWORK';
+          bucket.set(body.id, existing);
+          return new Response(
+            JSON.stringify({ kind: 'replay', record: existing }),
+            { status: 200 }
+          );
+        }
         return new Response(
           JSON.stringify({ kind: 'pending_inflight', record: existing }),
           { status: 200 }
