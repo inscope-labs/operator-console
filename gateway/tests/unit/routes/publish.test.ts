@@ -1,3 +1,9 @@
+const _idemSeq = { n: 0 };
+function idemKey(): string {
+  _idemSeq.n += 1;
+  return _idemSeq.n.toString(16).padStart(32, '0');
+}
+
 import { describe, it, expect, beforeEach } from 'vitest';
 import { clearRoutes, dispatch, listRoutes } from '../../../src/routes/router';
 import { registerTaskRoutes } from '../../../src/routes/tasks';
@@ -199,6 +205,7 @@ describe('POST /tasks/:id/publish', () => {
           'content-type': 'application/json',
         },
         body: JSON.stringify({
+          idempotencyKey: idemKey(),
           capability: cap,
           branch: BRANCH,
           head: HEAD,
@@ -237,6 +244,7 @@ describe('POST /tasks/:id/publish', () => {
           'content-type': 'application/json',
         },
         body: JSON.stringify({
+          idempotencyKey: idemKey(),
           capability: cap,
           branch: BRANCH,
           head: HEAD,
@@ -269,7 +277,7 @@ describe('POST /tasks/:id/publish', () => {
           authorization: 'Bearer tok',
           'content-type': 'application/json',
         },
-        body: JSON.stringify({ branch: BRANCH }),
+        body: JSON.stringify({ branch: BRANCH, idempotencyKey: idemKey() }),
       }),
       baseEnv(),
       ctx

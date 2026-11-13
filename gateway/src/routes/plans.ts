@@ -11,6 +11,10 @@ import {
   putPlanRecord,
 } from '../plan/client';
 import { isHalted } from '../halt/state';
+import {
+  gateIdempotencyWrite,
+  finishFromResponse,
+} from '../idempotency/write-gate';
 
 function json(
   data: unknown,
@@ -165,17 +169,30 @@ const upsertPlanHandler: RouteHandler = async (request, env, _ctx, params) => {
   } catch {
     return errorResponse('NETWORK', 'invalid JSON body', requestId);
   }
+
+  const idem = await gateIdempotencyWrite(
+    request,
+    env,
+    'PLAN_UPSERT',
+    body as unknown as Record<string, unknown>,
+    requestId
+  );
+  if (!idem.ok) return idem.response;
+  if (idem.replay) return idem.replay;
+  const _idemKey = idem.key;
+  const _idemCred = idem.credentialHash;
+
   const ifMatch = request.headers.get('if-match')?.replace(/"/g, '');
   const result = await putPlanRecord(env, planId, body as never, ifMatch);
   if (result.status === 409) {
-    return errorResponse('NETWORK', 'CAS conflict on plan etag', requestId);
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse('NETWORK', 'CAS conflict on plan etag', requestId));
   }
   if (!result.body) {
-    return errorResponse('NETWORK', 'failed to upsert plan', requestId);
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse('NETWORK', 'failed to upsert plan', requestId));
   }
-  return json(result.body, result.status, {
+  return await finishFromResponse(env, _idemCred, _idemKey, json(result.body, result.status, {
     etag: `"${result.body.etag}"`,
-  });
+  }));
 };
 
 export function registerPlanRoutes(): void {

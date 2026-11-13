@@ -88,6 +88,14 @@ Stable public error codes returned by Gateway A as JSON:
 |------|------|---------|
 | `NOT_IMPLEMENTED` | 501 | Operation is in the contract but not implemented in this build. The request was refused before any work was performed. Never returned with a 2xx status. See ADR 0002. |
 
+## Operation idempotency (BD-1.7 / ADR 0013)
+
+| Code | HTTP | Meaning |
+|------|------|---------|
+| `IDEMPOTENCY_KEY_INVALID` | 400 | `idempotencyKey` is missing from a write request, or the key (or lookup `{id}`) is not 32 lowercase hex characters |
+| `IDEMPOTENCY_KEY_REUSED` | 409 | The key is already recorded with a different request fingerprint. Nothing is executed |
+| `OPERATION_NOT_FOUND` | 404 | No record for this key is visible to the calling credential (`GET /operations/{id}`), including still-in-flight pending |
+
 ---
 
 ## Aliases (parent contract → frozen catalogue)

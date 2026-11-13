@@ -15,6 +15,10 @@ import {
   submissionObjectPath,
 } from './upload-validate';
 import { isHalted } from '../halt/state';
+import {
+  gateIdempotencyWrite,
+  finishFromResponse,
+} from '../idempotency/write-gate';
 import { nextTasks } from '../plan/client';
 import './../guards/register-core';
 
@@ -48,8 +52,21 @@ const publishHandler: RouteHandler = async (request, env, _ctx, params) => {
     return errorResponse('NETWORK', 'invalid JSON body', requestId);
   }
 
+  const idem = await gateIdempotencyWrite(
+    request,
+    env,
+    'PUBLISH',
+    body as unknown as Record<string, unknown>,
+    requestId
+  );
+  if (!idem.ok) return idem.response;
+  if (idem.replay) return idem.replay;
+  const _idemKey = idem.key;
+  const _idemCred = idem.credentialHash;
+
+
   if (!body.capability || typeof body.capability !== 'string') {
-    return errorResponse('BAD_ENCODING', 'capability required', requestId);
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse('BAD_ENCODING', 'capability required', requestId));
   }
 
   // Lab HMAC keys (SIGNING_KEYS) are Model A; permit only outside production.
@@ -64,42 +81,42 @@ const publishHandler: RouteHandler = async (request, env, _ctx, params) => {
     },
   });
   if (!gate.ok) {
-    return errorResponse(gate.code, gate.message, requestId);
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(gate.code, gate.message, requestId));
   }
 
   const cap = gate.capability;
   // Body fields must agree with capability when supplied.
   if (body.branch && body.branch !== cap.branch) {
-    return errorResponse(
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(
       'BRANCH_MISMATCH',
       'body branch does not match capability branch',
       requestId
-    );
+    ));
   }
   if (body.head && body.head.toLowerCase() !== cap.head.toLowerCase()) {
-    return errorResponse(
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(
       'HEAD_MOVED',
       'body head does not match capability head',
       requestId
-    );
+    ));
   }
   if (body.task && body.task !== cap.task && body.task !== taskId) {
-    return errorResponse(
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(
       'NETWORK',
       'task id does not match capability task',
       requestId
-    );
+    ));
   }
 
   let adapter;
   try {
     adapter = await getAdapter(env);
   } catch (e) {
-    return errorResponse(
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(
       'NETWORK',
       e instanceof Error ? e.message : 'adapter unavailable',
       requestId
-    );
+    ));
   }
 
   const consumer = adapter.consumer();
@@ -132,11 +149,11 @@ const publishHandler: RouteHandler = async (request, env, _ctx, params) => {
       diffText = changedPaths.join('\n');
     }
   } catch (e) {
-    return errorResponse(
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(
       'NETWORK',
       e instanceof Error ? e.message : 'compare failed',
       requestId
-    );
+    ));
   }
 
   const haltActive = await isHalted(env);
@@ -189,10 +206,10 @@ const publishHandler: RouteHandler = async (request, env, _ctx, params) => {
   });
 
   if (!outcome.ok) {
-    return errorResponse(outcome.code, outcome.message, requestId);
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(outcome.code, outcome.message, requestId));
   }
 
-  return json(
+  return await finishFromResponse(env, _idemCred, _idemKey, json(
     {
       accepted: true,
       operation: 'PUBLISH',
@@ -205,7 +222,7 @@ const publishHandler: RouteHandler = async (request, env, _ctx, params) => {
     },
     200,
     requestId
-  );
+  ));
 };
 
 
@@ -232,11 +249,24 @@ const uploadHandler: RouteHandler = async (request, env, _ctx, params) => {
     return errorResponse('NETWORK', 'invalid JSON body', requestId);
   }
 
+  const idem = await gateIdempotencyWrite(
+    request,
+    env,
+    'UPLOAD',
+    body as unknown as Record<string, unknown>,
+    requestId
+  );
+  if (!idem.ok) return idem.response;
+  if (idem.replay) return idem.replay;
+  const _idemKey = idem.key;
+  const _idemCred = idem.credentialHash;
+
+
   if (!body.capability || typeof body.capability !== 'string') {
-    return errorResponse('BAD_ENCODING', 'capability required', requestId);
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse('BAD_ENCODING', 'capability required', requestId));
   }
   if (!body.submissionId || typeof body.submissionId !== 'string') {
-    return errorResponse('BAD_ENCODING', 'submissionId required', requestId);
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse('BAD_ENCODING', 'submissionId required', requestId));
   }
 
   const payload = await validateUploadPayload({
@@ -244,7 +274,7 @@ const uploadHandler: RouteHandler = async (request, env, _ctx, params) => {
     zipSha256: body.zipSha256,
   });
   if (!payload.ok) {
-    return errorResponse(payload.code, payload.message, requestId);
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(payload.code, payload.message, requestId));
   }
 
   const allowModelA = (env.ENVIRONMENT ?? 'test') !== 'production';
@@ -258,7 +288,7 @@ const uploadHandler: RouteHandler = async (request, env, _ctx, params) => {
     },
   });
   if (!gate.ok) {
-    return errorResponse(gate.code, gate.message, requestId);
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(gate.code, gate.message, requestId));
   }
 
   const cap = gate.capability;
@@ -267,36 +297,36 @@ const uploadHandler: RouteHandler = async (request, env, _ctx, params) => {
     // but contract says upload — refuse unknown for this route when not upload
   }
   if (cap.op !== 'upload') {
-    return errorResponse(
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(
       'UNKNOWN_OP',
       `capability op must be upload for this route (got ${cap.op})`,
       requestId
-    );
+    ));
   }
   if (body.branch && body.branch !== cap.branch) {
-    return errorResponse(
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(
       'BRANCH_MISMATCH',
       'body branch does not match capability branch',
       requestId
-    );
+    ));
   }
   if (body.head && body.head.toLowerCase() !== cap.head.toLowerCase()) {
-    return errorResponse(
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(
       'HEAD_MOVED',
       'body head does not match capability head',
       requestId
-    );
+    ));
   }
 
   let adapter;
   try {
     adapter = await getAdapter(env);
   } catch (e) {
-    return errorResponse(
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(
       'NETWORK',
       e instanceof Error ? e.message : 'adapter unavailable',
       requestId
-    );
+    ));
   }
 
   const consumer = adapter.consumer();
@@ -329,11 +359,11 @@ const uploadHandler: RouteHandler = async (request, env, _ctx, params) => {
       diffText = changedPaths.join('\n') || ' ';
     }
   } catch (e) {
-    return errorResponse(
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(
       'NETWORK',
       e instanceof Error ? e.message : 'compare failed',
       requestId
-    );
+    ));
   }
 
   let submissionExists = false;
@@ -408,10 +438,10 @@ const uploadHandler: RouteHandler = async (request, env, _ctx, params) => {
   });
 
   if (!outcome.ok) {
-    return errorResponse(outcome.code, outcome.message, requestId);
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(outcome.code, outcome.message, requestId));
   }
 
-  return json(
+  return await finishFromResponse(env, _idemCred, _idemKey, json(
     {
       accepted: true,
       operation: 'UPLOAD',
@@ -424,7 +454,7 @@ const uploadHandler: RouteHandler = async (request, env, _ctx, params) => {
     },
     200,
     requestId
-  );
+  ));
 };
 
 
@@ -451,8 +481,21 @@ const reconcileHandler: RouteHandler = async (request, env, _ctx, params) => {
     return errorResponse('NETWORK', 'invalid JSON body', requestId);
   }
 
+  const idem = await gateIdempotencyWrite(
+    request,
+    env,
+    'RECONCILE',
+    body as unknown as Record<string, unknown>,
+    requestId
+  );
+  if (!idem.ok) return idem.response;
+  if (idem.replay) return idem.replay;
+  const _idemKey = idem.key;
+  const _idemCred = idem.credentialHash;
+
+
   if (!body.capability || typeof body.capability !== 'string') {
-    return errorResponse('BAD_ENCODING', 'capability required', requestId);
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse('BAD_ENCODING', 'capability required', requestId));
   }
 
   const allowModelA = (env.ENVIRONMENT ?? 'test') !== 'production';
@@ -466,41 +509,41 @@ const reconcileHandler: RouteHandler = async (request, env, _ctx, params) => {
     },
   });
   if (!gate.ok) {
-    return errorResponse(gate.code, gate.message, requestId);
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(gate.code, gate.message, requestId));
   }
 
   const cap = gate.capability;
   if (cap.op !== 'reconcile') {
-    return errorResponse(
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(
       'UNKNOWN_OP',
       `capability op must be reconcile for this route (got ${cap.op})`,
       requestId
-    );
+    ));
   }
   if (body.branch && body.branch !== cap.branch) {
-    return errorResponse(
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(
       'BRANCH_MISMATCH',
       'body branch does not match capability branch',
       requestId
-    );
+    ));
   }
   if (body.head && body.head.toLowerCase() !== cap.head.toLowerCase()) {
-    return errorResponse(
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(
       'HEAD_MOVED',
       'body head does not match capability head',
       requestId
-    );
+    ));
   }
 
   let adapter;
   try {
     adapter = await getAdapter(env);
   } catch (e) {
-    return errorResponse(
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(
       'NETWORK',
       e instanceof Error ? e.message : 'adapter unavailable',
       requestId
-    );
+    ));
   }
 
   const consumer = adapter.consumer();
@@ -532,11 +575,11 @@ const reconcileHandler: RouteHandler = async (request, env, _ctx, params) => {
       diffText = changedPaths.join('\n') || ' ';
     }
   } catch (e) {
-    return errorResponse(
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(
       'NETWORK',
       e instanceof Error ? e.message : 'compare failed',
       requestId
-    );
+    ));
   }
 
   const haltActive = await isHalted(env);
@@ -624,14 +667,14 @@ const reconcileHandler: RouteHandler = async (request, env, _ctx, params) => {
   });
 
   if (!outcome.ok) {
-    return errorResponse(outcome.code, outcome.message, requestId);
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(outcome.code, outcome.message, requestId));
   }
 
   const mutation = outcome.mutation as
     | { outcome?: string; prNumber?: number; mergeSha?: string }
     | undefined;
 
-  return json(
+  return await finishFromResponse(env, _idemCred, _idemKey, json(
     {
       accepted: true,
       operation: 'RECONCILE',
@@ -643,7 +686,7 @@ const reconcileHandler: RouteHandler = async (request, env, _ctx, params) => {
     },
     200,
     requestId
-  );
+  ));
 };
 
 

@@ -23,6 +23,7 @@ export interface Env {
   NONCE_STORE: DurableObjectNamespace;
   ENROLMENT_REGISTRY: DurableObjectNamespace;
   AUDIT_STREAM?: DurableObjectNamespace;
+  OPERATION_STORE?: DurableObjectNamespace;
 
   __adapter?: MultiRepoGitHubAdapter;
   /** Unit-test override for global halt marker. */

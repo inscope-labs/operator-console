@@ -14,6 +14,10 @@ import { resolveDeviceKey } from '../auth/device';
 import { runWriteTransaction } from '../adapter/transaction';
 import type { GuardContext } from '../guards/index';
 import { isHalted } from '../halt/state';
+import {
+  gateIdempotencyWrite,
+  finishFromResponse,
+} from '../idempotency/write-gate';
 import '../guards/register-core';
 
 function json(data: unknown, status = 200, requestId: string): Response {
@@ -76,13 +80,26 @@ const decideHandler: RouteHandler = async (request, env, _ctx, params) => {
     return errorResponse('NETWORK', 'invalid JSON body', requestId);
   }
 
+  const idem = await gateIdempotencyWrite(
+    request,
+    env,
+    'DECIDE',
+    body as unknown as Record<string, unknown>,
+    requestId
+  );
+  if (!idem.ok) return idem.response;
+  if (idem.replay) return idem.replay;
+  const _idemKey = idem.key;
+  const _idemCred = idem.credentialHash;
+
+
   if (!body.capability || typeof body.capability !== 'string') {
-    return errorResponse('BAD_ENCODING', 'capability required', requestId);
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse('BAD_ENCODING', 'capability required', requestId));
   }
 
   const fields = requireFields(body);
   if (!fields.ok) {
-    return errorResponse('BAD_ENCODING', fields.message, requestId);
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse('BAD_ENCODING', fields.message, requestId));
   }
 
   const attribution = body.attribution!.trim();
@@ -102,41 +119,41 @@ const decideHandler: RouteHandler = async (request, env, _ctx, params) => {
     },
   });
   if (!gate.ok) {
-    return errorResponse(gate.code, gate.message, requestId);
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(gate.code, gate.message, requestId));
   }
 
   const cap = gate.capability;
   if (cap.op !== 'decide') {
-    return errorResponse(
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(
       'UNKNOWN_OP',
       `capability op must be decide (got ${cap.op})`,
       requestId
-    );
+    ));
   }
   if (body.branch && body.branch !== cap.branch) {
-    return errorResponse(
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(
       'BRANCH_MISMATCH',
       'body branch does not match capability branch',
       requestId
-    );
+    ));
   }
   if (body.head && body.head.toLowerCase() !== cap.head.toLowerCase()) {
-    return errorResponse(
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(
       'HEAD_MOVED',
       'body head does not match capability head',
       requestId
-    );
+    ));
   }
 
   let adapter;
   try {
     adapter = await getAdapter(env);
   } catch (e) {
-    return errorResponse(
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(
       'NETWORK',
       e instanceof Error ? e.message : 'adapter unavailable',
       requestId
-    );
+    ));
   }
 
   const consumer = adapter.consumer();
@@ -169,11 +186,11 @@ const decideHandler: RouteHandler = async (request, env, _ctx, params) => {
       diffText = changedPaths.join('\n') || ' ';
     }
   } catch (e) {
-    return errorResponse(
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(
       'NETWORK',
       e instanceof Error ? e.message : 'compare failed',
       requestId
-    );
+    ));
   }
 
   const haltActive = await isHalted(env);
@@ -248,10 +265,10 @@ const decideHandler: RouteHandler = async (request, env, _ctx, params) => {
   });
 
   if (!outcome.ok) {
-    return errorResponse(outcome.code, outcome.message, requestId);
+    return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(outcome.code, outcome.message, requestId));
   }
 
-  return json(
+  return await finishFromResponse(env, _idemCred, _idemKey, json(
     {
       accepted: true,
       operation: 'DECIDE',
@@ -261,7 +278,7 @@ const decideHandler: RouteHandler = async (request, env, _ctx, params) => {
     },
     200,
     requestId
-  );
+  ));
 };
 
 export function registerDecisionRoutes(): void {

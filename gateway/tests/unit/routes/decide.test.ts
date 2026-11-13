@@ -1,3 +1,9 @@
+const _idemSeq = { n: 0 };
+function idemKey(): string {
+  _idemSeq.n += 1;
+  return _idemSeq.n.toString(16).padStart(32, '0');
+}
+
 import { describe, it, expect, beforeEach } from 'vitest';
 import { clearRoutes, dispatch, listRoutes } from '../../../src/routes/router';
 import { registerDecisionRoutes } from '../../../src/routes/decisions';
@@ -201,6 +207,7 @@ describe('POST /plans/:id/decide', () => {
           'content-type': 'application/json',
         },
         body: JSON.stringify({
+          idempotencyKey: idemKey(),
           capability: cap,
           decision: 'APPROVED',
           branch: BRANCH,
@@ -226,6 +233,7 @@ describe('POST /plans/:id/decide', () => {
           'content-type': 'application/json',
         },
         body: JSON.stringify({
+          idempotencyKey: idemKey(),
           capability: cap,
           plan: 'atlas',
           task: '7',

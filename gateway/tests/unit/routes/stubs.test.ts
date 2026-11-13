@@ -1,3 +1,9 @@
+const _idemSeq = { n: 0 };
+function idemKey(): string {
+  _idemSeq.n += 1;
+  return _idemSeq.n.toString(16).padStart(32, '0');
+}
+
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   dispatch,
@@ -76,7 +82,8 @@ describe('T1-103 fail-closed stubs (Stage 1.1)', () => {
       const res = await dispatch(
         new Request('https://gw.test/tasks/task-1/publish', {
           method: 'POST',
-          body: JSON.stringify({ capability: 'dummy' }),
+          body: JSON.stringify({
+          idempotencyKey: idemKey(), capability: 'dummy' }),
         }),
         baseEnv(),
         ctx
@@ -94,7 +101,7 @@ describe('T1-103 fail-closed stubs (Stage 1.1)', () => {
             authorization: 'Bearer test-token',
             'content-type': 'application/json',
           },
-          body: JSON.stringify({}),
+          body: JSON.stringify({ idempotencyKey: idemKey() }),
         }),
         baseEnv(),
         ctx
@@ -127,7 +134,7 @@ describe('T1-103 fail-closed stubs (Stage 1.1)', () => {
             authorization: 'Bearer test-token',
             'content-type': 'application/json',
           },
-          body: JSON.stringify({}),
+          body: JSON.stringify({ idempotencyKey: idemKey() }),
         }),
         baseEnv(),
         ctx

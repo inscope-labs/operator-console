@@ -9,6 +9,10 @@ import { gateCapability } from '../capability/gate';
 import { resolveDeviceKey } from '../auth/device';
 import { emitAudit } from '../audit/emit';
 import { engageHalt, clearHalt, isHalted } from '../halt/state';
+import {
+  gateIdempotencyWrite,
+  finishFromResponse,
+} from '../idempotency/write-gate';
 
 function json(data: unknown, status = 200, requestId: string): Response {
   return new Response(JSON.stringify(data), {
@@ -98,6 +102,19 @@ const haltHandler: RouteHandler = async (request, env) => {
     return errorResponse('NETWORK', 'invalid JSON body', requestId);
   }
 
+  const idem = await gateIdempotencyWrite(
+    request,
+    env,
+    'HALT',
+    body as unknown as Record<string, unknown>,
+    requestId
+  );
+  if (!idem.ok) return idem.response;
+  if (idem.replay) return idem.replay;
+  const _idemKey = idem.key;
+  const _idemCred = idem.credentialHash;
+
+
   const gated = await engineGate(env, body, 'halt', requestId);
   if ('error' in gated && gated.error) return gated.error;
   const cap = gated.cap!;
@@ -117,7 +134,7 @@ const haltHandler: RouteHandler = async (request, env) => {
     detail: { reason: body.reason },
   });
 
-  return json(
+  return await finishFromResponse(env, _idemCred, _idemKey, json(
     {
       accepted: true,
       operation: 'HALT',
@@ -127,7 +144,7 @@ const haltHandler: RouteHandler = async (request, env) => {
     },
     200,
     requestId
-  );
+  ));
 };
 
 const resumeHandler: RouteHandler = async (request, env) => {
@@ -138,6 +155,19 @@ const resumeHandler: RouteHandler = async (request, env) => {
   } catch {
     return errorResponse('NETWORK', 'invalid JSON body', requestId);
   }
+
+  const idem = await gateIdempotencyWrite(
+    request,
+    env,
+    'RESUME',
+    body as unknown as Record<string, unknown>,
+    requestId
+  );
+  if (!idem.ok) return idem.response;
+  if (idem.replay) return idem.replay;
+  const _idemKey = idem.key;
+  const _idemCred = idem.credentialHash;
+
 
   const gated = await engineGate(env, body, 'resume', requestId);
   if ('error' in gated && gated.error) return gated.error;
@@ -158,7 +188,7 @@ const resumeHandler: RouteHandler = async (request, env) => {
     detail: { reason: body.reason },
   });
 
-  return json(
+  return await finishFromResponse(env, _idemCred, _idemKey, json(
     {
       accepted: true,
       operation: 'RESUME',
@@ -168,7 +198,7 @@ const resumeHandler: RouteHandler = async (request, env) => {
     },
     200,
     requestId
-  );
+  ));
 };
 
 export function registerHaltRoutes(): void {

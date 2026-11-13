@@ -524,3 +524,27 @@ Gateway A is 100% complete for the 0.6.0 scope when:
 
 Any subsequent scope expansion (new operations, new guards, production cut-over) is a new plan revision.
 ```
+
+---
+
+## Amendment — Operation idempotency record and lookup (BD-1.7)
+
+**Status:** in progress (scope addition authorized for this run)
+
+**Paths:** `gateway/src/idempotency/`, `gateway/src/durable-objects/operation-store.ts`,
+write routes (`tasks`, `halt`, `decisions`, plan status), `GET /operations/:id`,
+`gateway/src/errors/catalogue.ts`, `gateway/docs/error-catalogue.md`, tests.
+
+**Work:**
+- G-IDEM-1: require `idempotencyKey` `^[0-9a-f]{32}$` on every write; missing/malformed → 400 `IDEMPOTENCY_KEY_INVALID`
+- G-IDEM-2: write-ahead record (credential hash, fingerprint); atomic DO check/create; terminal updates; ≥7 day retention + alarm
+- G-IDEM-3: `GET /operations/{id}` Bearer-only lookup per contract §3.19 / operation-lookup schema
+- G-IDEM-4: catalogue codes `IDEMPOTENCY_KEY_INVALID`, `IDEMPOTENCY_KEY_REUSED`, `OPERATION_NOT_FOUND`
+- G-IDEM-5: stubs remain 501 and record `failed`/`NOT_IMPLEMENTED` (never `completed`)
+- G-IDEM-6: vitest coverage for validation, replay, reuse, concurrency, lookup, retention, hygiene
+
+**Exit criteria:**
+- [ ] All six G-IDEM tasks complete
+- [ ] Gateway CI green on the pushed SHA
+- [ ] No capability/signature/nonce/credential stored in operation records
+
