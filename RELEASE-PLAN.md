@@ -1,7 +1,7 @@
 # Operator Console — v0.6.0 RELEASE PLAN
 
 **Repository:** `inscope-labs/operator-console` — this plan covers the **Android app (`app/`) only**. Operator Gateway "Gateway A" (`gateway/`) has its own plan and agent: `gateway/GATEWAY-A-COMPLETION-PLAN.md`.
-**Plan revision:** 1.1 — Android-only scope (gateway work moved to its own plan)
+**Plan revision:** 1.2 — Android-only scope (gateway work moved to its own plan); pre-scaffolded files named per stage (G-14)
 **Review baseline:** 5 November 2026 (`main` as cloned on that date; I did not run any build or test)
 **Supersedes:** `docs/V0.6.0-BUILD-PLAN.md` (OC-0…OC-9), the unfinished parts of `IMPLEMENTATION-PLAN.md` (Phases 4.3–6, kept in `public/assets/aistudio/IMPLEMENTATION-PLAN_c11dc242.md`), `docs/console-connectivity-remediation.md` stages 2–8, and the open stop-and-ask items in the `gateway-repair-ga` agent reports.
 **Gateway plan (separate owner):** `gateway/GATEWAY-A-COMPLETION-PLAN.md`. No stage in this plan changes `gateway/**`; this plan only consumes the gateway's published contract and its verified gates.
@@ -49,6 +49,7 @@ Release claims use the status vocabulary of the guide §1.3: **implemented, refe
 - **G-10** A failed gate blocks the phase transition. Record it; do not mark complete on documentation changes alone.
 - **G-11** Update console docs, gateway docs and build-engine documentation together whenever an operation name, capability field, endpoint, release class or agent transport changes.
 - **G-13** Scope split: AI Studio edits only `app/**`, `docs/**` Android documents and `agent-reports/**` allowed for the stage. It never creates, edits or deletes anything under `gateway/**`. Before each run it starts from the current `main` (pull first) so that gateway PRs merged meanwhile are not overwritten; if its working tree contains `gateway/**` changes, it discards them and reports.
+- **G-14** Pre-execution scaffolds (`docs/PRE-EXECUTION-FILE-MAP.md`, rules in `docs/PRE-EXECUTION-ONBOARDING.md`). A stage whose **Files** line names a scaffold completes that file **in place**: it does not recreate, rename, move or delete it, treats the scaffold as an untrusted proposal, and removes both markers (G-09). A stage may touch only the paths in its own **Files** line plus the existing files its tasks name (G-02). Paths are under `app/src/main/kotlin/com/inscopelabs/buildengine/` unless stated.
 
 ### A.4 Evidence-based baseline (5 Nov 2026)
 
@@ -348,6 +349,7 @@ Android phases begin at Phase 2. Stage and task IDs keep their numbers (no renum
 - T3-203 Restart recovery: on launch, uncertain operations are resolved by `GET /operations/{id}`; the app never resends automatically. WorkManager performs lookups only.
 - T3-204 Repeated taps are idempotent at the use-case level.
 - T3-205 Tests: crash between journal write and send, between send and ack, process death, network loss, replay refusal, head drift.
+- **Files:** scaffolded, complete in place: `domain/model/OperationOutcome.kt` (T3-201). **Created in this stage, only after Stage 3.1's dependency PR has merged** (filenames proposed): `data/local/OperationJournalEntity.kt`, `data/local/OperationJournalDao.kt`, `data/local/OperationJournalDatabase.kt` (T3-202), `data/worker/OperationRecoveryWorker.kt` (T3-203, T3-205). Existing, to complete: `data/repository/OperationRepositoryImpl.kt`.
 
 **Stage 3.3 — Publish (old T4-301/T4-302) `[AIS]`**
 - T3-301 `PublishTaskUseCase`, `PublishViewModel`, `PublishConfirmScreen` (operation, plan, task/order, branch, **full 40-character head**, TTL countdown from approval, posture and tier badge, guard summary), `PublishProgressScreen`, `OperationResultBanner` (shows `auditRef`).
@@ -381,9 +383,11 @@ Android phases begin at Phase 2. Stage and task IDs keep their numbers (no renum
 
 **Stage 4.3 — Intake and review `[AIS]`**
 - T4-301 Submission inspection (paths, file hashes, expected branch SHA, restrictions); blocked-task views that keep **missing input, spec conflict, decision needed, policy refusal, technical failure** distinct (guide item 37); rework creates a new revision identity and preserves the original.
+- **Files:** scaffolded, complete in place: `ui/submission/SubmissionReviewScreen.kt` (T4-301).
 
 **Stage 4.4 — Governance and audit views `[AIS]`**
 - T4-401 Decision history, audit inspection, device list/revoke screens (using the gateway admin routes defined in the gateway plan), halt/resume screen.
+- **Files:** scaffolded, complete in place: `ui/decision/DecisionHistoryScreen.kt`, `ui/audit/AuditInspectionScreen.kt`, `ui/device/DeviceManagementScreen.kt`, `ui/operations/HaltResumeScreen.kt` (T4-401).
 
 **Stage 4.5 — Polish `[AIS]`**
 - T4-501 Replace the placeholder theme files (`Color.kt`, `Theme.kt`, `Type.kt` still carry scaffold markers); accessibility and small-screen checks per BD-4.2; delete every remaining `SCAFFOLD` marker not on the deferred list.
@@ -392,10 +396,10 @@ Android phases begin at Phase 2. Stage and task IDs keep their numbers (no renum
 
 **Gate 5:** "Run all" executes the scenario catalogue against the deployed `test` Worker and produces a report; a deliberately weakened gateway fails the right scenarios; the release build contains no Lab code.
 
-**Stage 5.1 — Scenario engine `[AIS]`:** T5-101 `lab/Scenario`, `ScenarioResult`, `ScenarioRunner` (sequential, cancellable, no retries). T5-102 `LabReport` (JSON, in memory, shared by explicit action only; no signature, nonce or credential).
-**Stage 5.2 — Mutations `[AIS]`:** T5-201 `Mutator` with tests proving each mutation changes only what it claims. T5-202 `ScenarioCatalogue` from the contract error registry plus fixtures; a unit test asserts every error code has at least one scenario (including `ENROLL_*`, `AUTH_TIER_NOT_ALLOWED`, `CONFIG_INVALID`).
-**Stage 5.3 — Lab UI and safety `[AIS]`:** T5-301 `LabScreen`/`LabViewModel`. T5-302 `HmacCapabilitySigner` only inside Lab; persistent banner "LAB — not an operator approval". T5-303 environment guard before each scenario (already present; wire it). T5-304 Lab toggle off by default, never persisted.
-**Stage 5.4 — Contract self-check `[AIS]`:** T5-401 `ContractCheck` flags unknown error codes and DTO drift.
+**Stage 5.1 — Scenario engine `[AIS]`:** T5-101 `lab/Scenario`, `ScenarioResult`, `ScenarioRunner` (sequential, cancellable, no retries). T5-102 `LabReport` (JSON, in memory, shared by explicit action only; no signature, nonce or credential). **Files:** scaffolded, complete in place: `lab/Scenario.kt`, `lab/ScenarioResult.kt`, `lab/ScenarioRunner.kt`, `lab/LabReport.kt`.
+**Stage 5.2 — Mutations `[AIS]`:** T5-201 `Mutator` with tests proving each mutation changes only what it claims. T5-202 `ScenarioCatalogue` from the contract error registry plus fixtures; a unit test asserts every error code has at least one scenario (including `ENROLL_*`, `AUTH_TIER_NOT_ALLOWED`, `CONFIG_INVALID`). **Files:** scaffolded, complete in place: `lab/Mutator.kt`, `lab/ScenarioCatalogue.kt`.
+**Stage 5.3 — Lab UI and safety `[AIS]`:** T5-301 `LabScreen`/`LabViewModel`. T5-302 `HmacCapabilitySigner` only inside Lab; persistent banner "LAB — not an operator approval". T5-303 environment guard before each scenario (already present; wire it). T5-304 Lab toggle off by default, never persisted. **Files:** scaffolded, complete in place: `ui/lab/LabScreen.kt`, `ui/lab/LabViewModel.kt`; existing, to wire: `lab/LabEnvironmentGuard.kt`, `capability/signing/HmacCapabilitySigner.kt`.
+**Stage 5.4 — Contract self-check `[AIS]`:** T5-401 `ContractCheck` flags unknown error codes and DTO drift. **Files:** scaffolded, complete in place: `lab/ContractCheck.kt`.
 **Stage 5.5 — Packaging and deferred list `[CLAUDE]` + `[AIS]`:** T5-501 `[CLAUDE]` build change per BD-5.1. T5-502 `[AIS]` `docs/DEFERRED.md` listing every remaining scaffold item with the ADR that defers it (mTLS stub, Play Integrity). T5-503 `[AIS]` implement or delete remaining instrumented-test placeholders; the rest go to the device checklist.
 
 ### Phase 6 — Class B operator workflow and cbridge coverage
