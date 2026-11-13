@@ -2,10 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://inscope-labs.com/schemas/operator-gateway/operation-lookup.schema.json",
   "title": "OperationLookupResponse",
-  "description": "Operation outcome lookup keyed by idempotency key from GET /operations/{id}",
+  "description": "Operation outcome lookup keyed by the client-generated idempotency key from GET /operations/{id} (contract section 3.19)",
   "type": "object",
   "properties": {
-    "id": { "type": "string" },
+    "id": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
     "operation": { "type": "string" },
     "status": {
       "type": "string",
@@ -17,8 +17,19 @@
       "pattern": "^[0-9a-f]{40}$"
     },
     "auditRef": { "type": "string" },
-    "timestamp": { "type": "integer" }
+    "timestamp": { "type": "integer" },
+    "code": { "type": "string", "description": "Error code from the contract section 4.1 registry; required when status is failed or refused" }
   },
-  "required": ["id", "operation", "status", "auditRef", "timestamp"],
+  "required": ["id", "operation", "status", "timestamp"],
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "enum": ["failed", "refused"] } }, "required": ["status"] },
+      "then": { "required": ["code"] }
+    },
+    {
+      "if": { "properties": { "status": { "const": "completed" } }, "required": ["status"] },
+      "then": { "required": ["auditRef", "headSha"] }
+    }
+  ],
   "additionalProperties": false
 }

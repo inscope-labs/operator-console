@@ -15,9 +15,10 @@
           "enum": ["APPROVED", "REJECTED", "DEFERRED"]
         },
         "notes": { "type": "string" },
+        "idempotencyKey": { "type": "string", "pattern": "^[0-9a-f]{32}$", "description": "Client-generated operation idempotency key (contract section 1.6); not the capability nonce" },
         "capability": { "type": "string" }
       },
-      "required": ["plan", "decision", "capability"],
+      "required": ["plan", "decision", "idempotencyKey", "capability"],
       "additionalProperties": false
     },
     "response": {

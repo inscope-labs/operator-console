@@ -18,9 +18,10 @@
           "type": "string",
           "enum": ["draft", "ready", "in_progress", "completed", "halted", "archived"]
         },
+        "idempotencyKey": { "type": "string", "pattern": "^[0-9a-f]{32}$", "description": "Client-generated operation idempotency key (contract section 1.6); not the capability nonce" },
         "capability": { "type": "string" }
       },
-      "required": ["plan", "task", "branch", "expectedHead", "targetStatus", "capability"],
+      "required": ["plan", "task", "branch", "expectedHead", "targetStatus", "idempotencyKey", "capability"],
       "additionalProperties": false
     },
     "response": {

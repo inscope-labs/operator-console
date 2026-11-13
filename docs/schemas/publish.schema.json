@@ -17,12 +17,13 @@
           "type": "string",
           "pattern": "^[0-9a-f]{40}$"
         },
+        "idempotencyKey": { "type": "string", "pattern": "^[0-9a-f]{32}$", "description": "Client-generated operation idempotency key (contract section 1.6); not the capability nonce" },
         "capability": {
           "type": "string",
           "description": "Signed ctxop-v1 capability string"
         }
       },
-      "required": ["plan", "task", "branch", "head", "capability"],
+      "required": ["plan", "task", "branch", "head", "idempotencyKey", "capability"],
       "additionalProperties": false
     },
     "response": {
