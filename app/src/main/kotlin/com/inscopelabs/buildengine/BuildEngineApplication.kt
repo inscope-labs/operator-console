@@ -6,6 +6,7 @@ import android.os.Bundle
 import com.inscopelabs.buildengine.boot.BootGuard
 import com.inscopelabs.buildengine.boot.BootRoute
 import com.inscopelabs.buildengine.boot.RecoveryActivity
+import com.inscopelabs.buildengine.data.worker.OperationRecoveryWorker
 import com.inscopelabs.buildengine.diagnostics.CrashActivity
 import com.inscopelabs.buildengine.diagnostics.GlobalExceptionHandler
 import com.inscopelabs.buildengine.diagnostics.UserFacingErrorActivity
@@ -69,6 +70,7 @@ class BuildEngineApplication : Application() {
             applicationScope.launch {
                 sessionRepository.start()
             }
+            OperationRecoveryWorker.enqueueLaunchRecovery(this)
             BootGuard.stageSuccess("app_init")
         } catch (t: Throwable) {
             BootGuard.recordFailure(this, "app_init", t)

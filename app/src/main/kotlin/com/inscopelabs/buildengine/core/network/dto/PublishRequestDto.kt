@@ -23,4 +23,5 @@ data class PublishRequestDto(
     val branch: String = "",
     val head: String = "",
     val capability: String = "",
+    val idempotencyKey: String = "",
 )

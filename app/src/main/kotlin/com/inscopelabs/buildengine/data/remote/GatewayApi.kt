@@ -7,6 +7,7 @@ import com.inscopelabs.buildengine.core.network.dto.EnrollRequestDto
 import com.inscopelabs.buildengine.core.network.dto.EnrollResponseDto
 import com.inscopelabs.buildengine.core.network.dto.EngineScopeRequestDto
 import com.inscopelabs.buildengine.core.network.dto.GatewayAckDto
+import com.inscopelabs.buildengine.core.network.dto.OperationLookupDto
 import com.inscopelabs.buildengine.core.network.dto.PlanStatusDto
 import com.inscopelabs.buildengine.core.network.dto.PlanSummaryDto
 import com.inscopelabs.buildengine.core.network.dto.PlanValidationDto
@@ -89,4 +90,7 @@ interface GatewayApi {
 
     /** `POST /enroll/challenge`. */
     suspend fun enrollChallenge(): EnrollChallengeDto
+
+    /** `GET /operations/{id}` — operation outcome lookup keyed by idempotency key (§3.19). */
+    suspend fun lookupOperation(idempotencyKey: String): OperationLookupDto
 }

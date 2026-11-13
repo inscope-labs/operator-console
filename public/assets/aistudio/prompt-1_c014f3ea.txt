@@ -1,0 +1,91 @@
+STAGE 3.2 — Journal, executor and outcome model
+Repo: inscope-labs/operator-console. Plan: RELEASE-PLAN.md (revision 1.2), Phase 3, Stage 3.2, tasks T3-201 to T3-205.
+Authorized by the operator for this run only. Execute this stage and nothing else.
+Decision basis: ADR 0009 (encrypted Room + WorkManager), BD-3.2, ADR 0013 (BD-1.7: client idempotency key and lookup).
+
+PRE-FLIGHT (do these first; if any fails, STOP and report. Do not work around it)
+1. Pull the current main. Do not work from an older snapshot (G-13).
+2. Confirm gradle/libs.versions.toml has the aliases androidx-room-runtime, androidx-room-ktx, androidx-room-compiler and androidx-work-runtime-ktx, and that app/build.gradle.kts uses them and has the ksp room.schemaLocation argument (Stage 3.1, PR #59). Do not add dependencies yourself.
+3. Confirm docs/gateway-contract.md is at "Revision 1.1" and contains section 1.6 (operation idempotency key), section 3.19 (GET /operations/{id}), section 4.3 (lookup status to console outcome) and the error codes IDEMPOTENCY_KEY_INVALID, IDEMPOTENCY_KEY_REUSED and OPERATION_NOT_FOUND; also that docs/adr/0013-operation-idempotency-key-and-lookup.md exists and docs/schemas/operation-lookup.schema.json has the `code` property (PR #60). The contract and schemas are the only wire authority (G-07). Do not invent endpoints, fields or error codes.
+4. Read app/src/test/.../ArchitectureTest.kt before writing code. Note what it forbids (the text ".mint(", signer/crypto imports, Runtime.exec/ProcessBuilder, lab imports, etc.). Never write the text ".mint(". Never weaken or edit that test to make your code pass. If the journal's field encryption cannot live anywhere the test allows, STOP and report.
+
+IMPORTANT FACT: Gateway A does NOT implement the idempotencyKey field, the write-ahead record or GET /operations/{id} yet (the gateway agent builds them under its own plan). Everything in this stage is built and tested against fakes at the repository/transport boundary. The report must say so.
+
+SCOPE (G-02, G-13, G-14). Paths under app/src/main/kotlin/com/inscopelabs/buildengine/ ("M/"), app/src/test/... ("T/") and app/src/androidTest/... ("A/").
+Complete IN PLACE (scaffold: do not recreate, rename, move or delete; remove its "SCAFFOLD PLACEHOLDER" line and its TODO(...), G-09):
+- M/domain/model/OperationOutcome.kt (T3-201)
+Create (proposed names; list every name as a proposal in the report):
+- M/data/local/OperationJournalEntity.kt, M/data/local/OperationJournalDao.kt, M/data/local/OperationJournalDatabase.kt (T3-202)
+- M/data/worker/OperationRecoveryWorker.kt (T3-203, T3-205)
+- M/core/network/dto/OperationLookupDto.kt (lookup response DTO, matching docs/schemas/operation-lookup.schema.json exactly)
+- a small key generator class for the idempotency key, in a file you name under M/domain/ or M/data/ and state in the report
+Existing files, to modify only as the tasks below require:
+- M/data/repository/OperationRepositoryImpl.kt
+- M/domain/repository/OperationRepository.kt (add the lookup method only if needed; remove nothing)
+- M/core/network/GatewayEndpoints.kt (add the lookup endpoint constant only)
+- M/data/remote/GatewayApi.kt and M/data/remote/GatewayRepository.kt (add the lookup call only)
+- request DTOs for write operations only to add the required `idempotencyKey` field (core/network/dto/PublishRequestDto.kt, UploadRequestDto.kt, ReconcileRequestDto.kt, EngineScopeRequestDto.kt and any existing decide/status-transition request DTO), exactly as the schemas define it
+- Tests under T/ (and A/ only if no new dependency is needed)
+- agent-reports/<UTC-ISO>-stage-3-2-journal-executor.md
+NEVER touch: gateway/**, .github/workflows/*.yml, proguard-rules.pro, AndroidManifest.xml, app/build.gradle.kts, gradle/libs.versions.toml, version.properties, build-logs/**, network_security_config.xml, docs/** (except nothing; this stage changes no docs). If you need a dependency, manifest entry, rule or doc change, STOP and report it.
+
+THE KEY (ADR 0013; read contract section 1.6 first)
+- The journal and recovery key is a client-generated idempotency key: 128 random bits from SecureRandom, encoded as 32 lowercase hex characters (^[0-9a-f]{32}$). It is created when the operation intent is created, written to the journal BEFORE any send, and reused for repeated taps on the same intent.
+- It is sent as JSON body field `idempotencyKey` on every write request. It is NOT part of the signed capability. Do not change the capability codec, the capability format or the conformance vectors.
+- NEVER use, derive, hash or store the capability nonce, the signature or the capability string for any journal column, key, log or exception message (BD-3.2). The key is not a credential; it is still never logged together with anything secret.
+- The console never resends automatically. A resend after an uncertain outcome is a new operation: new key, new capability, fresh operator confirmation.
+
+TASKS
+T3-201 Outcome model. Sealed type across the repository boundary with exactly: Succeeded | Refused | Conflict | Timeout | UncertainCompletion | RecoveryRequired. Carry only what the contract defines (auditRef, headSha, error code where the contract gives them). Success must never be representable from "request sent" alone (G-08).
+
+T3-202 Journal.
+- Room database (androidx.room 2.x). Entity: intent (operation, plan, task, branch, expected head, other non-secret request fields needed to identify the intent), idempotency key, state, created/updated timestamps, auditRef, last error code. Export schema JSON to app/schemas and commit it.
+- Encryption: Keystore-wrapped AES-GCM field encryption using javax.crypto and the AndroidKeyStore provider. No new dependency. Fresh random IV per value, non-exportable key, fail closed on any key or decrypt error (the entry becomes RecoveryRequired; never a default or empty value). Keep the cipher behind an interface so JVM tests can substitute a fake.
+- The intent is written BEFORE the send. If the journal write fails, nothing is sent.
+- States must distinguish at least: intent recorded, sent, acknowledged, terminal outcome, uncertain, recovery required.
+
+T3-203 Restart recovery.
+- On app launch, entries in an uncertain state are resolved by GET /operations/{idempotencyKey}. WorkManager performs LOOKUPS ONLY. It never sends or resends a write.
+- OperationRecoveryWorker obtains its dependencies through a Hilt EntryPoint (EntryPointAccessors). Do not use hilt-work or @HiltWorker (not on the build).
+- Map lookup results to the outcome model EXACTLY as in contract section 4.3:
+  * completed -> Succeeded, only after the live-head check (T3-302 rule: the live branch head must equal headSha); otherwise UncertainCompletion
+  * pending -> UncertainCompletion
+  * refused with code in {HEAD_DRIFT, HEAD_MOVED, NONCE_REPLAYED, SUBMISSION_IMMUTABLE, ANCESTRY_FAIL, RECONCILE_REQUIRED, IDEMPOTENCY_KEY_REUSED} -> Conflict
+  * refused, any other code (including HALT_ACTIVE) -> Refused
+  * failed -> RecoveryRequired
+  * 404 OPERATION_NOT_FOUND -> RecoveryRequired (never an automatic resend, never treated as proof the request was not processed)
+  * the lookup itself times out or the network is down -> the journal entry is left unchanged and retried later
+  * Timeout is reserved for a WRITE SEND that received no response; it is always followed by a lookup
+- Unknown status values or an unknown/missing code on failed/refused fail closed to RecoveryRequired.
+
+T3-204 Idempotency. Repeated taps for the same intent reuse the same key and never create a second in-flight operation. A different intent gets a different key.
+
+OperationRepositoryImpl: complete only what these tasks require (journal write before send, send with idempotencyKey, outcome mapping, lookup). Leave publish/upload/reconcile/halt/resume/decide/status use cases for Stages 3.3 to 3.5. Anything you do not implement keeps its fail-closed TODO("SCAFFOLD: ...") and its markers. Do not invent behavior for it.
+
+T3-205 Tests: real tests, not placeholders. JVM tests with fakes for the gateway transport, the journal and the cipher:
+- crash between journal write and send (nothing sent; entry recoverable)
+- crash between send and acknowledgement (uncertain; lookup resolves it; no resend)
+- process death and restart recovery
+- network loss on send (Timeout, then lookup) and on lookup (entry unchanged)
+- replay refusal (NONCE_REPLAYED -> Conflict)
+- head drift (HEAD_DRIFT / HEAD_MOVED -> Conflict; completed with a moved live head -> UncertainCompletion)
+- one test per row of the section 4.3 mapping above, including 404 and unknown status/code
+- two taps on one intent reuse one key; different intents get different keys
+- the generated key matches ^[0-9a-f]{32}$ and is never equal to or derived from the capability's nonce field
+- no capability, signature or nonce ever reaches the journal entity, its encrypted values or any log line (assert on the entity fields and captured log output)
+- write request DTOs serialize `idempotencyKey` and decode lookup responses per the schemas
+Anything that genuinely needs the Android runtime (real Keystore, real WorkManager execution) goes in A/ only if no new dependency is needed; otherwise list it in the report as a deferred device-checklist item.
+
+RULES
+- G-01: no release-build verification, no arbitrary shell setup, no HEAD drift-checks (a drift failure goes back to Claude for hash correction).
+- G-04/G-10: no claim without evidence. If you could not run a gate, write "unverified in-agent" in the report; that is NOT a pass. The stage closes only when CI is green on the pushed SHA.
+- G-05: fail closed on missing configuration, unavailable state, ambiguous policy, unverifiable input.
+- G-08: upload, accept, publish and reconcile are distinct states. Never report success because a request was sent.
+- G-09: leave no "SCAFFOLD PLACEHOLDER" line or TODO(...) in the files this stage completes.
+- Match conventions: package equals directory; states are data objects; Hilt for DI.
+- Push once, from current main, with no unrelated edits. AI Studio pushes its whole working tree: before pushing, confirm the diff contains only the paths listed above plus tests, schemas export and the report.
+
+REPORT (mandatory): agent-reports/<UTC-ISO>-stage-3-2-journal-executor.md
+Include: files created and changed; status of each of T3-201 to T3-205; every assumption and every proposed name or signature; anything you stopped on; each test and what it proves; what is "unverified in-agent"; confirmation that Gateway A does not yet implement idempotencyKey or the lookup and all gateway behaviour was faked; confirmation that no capability, signature or nonce is persisted or logged; confirmation that no protected path, docs/** file or gateway/** file was touched; deferred device-checklist items.
+
+DO NOT: merge anything, edit gateway/** or docs/**, add dependencies, change ArchitectureTest or the capability codec to fit your code, use the nonce as a key, resend automatically, start Stage 3.3, or invent contract details.

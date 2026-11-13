@@ -21,4 +21,5 @@ data class EngineScopeRequestDto(
     val head: String = "",
     val reason: String = "",
     val capability: String = "",
+    val idempotencyKey: String = "",
 )

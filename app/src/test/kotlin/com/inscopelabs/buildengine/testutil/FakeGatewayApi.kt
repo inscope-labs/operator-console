@@ -7,6 +7,7 @@ import com.inscopelabs.buildengine.core.network.dto.EngineScopeRequestDto
 import com.inscopelabs.buildengine.core.network.dto.EnrollRequestDto
 import com.inscopelabs.buildengine.core.network.dto.EnrollResponseDto
 import com.inscopelabs.buildengine.core.network.dto.GatewayAckDto
+import com.inscopelabs.buildengine.core.network.dto.OperationLookupDto
 import com.inscopelabs.buildengine.core.network.dto.PlanStatusDto
 import com.inscopelabs.buildengine.core.network.dto.PlanSummaryDto
 import com.inscopelabs.buildengine.core.network.dto.PlanValidationDto
@@ -51,7 +52,20 @@ class FakeGatewayApi : GatewayApi {
     override suspend fun resume(request: EngineScopeRequestDto): GatewayAckDto = GatewayAckDto(accepted = true, operation = "resume", auditRef = "ref-5")
     override suspend fun sync(request: SyncRequestDto): SyncStatusDto = SyncStatusDto(status = "synced", headSha = "0".repeat(40), inSync = true)
     override suspend fun doctor(): DoctorReportDto = DoctorReportDto(healthy = true, checks = emptyList())
+    var lookupResult: (String) -> OperationLookupDto = { key ->
+        OperationLookupDto(
+            id = key,
+            operation = "PUBLISH",
+            status = "completed",
+            branch = "task-10008-refactor-parser",
+            headSha = "0".repeat(40),
+            auditRef = "audit-default",
+            timestamp = 1761840000L,
+        )
+    }
+
     override suspend fun enroll(request: EnrollRequestDto): EnrollResponseDto = enrollResult(request)
     override suspend fun rotateKey(request: RotateKeyRequestDto): EnrollResponseDto = rotateKeyResult(request)
     override suspend fun enrollChallenge(): EnrollChallengeDto = enrollChallengeResult()
+    override suspend fun lookupOperation(idempotencyKey: String): OperationLookupDto = lookupResult(idempotencyKey)
 }

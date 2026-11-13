@@ -18,4 +18,5 @@ data class ReconcileRequestDto(
     val head: String = "",
     val submissionId: String = "",
     val capability: String = "",
+    val idempotencyKey: String = "",
 )

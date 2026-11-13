@@ -135,6 +135,7 @@ object GatewayEndpoints {
 
     const val SYNC: String = "/sync"
     const val DOCTOR: String = "/doctor"
+    const val OPERATION_LOOKUP: String = "/operations/{operationId}"
 
     const val ENROLL: String = "/enroll"
     const val ENROLL_ROTATE: String = "/enroll/rotate"
@@ -204,6 +205,9 @@ object GatewayEndpoints {
 
     /** `POST /decisions/{decisionId}` — the framework decision. */
     fun decision(decisionId: String): String = path(DECISION, "decisionId" to decisionId)
+
+    /** `GET /operations/{id}` — operation outcome lookup keyed by idempotency key (§3.19). */
+    fun operationLookup(operationId: String): String = path(OPERATION_LOOKUP, "operationId" to operationId)
 
     /**
      * Fills the placeholders of [template] with [parameters].

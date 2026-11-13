@@ -1,0 +1,117 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "d11ab474bec86accd0ce365850718e5c",
+    "entities": [
+      {
+        "tableName": "operation_journal",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`idempotencyKey` TEXT NOT NULL, `intentFingerprint` TEXT NOT NULL, `encryptedOperation` TEXT NOT NULL, `encryptedPlan` TEXT NOT NULL, `encryptedTask` TEXT NOT NULL, `encryptedBranch` TEXT NOT NULL, `encryptedExpectedHead` TEXT NOT NULL, `encryptedExtraFields` TEXT NOT NULL, `state` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, `encryptedAuditRef` TEXT, `encryptedResultHeadSha` TEXT, `encryptedLastErrorCode` TEXT, PRIMARY KEY(`idempotencyKey`))",
+        "fields": [
+          {
+            "fieldPath": "idempotencyKey",
+            "columnName": "idempotencyKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "intentFingerprint",
+            "columnName": "intentFingerprint",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "encryptedOperation",
+            "columnName": "encryptedOperation",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "encryptedPlan",
+            "columnName": "encryptedPlan",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "encryptedTask",
+            "columnName": "encryptedTask",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "encryptedBranch",
+            "columnName": "encryptedBranch",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "encryptedExpectedHead",
+            "columnName": "encryptedExpectedHead",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "encryptedExtraFields",
+            "columnName": "encryptedExtraFields",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "encryptedAuditRef",
+            "columnName": "encryptedAuditRef",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "encryptedResultHeadSha",
+            "columnName": "encryptedResultHeadSha",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "encryptedLastErrorCode",
+            "columnName": "encryptedLastErrorCode",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "idempotencyKey"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_operation_journal_intentFingerprint",
+            "unique": false,
+            "columnNames": [
+              "intentFingerprint"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_operation_journal_intentFingerprint` ON `${TABLE_NAME}` (`intentFingerprint`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd11ab474bec86accd0ce365850718e5c')"
+    ]
+  }
+}

@@ -5,15 +5,22 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
+import androidx.room.Room
 import com.inscopelabs.buildengine.BuildConfig
 import com.inscopelabs.buildengine.core.crypto.SecureRandomSource
 import com.inscopelabs.buildengine.core.network.ErrorMapper
 import com.inscopelabs.buildengine.core.time.Clock
 import com.inscopelabs.buildengine.data.enrollment.DeviceEnrollmentStore
+import com.inscopelabs.buildengine.data.local.AndroidKeystoreJournalCipher
 import com.inscopelabs.buildengine.data.local.GatewayBaseUrlStore
 import com.inscopelabs.buildengine.data.local.HealthSnapshotStore
+import com.inscopelabs.buildengine.data.local.IdempotencyKeyGenerator
+import com.inscopelabs.buildengine.data.local.JournalFieldCipher
+import com.inscopelabs.buildengine.data.local.OperationJournalDao
+import com.inscopelabs.buildengine.data.local.OperationJournalDatabase
 import com.inscopelabs.buildengine.data.local.OperatorCredentialStore
 import com.inscopelabs.buildengine.data.local.SelectionStore
+import com.inscopelabs.buildengine.data.remote.GatewayApi
 import com.inscopelabs.buildengine.data.remote.GatewayRepository
 import com.inscopelabs.buildengine.data.repository.ConnectionStatusRepositoryImpl
 import com.inscopelabs.buildengine.data.repository.OperationRepositoryImpl
@@ -128,8 +135,49 @@ object DataModule {
 
     @Provides
     @Singleton
-    fun provideOperationRepository(gateway: GatewayRepository): OperationRepository =
-        OperationRepositoryImpl(gateway)
+    fun provideOperationJournalDatabase(
+        @ApplicationContext context: Context,
+    ): OperationJournalDatabase = Room.databaseBuilder(
+        context,
+        OperationJournalDatabase::class.java,
+        OperationJournalDatabase.DATABASE_NAME,
+    ).build()
+
+    @Provides
+    @Singleton
+    fun provideOperationJournalDao(
+        database: OperationJournalDatabase,
+    ): OperationJournalDao = database.operationJournalDao()
+
+    @Provides
+    @Singleton
+    fun provideJournalFieldCipher(): JournalFieldCipher = AndroidKeystoreJournalCipher()
+
+    @Provides
+    @Singleton
+    fun provideIdempotencyKeyGenerator(
+        secureRandomSource: SecureRandomSource,
+    ): IdempotencyKeyGenerator = IdempotencyKeyGenerator(secureRandomSource)
+
+    @Provides
+    @Singleton
+    fun provideOperationRepositoryImpl(
+        gatewayApi: GatewayApi,
+        journalDao: OperationJournalDao,
+        cipher: JournalFieldCipher,
+        keyGenerator: IdempotencyKeyGenerator,
+        clock: Clock,
+    ): OperationRepositoryImpl = OperationRepositoryImpl(
+        gateway = gatewayApi,
+        journalDao = journalDao,
+        cipher = cipher,
+        keyGenerator = keyGenerator,
+        clock = clock,
+    )
+
+    @Provides
+    @Singleton
+    fun provideOperationRepository(impl: OperationRepositoryImpl): OperationRepository = impl
 
     /**
      * The session repository.

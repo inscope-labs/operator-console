@@ -21,4 +21,5 @@ data class UploadRequestDto(
     val zipSha256: String = "",
     val zipBase64: String = "",
     val capability: String = "",
+    val idempotencyKey: String = "",
 )

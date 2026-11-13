@@ -14,6 +14,7 @@ import com.inscopelabs.buildengine.core.network.dto.EnrollResponseDto
 import com.inscopelabs.buildengine.core.network.dto.EngineScopeRequestDto
 import com.inscopelabs.buildengine.core.network.dto.GatewayAckDto
 import com.inscopelabs.buildengine.core.network.dto.GatewayHealthDto
+import com.inscopelabs.buildengine.core.network.dto.OperationLookupDto
 import com.inscopelabs.buildengine.core.network.dto.PlanStatusDto
 import com.inscopelabs.buildengine.core.network.dto.PlanSummaryDto
 import com.inscopelabs.buildengine.core.network.dto.PlanValidationDto
@@ -123,6 +124,9 @@ class GatewayRepository(
 
     override suspend fun enrollChallenge(): EnrollChallengeDto =
         decode(httpClient.post(GatewayEndpoints.enrollChallenge(), "{}"))
+
+    override suspend fun lookupOperation(idempotencyKey: String): OperationLookupDto =
+        decode(httpClient.get(GatewayEndpoints.operationLookup(idempotencyKey)))
 
     /**
      * The gateway preflight — `GET /health`.
