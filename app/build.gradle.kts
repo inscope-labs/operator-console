@@ -82,6 +82,11 @@ android {
     }
 }
 
+ksp {
+    // Exported Room schemas are committed so schema changes show up in review.
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
@@ -111,7 +116,12 @@ dependencies {
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.datastore.preferences)
-    implementation(libs.play.integrity)
+
+    // Operation journal (ADR 0009): Room for storage, WorkManager for recovery lookups only.
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
+    implementation(libs.androidx.work.runtime.ktx)
 
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.okhttp)
