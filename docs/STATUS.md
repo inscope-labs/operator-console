@@ -1,7 +1,7 @@
 # Operator Console — Status Matrix
 
 **Authoritative project status document per Guide §10.3 and `RELEASE-PLAN.md` (Stage 0.2 / T0-202).**  
-Last updated: **2026-11-06 (Stage 0.2 baseline)**.  
+Last updated: **2026-11-13 (Stage 3.1 sign-off & Stage 3.2 journal executor)**.  
 Reference plan of record: [`RELEASE-PLAN.md`](../RELEASE-PLAN.md).
 
 ---
@@ -41,8 +41,8 @@ Reference plan of record: [`RELEASE-PLAN.md`](../RELEASE-PLAN.md).
 | Stage 2.3 | Certificate Pinning & Expiry Rules | **implemented** | yes | yes | no | **yes** | T2-302, T2-304, T2-305 implemented: CertificatePinning with primary/backup pins, BD-2.2 180-day expiry enforcement, release empty pin refusal, dynamic rotation without app update, OkHttp pinner & interceptor, docs/PIN-ROTATION.md, 17 pinning JVM tests passing (333 total) |
 | Stage 2.4 | Preflight Screen & Failure Vocabulary | **implemented** | yes | yes | no | **yes** | T2-401 (PreflightScreen with 8 independent checks: configured, reachable, TLS/pins, auth, clock skew <=10s, contract version, enrolment, posture/tier), T2-402 (extended failure states TLS_PINNING, AUTH, STALE, POLICY_REFUSED in ErrorMapper), T2-403 (Crashlytics reflection reporter & diagnostic hooks removed per BD-2.3; local redacted diagnostics preserved); 349 unit tests passing |
 | **Phase 3** | **Privileged Operations & Durable Recovery** | | | | | | Gate 3 open |
-| Stage 3.1 | Build-file Authorization (Room, WorkManager) | not started | no | no | no | **no** | Awaiting Claude PR for Room/WorkManager/encryption deps |
-| Stage 3.2 | Operation Journal & GET /operations/{id} Recovery | not started | no | no | no | **no** | Pre-send intent logging and restart recovery required |
+| Stage 3.1 | Build-file Authorization (Room, WorkManager) | **implemented** | yes | yes | no | **yes** | T3-101 / BD-2.4 / BD-3.2 / BD-3.3 signed off: Room 2.8.5 (KSP schema export) and WorkManager 2.11.2 configured; Keystore AES-GCM field encryption chosen (no SQLCipher); Play Integrity removed from build/classpath; ProGuard rules updated for Room, WorkManager, Hilt `@EntryPoint`, and `data.local` serialization; manifest verified unchanged (2 permissions, non-expedited WorkManager) |
+| Stage 3.2 | Operation Journal & GET /operations/{id} Recovery | **implemented** | yes | yes | no | **yes (fakes/MockWebServer)** | T3-201–T3-205 completed: `OperationOutcome`, encrypted Room journal (`AndroidKeystoreJournalCipher`), `OperationRecoveryWorker`, `OperationRepositoryImpl` write-before-send/idempotency/lookup; 379+ JVM tests passing (live Gateway A & on-device Keystore/Room/WorkManager runtime deferred to device acceptance) |
 | Stage 3.3 | Guarded Publish Flow (full 40-char SHA confirmation) | scaffold | no | yes | no | **no** | `PublishTaskUseCase.kt` has scaffold markers |
 | Stage 3.4 | Remaining Operations (halt, resume, upload, reconcile) | scaffold | no | yes | no | **no** | 25 app files carry TODO/SCAFFOLD placeholders |
 | Stage 3.5 | Confirmation Tier Hardening (degraded mode) | **implemented** | yes | yes | no | **yes (read/minter)** | `AuthTierResolver`, `BiometricGate`, 216 unit tests passing |
