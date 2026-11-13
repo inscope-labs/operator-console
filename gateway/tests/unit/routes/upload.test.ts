@@ -1,3 +1,9 @@
+const _idemSeq = { n: 0 };
+function idemKey(): string {
+  _idemSeq.n += 1;
+  return _idemSeq.n.toString(16).padStart(32, '0');
+}
+
 import { describe, it, expect, beforeEach } from 'vitest';
 import { clearRoutes, dispatch, listRoutes } from '../../../src/routes/router';
 import { registerTaskRoutes } from '../../../src/routes/tasks';
@@ -211,7 +217,8 @@ describe('POST /tasks/:id/upload', () => {
           authorization: 'Bearer tok',
           'content-type': 'application/json',
         },
-        body: JSON.stringify({ submissionId: 'sub-1' }),
+        body: JSON.stringify({
+          idempotencyKey: idemKey(), submissionId: 'sub-1' }),
       }),
       baseEnv(),
       ctx
@@ -231,6 +238,7 @@ describe('POST /tasks/:id/upload', () => {
           'content-type': 'application/json',
         },
         body: JSON.stringify({
+          idempotencyKey: idemKey(),
           capability: cap,
           submissionId: 'sub-1',
           zipBase64: toB64(new TextEncoder().encode('x')),
@@ -260,6 +268,7 @@ describe('POST /tasks/:id/upload', () => {
           'content-type': 'application/json',
         },
         body: JSON.stringify({
+          idempotencyKey: idemKey(),
           capability: cap,
           submissionId: 'sub-7731',
           zipBase64: toB64(bytes),
@@ -295,6 +304,7 @@ describe('POST /tasks/:id/upload', () => {
           'content-type': 'application/json',
         },
         body: JSON.stringify({
+          idempotencyKey: idemKey(),
           capability: cap,
           submissionId: 'sub-1',
           zipBase64: toB64(bytes),

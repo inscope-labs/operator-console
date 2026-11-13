@@ -1,8 +1,3 @@
-/**
- * Stage 4.2 — Sync & Doctor unit tests.
- * Doctor must never leak secrets; both endpoints return contract shapes.
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import { dispatch, clearRoutes } from '../../../src/routes/router';
 import { registerDoctorRoutes } from '../../../src/routes/doctor';

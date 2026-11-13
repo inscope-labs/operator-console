@@ -16,11 +16,13 @@ import { registerDoctorRoutes } from './routes/doctor';
 import { registerSyncRoutes } from './routes/sync';
 import { registerHaltRoutes } from './routes/halt';
 import { registerAuditRoutes } from './routes/audit';
+import { registerOperationRoutes } from './routes/operations';
 import { NonceStore } from './durable-objects/nonce-store';
 import { EnrolmentRegistry } from './durable-objects/enrolment-registry';
 import { HaltState } from './durable-objects/halt-state';
 import { PlanDO } from './durable-objects/plan-do';
 import { AuditStream } from './durable-objects/audit-stream';
+import { OperationStore } from './durable-objects/operation-store';
 import './guards/register-core';
 
 export type { Env } from './runtime';
@@ -38,6 +40,7 @@ registerDoctorRoutes();
 registerSyncRoutes();
 registerHaltRoutes();
 registerAuditRoutes();
+registerOperationRoutes();
 
 export default {
   async fetch(
@@ -61,4 +64,4 @@ export default {
   },
 };
 
-export { NonceStore, EnrolmentRegistry, HaltState, PlanDO, AuditStream };
+export { NonceStore, EnrolmentRegistry, HaltState, PlanDO, AuditStream, OperationStore };

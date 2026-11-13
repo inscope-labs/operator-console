@@ -49,7 +49,11 @@ export type ErrorCode =
   | 'ENROLL_ATTESTATION_INVALID'
   | 'AUTH_TIER_NOT_ALLOWED'
   // Stub / unverified transaction
-  | 'NOT_IMPLEMENTED';
+  | 'NOT_IMPLEMENTED'
+  // Operation idempotency (BD-1.7 / ADR 0013)
+  | 'IDEMPOTENCY_KEY_INVALID'
+  | 'IDEMPOTENCY_KEY_REUSED'
+  | 'OPERATION_NOT_FOUND';
 
 export interface GatewayErrorBody {
   error: ErrorCode;
@@ -93,6 +97,9 @@ export const HTTP_STATUS: Record<ErrorCode, number> = {
   ENROLL_ATTESTATION_INVALID: 400,
   AUTH_TIER_NOT_ALLOWED: 403,
   NOT_IMPLEMENTED: 501,
+  IDEMPOTENCY_KEY_INVALID: 400,
+  IDEMPOTENCY_KEY_REUSED: 409,
+  OPERATION_NOT_FOUND: 404,
 };
 
 /** Human-readable defaults (no secrets). Every code has a default. */
@@ -133,6 +140,12 @@ export const ERROR_MESSAGE: Record<ErrorCode, string> = {
     'Attestation chain, challenge binding, key, or tier mismatch',
   AUTH_TIER_NOT_ALLOWED: 'Derived auth tier is not permitted in this environment',
   NOT_IMPLEMENTED: 'Operation or route not yet implemented',
+  IDEMPOTENCY_KEY_INVALID:
+    'idempotencyKey is missing or is not 32 lowercase hex characters',
+  IDEMPOTENCY_KEY_REUSED:
+    'idempotencyKey is already recorded with a different request fingerprint',
+  OPERATION_NOT_FOUND:
+    'No operation record is visible for this key under the calling credential',
 };
 
 /** Ordered list of every public code (for freeze tests and docs generation). */
