@@ -560,8 +560,8 @@ Operation lookup for journal recovery (BD-1.7). `{id}` is the console's `idempot
 }
 ```
 - `status`: `pending` (recorded, not terminal), `completed`, `failed` (the gateway ended the operation without
-  completing it), `refused` (a guard or policy refused it). For `failed` and `refused` the body also carries `code`, a
-  code from §4.1.
+  completing it), `refused` (a guard or policy refused it). `completed` always carries `auditRef` and `headSha`; `failed` and
+  `refused` carry `code`, a code from §4.1, and `auditRef` where one exists; `pending` may carry neither.
 - **Errors**: `404 OPERATION_NOT_FOUND` if the gateway has no record visible to this credential: the request did not
   arrive, was never processed, or is still in flight; `400 IDEMPOTENCY_KEY_INVALID` for a malformed `{id}`.
 
