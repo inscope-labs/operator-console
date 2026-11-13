@@ -20,9 +20,10 @@
           "pattern": "^[0-9a-f]{64}$"
         },
         "zipBase64": { "type": "string" },
+        "idempotencyKey": { "type": "string", "pattern": "^[0-9a-f]{32}$", "description": "Client-generated operation idempotency key (contract section 1.6); not the capability nonce" },
         "capability": { "type": "string" }
       },
-      "required": ["plan", "task", "branch", "head", "submissionId", "zipSha256", "zipBase64", "capability"],
+      "required": ["plan", "task", "branch", "head", "submissionId", "zipSha256", "zipBase64", "idempotencyKey", "capability"],
       "additionalProperties": false
     },
     "response": {
