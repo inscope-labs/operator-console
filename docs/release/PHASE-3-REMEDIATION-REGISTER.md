@@ -2,7 +2,7 @@
 
 **Document ID:** `OC-PR3-RR-001`  
 **Repository:** `inscope-labs/operator-console`  
-**Revision:** `1.1` — verified against the repository and corrected before installation (see Appendix A)  
+**Revision:** `1.2` — records the operator decisions of ADR 0014 (see Appendix C); revision 1.1 was verified against the repository and corrected before installation (Appendix A)  
 **Install path:** `docs/release/PHASE-3-REMEDIATION-REGISTER.md`, via a Claude branch and pull request that the operator merges (ADR 0010)  
 **Assessment baseline:** `732b7fbc41e3a139ead15db0d09f1c0e498ff347`  
 **Verification head:** `7fdd304` (`main` on 2026-11-13). Findings below were re-checked at this commit  
@@ -174,7 +174,8 @@ Task status is initially **OPEN** for every item. Implementation agents must not
   - Unknown fields and error codes, and malformed response bodies, fail closed.
   - Contract vectors used by Android tests match the frozen contract revision.
 - **Evidence:** Contract-to-client traceability matrix, schema/vector test results and the contract revision identifier.
-- **Dependency note:** Answering the questions above may require a separately approved contract change. It does not authorize gateway source implementation under this Android register.
+- **Operator decisions (ADR 0014, 2026-11-14):** D1 — the gateway returns the work-order identifier on the task read through a contract revision, and the console uses it; D2 — `decide` is a documented reduction to the schema's `decision` and `notes` (rationale in `notes`, attribution from the enrolled key identifier in the audit record, no separate evidence field), which settles question 1; D3 — the gateway agent adds `POST /plans/{id}/status`. Questions 2 and 3 remain to be stated in the traceability matrix.
+- **Dependency note:** The order identifier (D1) needs a separately approved contract revision (1.2) and a gateway change. This register does not authorize gateway source implementation.
 
 ---
 
@@ -302,8 +303,9 @@ Task status is initially **OPEN** for every item. Implementation agents must not
   - Success requires gateway confirmation plus live-head validation.
   - `auditRef` and operation ID are shown on terminal success.
   - Refusal, conflict, timeout, uncertain completion and recovery-required are separately represented.
-  - Real tests cover each distinct refusal (scope refused, replayed, head drifted, halt active), a declined confirmation, and TTL expiry while the confirmation prompt is open (T3-303).
+  - Real tests cover each distinct refusal (scope refused, replayed, head drifted, halt active), a declined confirmation, and a minted capability that expires exactly the configured lifetime after approval (ADR 0014 D4 replaces the "TTL expiry while the prompt is open" case).
   - `OperationResultBanner` shows `auditRef` and carries no scaffold marker.
+- **Order identifier:** Publish needs the work-order identifier from the task read (ADR 0014 D1). Until the contract revision and gateway change land, `PublishOrderResolver` fails closed and end-to-end publish evidence cannot be produced.
 - **Evidence:** Use-case/ViewModel tests, Compose/UI state tests, controlled-gateway integration test and screenshots or test artifacts.
 
 #### PR3-022 — Complete upload
@@ -361,7 +363,7 @@ Task status is initially **OPEN** for every item. Implementation agents must not
   - The decision is journalled and recovered using the same executor.
   - Unsupported decisions are not fabricated or silently mapped to another operation.
 - **Evidence:** Contract traceability, DTO/vector tests, use-case tests and controlled-gateway integration result.
-- **Hard blocker:** If PR3-003 leaves the attribution, rationale and evidence fields without an approved mapping, this task remains OPEN until the operator approves a contract revision or a documented reduction.
+- **Operator decision (ADR 0014 D2):** Documented reduction. The request carries `decision` and `notes` only (plus the schema's scope fields and `idempotencyKey`); the rationale goes in `notes`, attribution is the enrolled key identifier in the gateway audit record, and there is no separate evidence field. The UI shows exactly what will be sent. The reduction is recorded in `docs/STATUS.md` and the evidence dossier. This task is no longer blocked on a schema change.
 
 #### PR3-026 — Complete task-status transition
 
@@ -374,6 +376,7 @@ Task status is initially **OPEN** for every item. Implementation agents must not
   - “Done” or equivalent completion status requires the contract-defined evidence.
   - Status changes use the shared journal-backed executor.
   - The displayed status is refreshed from authoritative state after the operation.
+- **Gateway dependency (ADR 0014 D3):** The gateway agent adds `POST /plans/{id}/status`. Client work and unit tests can proceed; integration evidence waits for the route.
 - **Evidence:** Transition-table tests, evidence-validation tests and controlled-gateway integration results.
 
 #### PR3-027 — Work-order creation: documented alternative, not implementation
@@ -381,7 +384,7 @@ Task status is initially **OPEN** for every item. Implementation agents must not
 - **Traceability:** T3-404 (`CreateWorkOrderUseCase`); BD-1.3.
 - **Priority:** High.
 - **Verified starting point:** The plan says `CreateWorkOrderUseCase` is built only if BD-1.3 says so, otherwise a documented alternative screen. The plan's recommended BD-1.3 option is B: add `decide` and guarded status transitions only; work orders stay with engine tooling. The contract's §2 table lists `POST /plans/{id}/order` but defines no §3 request or response and no schema, so I-10 forbids implementing it on the client.
-- **Work:** Confirm the operator's recorded BD-1.3 decision. Unless the operator chose otherwise, defer work-order creation: remove `CreateWorkOrderUseCase` from any operational path, show the documented alternative, and record the deferral in `docs/STATUS.md` and the evidence dossier.
+- **Work:** BD-1.3 option B is confirmed by the operator (ADR 0014 D5). Defer work-order creation: remove `CreateWorkOrderUseCase` from any operational path, show the documented alternative, and record the deferral in `docs/STATUS.md` and the evidence dossier.
 - **Acceptance:** No scaffolded work-order action is represented as operational. If the operator instead chose to support it, an approved contract revision defines the request and response first, and the work then follows the same executor, confirmation, journal and recovery rules.
 - **Evidence:** The operator's BD-1.3 decision reference and the status record.
 - **Gate treatment:** A deferral under BD-1.3 option B is a plan-consistent disposition and does not block Gate 3.
@@ -394,7 +397,7 @@ Task status is initially **OPEN** for every item. Implementation agents must not
 
 - **Traceability:** T3-501; BD-3.1.
 - **Priority:** Critical.
-- **Assumption:** BD-3.1 is encoded as the plan's recommended option (a): both tiers accepted in staging and production, the gateway records the tier, and `decide` and `resume` require `hardware_confirm` when the device can provide it. The operator's recorded BD-3.1 closure must be cited; if it differs, this task changes with it.
+- **Decision (ADR 0014 D5):** BD-3.1 option (a) is confirmed by the operator: both tiers accepted in staging and production, the gateway records the tier, and `decide` and `resume` require `hardware_confirm` when the device can provide it.
 - **Work:** Encode the approved minimum authentication tier by environment and operation. Show the effective tier and reason in the confirmation summary.
 - **Acceptance:**
   - The policy is explicit, centrally defined and unit-tested.
@@ -660,7 +663,7 @@ Complete this section only after review.
 | Field | Acceptance value |
 |---|---|
 | Reviewed commit SHA | |
-| Register revision | `1.1` |
+| Register revision | `1.2` |
 | Mandatory tasks accepted | |
 | Approved deferrals | |
 | Open blockers | |
@@ -715,6 +718,26 @@ Verification was by static inspection of `inscope-labs/operator-console` at `7fd
 | PR3-033 | 3.6 | `[AIS]` |
 | PR3-040 to PR3-042 | Gate 3 evidence | `[AIS]` tests; the controlled gateway is an operator-named environment |
 | PR3-043 | 7.1 (pulled forward) | `[CLAUDE]` branch and PR |
+
+---
+
+## Appendix C — Operator decisions recorded in revision 1.2
+
+Source: ADR 0014, approved by the operator on 2026-11-14.
+
+| ID | Decision | Tasks affected |
+|---|---|---|
+| D1 | The gateway returns the work-order identifier on the task read through a contract revision; the console uses it and never invents one | PR3-003, PR3-021 |
+| D2 | `decide` is a documented reduction: `decision` and `notes` only, rationale in `notes`, attribution from the enrolled key identifier in the audit record, no separate evidence field | PR3-003, PR3-025 |
+| D3 | The gateway agent adds `POST /plans/{id}/status` | PR3-026 |
+| D4 | "TTL expiry while the prompt is open" is removed from Gate 3; replaced by "a minted capability expires exactly the configured lifetime after approval" | PR3-021 |
+| D5 | BD-1.3 option B and BD-3.1 option (a) are confirmed | PR3-027, PR3-030 |
+
+**Still open (operator action needed):** whether the `[REG+]` items of §1.3 become Gate 3 requirements; acceptance
+of the `proguard-rules.pro` edit from commit `7fdd304`; the controlled gateway environment for PR3-042.
+
+**Follow-ups, not done by this revision:** contract revision 1.2 for the order identifier; the gateway agent task
+for the order field and the status route; a `RELEASE-PLAN.md` revision for T3-303 and a pointer to this register.
 
 *End of register.*
 
