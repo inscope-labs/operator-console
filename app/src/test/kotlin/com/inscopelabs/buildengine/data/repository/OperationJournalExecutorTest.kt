@@ -1,6 +1,12 @@
 package com.inscopelabs.buildengine.data.repository
 
+import com.inscopelabs.buildengine.capability.CapabilityMinter
+import com.inscopelabs.buildengine.capability.DeviceNonceSource
+import com.inscopelabs.buildengine.capability.model.CapabilityScope
 import com.inscopelabs.buildengine.capability.model.OperationType
+import com.inscopelabs.buildengine.capability.signing.HmacCapabilitySigner
+import com.inscopelabs.buildengine.capability.signing.SignedCapability
+import com.inscopelabs.buildengine.domain.model.OperationRequest
 import com.inscopelabs.buildengine.core.crypto.SecureRandomSource
 import com.inscopelabs.buildengine.core.network.GatewayHttpException
 import com.inscopelabs.buildengine.core.network.GatewayProtocolException
@@ -64,7 +70,7 @@ class OperationJournalExecutorTest {
         cipher = RecordingFakeCipher()
         clock = FixedClock(1761840000L)
         keyGenerator = IdempotencyKeyGenerator(SecureRandomSource())
-        fakeGateway = FakeGatewayApi()
+        fakeGateway = FakeGatewayApi().apply { branchHeadResult = { HEAD_SHA_1 } }
         capturedLogs.clear()
         Logger.logSink = { _, tag, message, error ->
             capturedLogs.add("$tag: $message ${error?.message.orEmpty()}")
@@ -837,6 +843,219 @@ class OperationJournalExecutorTest {
         assertFalse(stored.encryptedBranch.contains("task-10008"))
     }
 
+    // -- Stage 3.3: T3-302 live-head check on the synchronous acknowledgement path ----------
+
+    @Test
+    fun `T3-302 accepted ack with a drifted live head is UncertainCompletion and is not resent`() = runTest {
+        var sends = 0
+        val repo = newExecutor(
+            object : GatewayApi by fakeGateway {
+                override suspend fun branchHead(branch: String): BranchHeadDto =
+                    BranchHeadDto(branch = branch, headSha = HEAD_SHA_2)
+            },
+        )
+        val outcome = repo.executeOperation(sampleIntent()) {
+            sends++
+            GatewayAckDto(accepted = true, branch = "task-10008-refactor-parser", headSha = HEAD_SHA_1, auditRef = "audit-drift")
+        }
+
+        assertEquals(
+            OperationOutcome.UncertainCompletion(
+                idempotencyKey = dao.getAll().single().idempotencyKey,
+                headSha = HEAD_SHA_1,
+                auditRef = "audit-drift",
+            ),
+            outcome,
+        )
+        assertEquals(1, sends)
+        assertEquals(OperationJournalState.UNCERTAIN, dao.getAll().single().state)
+    }
+
+    @Test
+    fun `T3-302 accepted ack with an unavailable live-head check is UncertainCompletion`() = runTest {
+        val repo = newExecutor(
+            object : GatewayApi by fakeGateway {
+                override suspend fun branchHead(branch: String): BranchHeadDto =
+                    throw IOException("live head unreachable")
+            },
+        )
+        val outcome = repo.executeOperation(sampleIntent()) {
+            GatewayAckDto(accepted = true, headSha = HEAD_SHA_1, auditRef = "audit-unavailable")
+        }
+        assertTrue(outcome is OperationOutcome.UncertainCompletion)
+        assertEquals(OperationJournalState.UNCERTAIN, dao.getAll().single().state)
+    }
+
+    @Test
+    fun `T3-302 accepted ack naming a different branch is UncertainCompletion`() = runTest {
+        val repo = newExecutor()
+        val outcome = repo.executeOperation(sampleIntent()) {
+            GatewayAckDto(accepted = true, branch = "task-99999-other", headSha = HEAD_SHA_1, auditRef = "audit-other")
+        }
+        assertTrue(outcome is OperationOutcome.UncertainCompletion)
+        assertEquals(OperationJournalState.UNCERTAIN, dao.getAll().single().state)
+    }
+
+    @Test
+    fun `T3-302 accepted ack with a matching live head is Succeeded`() = runTest {
+        val repo = newExecutor()
+        val outcome = repo.executeOperation(sampleIntent()) {
+            GatewayAckDto(accepted = true, branch = "task-10008-refactor-parser", headSha = HEAD_SHA_1, auditRef = "audit-match")
+        }
+        assertEquals(OperationOutcome.Succeeded(auditRef = "audit-match", headSha = HEAD_SHA_1), outcome)
+        assertEquals(OperationJournalState.TERMINAL_SUCCEEDED, dao.getAll().single().state)
+    }
+
+    // -- Stage 3.3: publish through the journal-backed executor ------------------------------
+
+    private fun signedPublish(task: String = "10008"): Pair<OperationRequest, SignedCapability> {
+        val scope = CapabilityScope(
+            op = OperationType.PUBLISH,
+            branch = "task-10008-refactor-parser",
+            head = HEAD_SHA_1,
+            nonce = SECRET_NONCE,
+        )
+        val minter = CapabilityMinter(
+            signer = HmacCapabilitySigner(keyId = "test_kid", secretUtf8 = "test-secret-key-32-bytes-long!!"),
+            nonceSource = DeviceNonceSource(SecureRandomSource()),
+            clock = clock,
+        )
+        val signed = minter.mint(scope = scope, order = "order-7731", plan = "atlas", task = task)
+        val request = OperationRequest(
+            op = OperationType.PUBLISH,
+            scope = scope,
+            plan = "atlas",
+            task = task,
+            order = "order-7731",
+        )
+        return request to signed
+    }
+
+    @Test
+    fun `publish sends the capability on the wire only and persists or logs no secret`() = runTest {
+        var sent: PublishRequestDto? = null
+        val repo = newExecutor(
+            object : GatewayApi by fakeGateway {
+                override suspend fun publish(request: PublishRequestDto): GatewayAckDto {
+                    sent = request
+                    return GatewayAckDto(
+                        accepted = true,
+                        operation = "PUBLISH",
+                        branch = "task-10008-refactor-parser",
+                        headSha = HEAD_SHA_1,
+                        auditRef = "audit-pub-1",
+                    )
+                }
+            },
+        )
+        val (request, signed) = signedPublish()
+
+        val outcome = repo.publish(request, signed)
+
+        assertEquals(OperationOutcome.Succeeded(auditRef = "audit-pub-1", headSha = HEAD_SHA_1), outcome)
+        val wire = sent!!
+        assertEquals(signed.toWire(), wire.capability)
+        assertEquals("atlas", wire.plan)
+        assertEquals("10008", wire.task)
+        assertEquals("task-10008-refactor-parser", wire.branch)
+        assertEquals(HEAD_SHA_1, wire.head)
+        assertTrue(KEY_PATTERN.matches(wire.idempotencyKey))
+        assertEquals(dao.getAll().single().idempotencyKey, wire.idempotencyKey)
+        assertNotEquals(SECRET_NONCE, wire.idempotencyKey)
+
+        val persisted = dao.getAll().single().toString() + cipher.recordedPlaintexts.joinToString("|")
+        assertFalse(persisted.contains(SECRET_NONCE))
+        assertFalse(persisted.contains(signed.signatureBase64Url))
+        assertFalse(persisted.contains("ctxop-v1"))
+        capturedLogs.forEach { line ->
+            assertFalse(line.contains(SECRET_NONCE))
+            assertFalse(line.contains(signed.signatureBase64Url))
+            assertFalse(line.contains("ctxop-v1"))
+        }
+    }
+
+    @Test
+    fun `publish rejects a capability that does not match the request before any journal write or send`() = runTest {
+        var sends = 0
+        val repo = newExecutor(
+            object : GatewayApi by fakeGateway {
+                override suspend fun publish(request: PublishRequestDto): GatewayAckDto {
+                    sends++
+                    return GatewayAckDto(accepted = true)
+                }
+            },
+        )
+        val (request, signed) = signedPublish()
+        val mismatched = request.copy(task = "99999")
+
+        val failure = runCatching { repo.publish(mismatched, signed) }
+
+        assertTrue(failure.exceptionOrNull() is IllegalArgumentException)
+        assertEquals(0, sends)
+        assertTrue(dao.getAll().isEmpty())
+    }
+
+    @Test
+    fun `publish refusals keep their distinct meaning`() = runTest {
+        val cases = listOf(
+            "HALT_ACTIVE" to OperationOutcome.Refused(code = "HALT_ACTIVE"),
+            "BRANCH_MISMATCH" to OperationOutcome.Refused(code = "BRANCH_MISMATCH"),
+            "NONCE_REPLAYED" to OperationOutcome.Conflict(code = "NONCE_REPLAYED"),
+            "HEAD_DRIFT" to OperationOutcome.Conflict(code = "HEAD_DRIFT"),
+        )
+        cases.forEachIndexed { index, (code, expected) ->
+            dao = FakeOperationJournalDao()
+            val repo = newExecutor(
+                object : GatewayApi by fakeGateway {
+                    override suspend fun publish(request: PublishRequestDto): GatewayAckDto =
+                        throw GatewayHttpException(
+                            statusCode = 409,
+                            body = """{"code": "$code", "message": "refused"}""",
+                            message = "refused",
+                        )
+                },
+            )
+            val (request, signed) = signedPublish(task = "10008")
+            assertEquals("case $index $code", expected, repo.publish(request, signed))
+        }
+    }
+
+    @Test
+    fun `publish repeated after a lost response looks up and never resends`() = runTest {
+        var sends = 0
+        val repo = newExecutor(
+            object : GatewayApi by fakeGateway {
+                override suspend fun publish(request: PublishRequestDto): GatewayAckDto {
+                    sends++
+                    throw IOException("lost response")
+                }
+
+                override suspend fun lookupOperation(idempotencyKey: String): OperationLookupDto =
+                    OperationLookupDto(
+                        id = idempotencyKey,
+                        operation = "PUBLISH",
+                        status = "completed",
+                        branch = "task-10008-refactor-parser",
+                        headSha = HEAD_SHA_1,
+                        auditRef = "audit-lookup",
+                        timestamp = 1761840090L,
+                    )
+            },
+        )
+        val (request, signed) = signedPublish()
+
+        val first = repo.publish(request, signed)
+        assertTrue(first is OperationOutcome.Timeout)
+        assertEquals(1, sends)
+
+        val (request2, signed2) = signedPublish()
+        val second = repo.publish(request2, signed2)
+
+        assertEquals(1, sends)
+        assertEquals(1, dao.getAll().size)
+        assertEquals(OperationOutcome.Succeeded(auditRef = "audit-lookup", headSha = HEAD_SHA_1), second)
+    }
+
     // -- Helpers & Fakes --------------------------------------------------------
 
     private suspend fun seedUncertainEntry(task: String = "10008"): String {
@@ -929,6 +1148,7 @@ class OperationJournalExecutorTest {
         const val FAKE_CAPABILITY =
             "ctxop-v1\nk2\n1761840000\norder-7731\natlas\n10008\nPUBLISH\n" +
                 "task-10008-refactor-parser\n$HEAD_SHA_1\n7f3c9b1e5d2a7046\nsig_fake"
+        const val SECRET_NONCE = "7f3c9b1e5d2a7046"
         val KEY_PATTERN = Regex("^[0-9a-f]{32}$")
     }
 }

@@ -1,5 +1,7 @@
 package com.inscopelabs.buildengine.data.repository
 
+import com.inscopelabs.buildengine.capability.model.OperationType
+import com.inscopelabs.buildengine.capability.signing.SignedCapability
 import com.inscopelabs.buildengine.core.network.ErrorMapper
 import com.inscopelabs.buildengine.core.network.GatewayHttpException
 import com.inscopelabs.buildengine.core.network.GatewayNotConfiguredException
@@ -7,6 +9,7 @@ import com.inscopelabs.buildengine.core.network.GatewayProtocolException
 import com.inscopelabs.buildengine.core.network.dto.GatewayAckDto
 import com.inscopelabs.buildengine.core.network.dto.GatewayErrorDto
 import com.inscopelabs.buildengine.core.network.dto.OperationLookupDto
+import com.inscopelabs.buildengine.core.network.dto.PublishRequestDto
 import com.inscopelabs.buildengine.core.time.Clock
 import com.inscopelabs.buildengine.core.time.SystemClock
 import com.inscopelabs.buildengine.data.local.DecryptedJournalRecord
@@ -305,18 +308,73 @@ class OperationRepositoryImpl(
             )
         }
 
-        journalDao.update(
-            ackedEntity.copy(
-                state = OperationJournalState.TERMINAL_SUCCEEDED,
-                updatedAtEpochMs = nowEpochMillis(),
-            ),
-        )
-        Logger.i(TAG, "Operation key=$key acknowledged and recorded TERMINAL_SUCCEEDED")
-        return OperationOutcome.Succeeded(
-            auditRef = ack.auditRef,
-            headSha = ack.headSha,
-        )
+        // T3-302: an accepted acknowledgement is not enough. Success also needs the live branch
+        // head to match the head the gateway reports; anything else stays UncertainCompletion.
+        val intentBranch = decryptOrFailClosed(ackedEntity)?.intent?.branch?.trim().orEmpty()
+        val ackBranch = ack.branch.trim()
+        if (intentBranch.isEmpty() || (ackBranch.isNotEmpty() && ackBranch != intentBranch)) {
+            Logger.w(TAG, "Acknowledgement branch missing or contradicting intent for key=$key; UncertainCompletion")
+            markUncertainWithResult(ackedEntity, headSha = ack.headSha, auditRef = ack.auditRef)
+            return OperationOutcome.UncertainCompletion(
+                idempotencyKey = key,
+                headSha = ack.headSha,
+                auditRef = ack.auditRef,
+            )
+        }
+        return when (verifyLiveHead(key, intentBranch, ack.headSha)) {
+            LiveHeadCheck.MATCH -> {
+                if (!markTerminalSucceeded(ackedEntity, auditRef = ack.auditRef, headSha = ack.headSha)) {
+                    return OperationOutcome.RecoveryRequired(idempotencyKey = key, auditRef = ack.auditRef)
+                }
+                Logger.i(TAG, "Operation key=$key acknowledged, live head verified, recorded TERMINAL_SUCCEEDED")
+                OperationOutcome.Succeeded(
+                    auditRef = ack.auditRef,
+                    headSha = ack.headSha,
+                )
+            }
+            LiveHeadCheck.DRIFTED, LiveHeadCheck.UNAVAILABLE -> {
+                Logger.w(TAG, "Live head not verified after acknowledgement for key=$key; UncertainCompletion")
+                markUncertainWithResult(ackedEntity, headSha = ack.headSha, auditRef = ack.auditRef)
+                OperationOutcome.UncertainCompletion(
+                    idempotencyKey = key,
+                    headSha = ack.headSha,
+                    auditRef = ack.auditRef,
+                )
+            }
+        }
     }
+
+    private suspend fun verifyLiveHead(key: String, branch: String, expectedHead: String): LiveHeadCheck {
+        val live = try {
+            gateway.branchHead(branch)
+        } catch (e: TimeoutCancellationException) {
+            Logger.w(TAG, "Live-head check timed out for key=$key")
+            return LiveHeadCheck.UNAVAILABLE
+        } catch (e: UnknownHostException) {
+            Logger.w(TAG, "Live-head check host unreachable for key=$key")
+            return LiveHeadCheck.UNAVAILABLE
+        } catch (e: IOException) {
+            Logger.w(TAG, "Live-head check IO error for key=$key")
+            return LiveHeadCheck.UNAVAILABLE
+        } catch (e: GatewayNotConfiguredException) {
+            Logger.w(TAG, "Live-head check: gateway not configured for key=$key")
+            return LiveHeadCheck.UNAVAILABLE
+        } catch (e: GatewayHttpException) {
+            Logger.w(TAG, "Live-head check HTTP ${e.statusCode} for key=$key")
+            return LiveHeadCheck.UNAVAILABLE
+        } catch (e: GatewayProtocolException) {
+            Logger.w(TAG, "Live-head check malformed response for key=$key")
+            return LiveHeadCheck.UNAVAILABLE
+        }
+        val liveSha = live.headSha.trim()
+        return if (liveSha.isNotEmpty() && liveSha.equals(expectedHead.trim(), ignoreCase = true)) {
+            LiveHeadCheck.MATCH
+        } else {
+            LiveHeadCheck.DRIFTED
+        }
+    }
+
+    private enum class LiveHeadCheck { MATCH, DRIFTED, UNAVAILABLE }
 
     private suspend fun handleWriteHttpException(
         sentEntity: OperationJournalEntity,
@@ -768,10 +826,43 @@ class OperationRepositoryImpl(
         val outcomes: Map<String, OperationOutcome>,
     )
 
-    // -- Privileged operation use-case facades (completed in Stages 3.3 to 3.5) --
+    // -- Privileged operation use-case facades (publish: Stage 3.3; the rest: Stages 3.4 and 3.5) --
 
-    override suspend fun publish(request: OperationRequest): OperationResult =
-        TODO("SCAFFOLD: publish — the only path to the public repository.")
+    /**
+     * Stage 3.3: the only path to the public repository. The intent is journalled before the
+     * single send; the capability travels on the wire only and is never persisted or logged.
+     */
+    override suspend fun publish(request: OperationRequest, capability: SignedCapability): OperationOutcome {
+        require(request.op == OperationType.PUBLISH) { "publish requires a PUBLISH request" }
+        val bound = capability.capability
+        require(
+            bound.op == OperationType.PUBLISH &&
+                bound.branch == request.scope.branch &&
+                bound.head == request.scope.head &&
+                bound.plan == request.plan &&
+                bound.task == request.task,
+        ) { "Capability does not match the publish request" }
+
+        val intent = OperationIntent(
+            operation = OperationType.PUBLISH,
+            plan = request.plan,
+            task = request.task,
+            branch = request.scope.branch,
+            expectedHead = request.scope.head,
+        )
+        return executeOperation(intent) { idempotencyKey ->
+            gateway.publish(
+                PublishRequestDto(
+                    plan = request.plan,
+                    task = request.task,
+                    branch = request.scope.branch,
+                    head = request.scope.head,
+                    capability = capability.toWire(),
+                    idempotencyKey = idempotencyKey,
+                ),
+            )
+        }
+    }
 
     override suspend fun upload(request: OperationRequest): OperationResult =
         TODO("SCAFFOLD: upload a submission (content-addressed, immutable).")
