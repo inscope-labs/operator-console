@@ -166,4 +166,100 @@ describe('gateIdempotencyWrite', () => {
     expect(rec?.status).toBe('refused');
     expect(rec?.code).toBe('HEAD_MOVED');
   });
+
+  it('rejects uppercase key', async () => {
+    const r = await gateIdempotencyWrite(
+      req({ idempotencyKey: 'A'.repeat(32), capability: 'x' }),
+      env(),
+      'PUBLISH',
+      { idempotencyKey: 'A'.repeat(32), capability: 'x' },
+      'rid'
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.response.status).toBe(400);
+      const b = (await r.response.json()) as { error: string };
+      expect(b.error).toBe('IDEMPOTENCY_KEY_INVALID');
+    }
+  });
+
+  it('rejects 31-char and 33-char keys', async () => {
+    for (const bad of ['a'.repeat(31), 'a'.repeat(33)]) {
+      const r = await gateIdempotencyWrite(
+        req({ idempotencyKey: bad }),
+        env(),
+        'PUBLISH',
+        { idempotencyKey: bad },
+        'rid'
+      );
+      expect(r.ok).toBe(false);
+      if (!r.ok) {
+        expect(r.response.status).toBe(400);
+        const b = (await r.response.json()) as { error: string };
+        expect(b.error).toBe('IDEMPOTENCY_KEY_INVALID');
+      }
+    }
+  });
+
+  it('records failed with NOT_IMPLEMENTED when that code is returned', async () => {
+    const e = env();
+    const first = await gateIdempotencyWrite(
+      req({ idempotencyKey: KEY, branch: 'task-1' }),
+      e,
+      'PUBLISH',
+      { idempotencyKey: KEY, branch: 'task-1' },
+      'rid'
+    );
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    await finishFromResponse(
+      e,
+      first.credentialHash,
+      first.key,
+      new Response(
+        JSON.stringify({ error: 'NOT_IMPLEMENTED', message: 'stub', request_id: 'r' }),
+        { status: 501 }
+      )
+    );
+    const rec = await getOperation(e, first.credentialHash, KEY);
+    expect(rec?.status).toBe('failed');
+    expect(rec?.code).toBe('NOT_IMPLEMENTED');
+  });
+
+  it('pending timeout marks record failed with NETWORK', async () => {
+    const e = env();
+    const past = Math.floor(Date.now() / 1000) - (16 * 60);
+    const { beginOperation, getOperation: getOp } = await import(
+      '../../../src/idempotency/store-client'
+    );
+    const { computeFingerprint } = await import(
+      '../../../src/idempotency/fingerprint'
+    );
+    const hash = await hashOperatorCredential('tok');
+    const body = { idempotencyKey: KEY, branch: 'task-1' };
+    const fp = await computeFingerprint('PUBLISH', body);
+    await beginOperation(e, {
+      credentialHash: hash,
+      id: KEY,
+      operation: 'PUBLISH',
+      fingerprint: fp,
+      now: past,
+    });
+    const second = await gateIdempotencyWrite(
+      req(body),
+      e,
+      'PUBLISH',
+      body,
+      'rid2'
+    );
+    // Same fingerprint after timeout → replay of the now-failed record
+    expect(second.ok).toBe(true);
+    if (second.ok) {
+      expect(second.replay).toBeDefined();
+    }
+    const rec = await getOp(e, hash, KEY);
+    expect(rec).toBeTruthy();
+    expect(rec!.status).toBe('failed');
+    expect(rec!.code).toBe('NETWORK');
+  });
 });
