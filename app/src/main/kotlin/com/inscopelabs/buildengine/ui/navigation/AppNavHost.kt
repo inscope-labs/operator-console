@@ -1,6 +1,8 @@
 package com.inscopelabs.buildengine.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -63,14 +65,19 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
         composable(
             route = Routes.PUBLISH,
             arguments = listOf(navArgument("taskId") { type = NavType.StringType }),
-        ) {
-            PublishConfirmScreen()
+        ) { backStackEntry ->
+            val taskId = backStackEntry.arguments?.getString("taskId").orEmpty()
+            PublishConfirmScreen(
+                onSubmitted = { navController.navigate(Routes.publishProgress(taskId)) },
+            )
         }
         composable(
             route = Routes.PUBLISH_PROGRESS,
             arguments = listOf(navArgument("taskId") { type = NavType.StringType }),
-        ) {
-            PublishProgressScreen()
+        ) { backStackEntry ->
+            // Share the confirmation destination's view model: one submission, one state.
+            val confirmEntry = remember(backStackEntry) { navController.getBackStackEntry(Routes.PUBLISH) }
+            PublishProgressScreen(viewModel = hiltViewModel(confirmEntry))
         }
         composable(
             route = Routes.DECISION,

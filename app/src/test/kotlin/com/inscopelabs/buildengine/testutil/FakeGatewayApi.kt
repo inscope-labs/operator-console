@@ -44,7 +44,10 @@ class FakeGatewayApi : GatewayApi {
     override suspend fun validatePlan(planId: String): PlanValidationDto = PlanValidationDto(valid = true, planId = planId)
     override suspend fun renderCheck(planId: String): RenderCheckDto = RenderCheckDto(ok = true, planId = planId)
     override suspend fun nextTasks(): List<TaskSummaryDto> = emptyList()
-    override suspend fun branchHead(branch: String): BranchHeadDto = BranchHeadDto(branch = branch, headSha = "0".repeat(40))
+    /** The live head [branchHead] reports for any branch. */
+    var branchHeadResult: (String) -> String = { "0".repeat(40) }
+
+    override suspend fun branchHead(branch: String): BranchHeadDto = BranchHeadDto(branch = branch, headSha = branchHeadResult(branch))
     override suspend fun publish(request: PublishRequestDto): GatewayAckDto = GatewayAckDto(accepted = true, operation = "publish", auditRef = "ref-1")
     override suspend fun reconcile(request: ReconcileRequestDto): GatewayAckDto = GatewayAckDto(accepted = true, operation = "reconcile", auditRef = "ref-2")
     override suspend fun upload(request: UploadRequestDto): GatewayAckDto = GatewayAckDto(accepted = true, operation = "upload", auditRef = "ref-3")

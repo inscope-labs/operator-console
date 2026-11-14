@@ -111,7 +111,13 @@ object UseCaseModule {
     fun providePublishTaskUseCase(
         operationRepository: OperationRepository,
         confirmAndMint: ConfirmAndMintCapabilityUseCase,
-    ): PublishTaskUseCase = PublishTaskUseCase(operationRepository, confirmAndMint)
+        nonceSource: com.inscopelabs.buildengine.capability.NonceSource,
+    ): PublishTaskUseCase = PublishTaskUseCase(operationRepository, confirmAndMint, nonceSource)
+
+    @Provides
+    @Singleton
+    fun providePublishOrderResolver(): com.inscopelabs.buildengine.domain.usecase.write.PublishOrderResolver =
+        com.inscopelabs.buildengine.domain.usecase.write.UnresolvedPublishOrderResolver()
 
     @Provides
     @Singleton
