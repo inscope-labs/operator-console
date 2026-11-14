@@ -2,6 +2,8 @@ package com.inscopelabs.buildengine.domain.usecase.enrollment
 
 import com.inscopelabs.buildengine.core.network.GatewayHttpException
 import com.inscopelabs.buildengine.core.network.dto.BranchHeadDto
+import com.inscopelabs.buildengine.core.network.dto.DecideAckDto
+import com.inscopelabs.buildengine.core.network.dto.DecideRequestDto
 import com.inscopelabs.buildengine.core.network.dto.DoctorReportDto
 import com.inscopelabs.buildengine.core.network.dto.EnrollChallengeDto
 import com.inscopelabs.buildengine.core.network.dto.EnrollRequestDto
@@ -10,6 +12,8 @@ import com.inscopelabs.buildengine.core.network.dto.EngineScopeRequestDto
 import com.inscopelabs.buildengine.core.network.dto.GatewayAckDto
 import com.inscopelabs.buildengine.core.network.dto.OperationLookupDto
 import com.inscopelabs.buildengine.core.network.dto.PlanStatusDto
+import com.inscopelabs.buildengine.core.network.dto.PlanStatusTransitionAckDto
+import com.inscopelabs.buildengine.core.network.dto.PlanStatusTransitionRequestDto
 import com.inscopelabs.buildengine.core.network.dto.PlanSummaryDto
 import com.inscopelabs.buildengine.core.network.dto.PlanValidationDto
 import com.inscopelabs.buildengine.core.network.dto.PublishRequestDto
@@ -50,6 +54,8 @@ class RevokeDeviceKeyUseCaseTest {
         override suspend fun listPlans(): List<PlanSummaryDto> = TODO()
         override suspend fun getPlan(planId: String): PlanSummaryDto = TODO()
         override suspend fun planStatus(planId: String): PlanStatusDto = TODO()
+        override suspend fun transitionPlanStatus(request: PlanStatusTransitionRequestDto): PlanStatusTransitionAckDto = TODO()
+        override suspend fun decide(request: DecideRequestDto): DecideAckDto = TODO()
         override suspend fun validatePlan(planId: String): PlanValidationDto = TODO()
         override suspend fun renderCheck(planId: String): RenderCheckDto = TODO()
         override suspend fun nextTasks(): List<TaskSummaryDto> = TODO()
