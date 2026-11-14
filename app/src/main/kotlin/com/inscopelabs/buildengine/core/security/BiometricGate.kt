@@ -46,6 +46,15 @@ open class BiometricGate(
         }
     }
 
+    /**
+     * Whether the device can provide a hardware_confirm gesture at all
+     * (Stage 3.5, T3-502). Used by the confirmation tier policy to decide whether
+     * hardware_confirm is required or whether the explicit in_app_confirm
+     * downgrade applies (BD-3.1(a)).
+     */
+    open fun hardwareConfirmAvailable(): Boolean =
+        canAuthenticate() == BiometricManager.BIOMETRIC_SUCCESS
+
     /** Authorizes an initialized Signature object via the BiometricPrompt CryptoObject. */
     open suspend fun authorize(
         signature: Signature,

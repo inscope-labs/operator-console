@@ -8,6 +8,7 @@ import com.inscopelabs.buildengine.core.security.AuthTier
 import com.inscopelabs.buildengine.core.security.AuthorizedSignatureResult
 import com.inscopelabs.buildengine.core.security.BiometricGate
 import com.inscopelabs.buildengine.core.security.BiometricPolicy
+import com.inscopelabs.buildengine.core.security.ConfirmationTierPolicy
 import com.inscopelabs.buildengine.core.security.PromptInfoSpec
 import com.inscopelabs.buildengine.core.time.Clock
 import com.inscopelabs.buildengine.core.time.SystemClock
@@ -66,6 +67,8 @@ class ConfirmAndMintCapabilityUseCase(
     private val healthSnapshotStore: com.inscopelabs.buildengine.data.local.HealthSnapshotStore? = null,
     private val expectedEnvironmentProvider: (() -> String)? = null,
     private val reportedEnvironmentProvider: (() -> String?)? = null,
+    private val tierPolicy: ConfirmationTierPolicy? = null,
+    private val hardwareConfirmAvailable: (() -> Boolean)? = null,
     private val signatureEngineProvider: () -> Signature = {
         Signature.getInstance("SHA256withECDSA")
     },
@@ -119,6 +122,18 @@ class ConfirmAndMintCapabilityUseCase(
         val keyAlias = activeRecord?.keyAlias ?: "op-key-v1"
 
         val effectiveClock = clock ?: SystemClock()
+
+        // Step 3b: enforce the per-operation minimum tier (T3-501, BD-3.1(a)).
+        // A refusal here is never a silent downgrade: the reason is reported so the
+        // operator sees which tier the operation requires and why (T3-502).
+        val activeTierPolicy = tierPolicy ?: ConfirmationTierPolicy(
+            hardwareConfirmAvailable = hardwareConfirmAvailable
+                ?: { biometricGate.hardwareConfirmAvailable() },
+        )
+        val tierDecision = activeTierPolicy.resolve(request.op, effectiveTier)
+        if (!tierDecision.allowed) {
+            return MintResult.TierNotAllowed(tierDecision.reason)
+        }
 
         // Step 4: Authorize and mint based on confirmation tier
         return when (effectiveTier) {
