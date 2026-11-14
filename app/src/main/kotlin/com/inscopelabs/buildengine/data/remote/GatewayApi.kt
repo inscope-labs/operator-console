@@ -14,6 +14,8 @@ import com.inscopelabs.buildengine.core.network.dto.PlanValidationDto
 import com.inscopelabs.buildengine.core.network.dto.PublishRequestDto
 import com.inscopelabs.buildengine.core.network.dto.ReconcileRequestDto
 import com.inscopelabs.buildengine.core.network.dto.RenderCheckDto
+import com.inscopelabs.buildengine.core.network.dto.RevokeKeyRequestDto
+import com.inscopelabs.buildengine.core.network.dto.RevokeKeyResponseDto
 import com.inscopelabs.buildengine.core.network.dto.RotateKeyRequestDto
 import com.inscopelabs.buildengine.core.network.dto.SyncRequestDto
 import com.inscopelabs.buildengine.core.network.dto.SyncStatusDto
@@ -93,4 +95,7 @@ interface GatewayApi {
 
     /** `GET /operations/{id}` — operation outcome lookup keyed by idempotency key (§3.19). */
     suspend fun lookupOperation(idempotencyKey: String): OperationLookupDto
+
+    /** `POST /admin/revoke` — device key revocation (§3.21, BD-1.10). */
+    suspend fun revokeKey(request: RevokeKeyRequestDto): RevokeKeyResponseDto
 }
