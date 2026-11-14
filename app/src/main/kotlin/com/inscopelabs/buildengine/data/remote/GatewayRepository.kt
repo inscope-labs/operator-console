@@ -21,6 +21,8 @@ import com.inscopelabs.buildengine.core.network.dto.PlanValidationDto
 import com.inscopelabs.buildengine.core.network.dto.PublishRequestDto
 import com.inscopelabs.buildengine.core.network.dto.ReconcileRequestDto
 import com.inscopelabs.buildengine.core.network.dto.RenderCheckDto
+import com.inscopelabs.buildengine.core.network.dto.RevokeKeyRequestDto
+import com.inscopelabs.buildengine.core.network.dto.RevokeKeyResponseDto
 import com.inscopelabs.buildengine.core.network.dto.RotateKeyRequestDto
 import com.inscopelabs.buildengine.core.network.dto.SyncRequestDto
 import com.inscopelabs.buildengine.core.network.dto.SyncStatusDto
@@ -127,6 +129,9 @@ class GatewayRepository(
 
     override suspend fun lookupOperation(idempotencyKey: String): OperationLookupDto =
         decode(httpClient.get(GatewayEndpoints.operationLookup(idempotencyKey)))
+
+    override suspend fun revokeKey(request: RevokeKeyRequestDto): RevokeKeyResponseDto =
+        decode(httpClient.post(GatewayEndpoints.adminRevoke(), json.encodeToString(request)))
 
     /**
      * The gateway preflight — `GET /health`.
