@@ -89,6 +89,28 @@ class DeviceEnrollmentStore(
         check(preferences.edit().remove(recordKey(kid)).commit()) { "Unable to remove pending enrolment" }
     }
 
+    /**
+     * Retires [kid] and clears the active pointer when it pointed at it.
+     * Used by key invalidation / gateway-side revocation (Stage 3.5, T3-503):
+     * a retired key is never offered as the active enrolment again.
+     */
+    @Synchronized
+    fun retire(kid: String, now: Long) {
+        val record = record(kid) ?: return
+        val editor = preferences.edit()
+        editor.putString(
+            recordKey(kid),
+            encode(record.copy(status = Status.RETIRED, retiredAtEpochSeconds = now)),
+        )
+        if (activeKid(record.environment) == kid) {
+            editor.remove(activeKidKey(record.environment))
+            if (preferences.getString(KEY_ACTIVE_KID, null) == kid) {
+                editor.remove(KEY_ACTIVE_KID)
+            }
+        }
+        check(editor.commit()) { "Unable to retire device enrolment" }
+    }
+
     fun activeRecord(environment: String? = null): Record? {
         val kid = activeKid(environment) ?: return null
         val rec = record(kid)?.takeIf { it.status == Status.ACTIVE } ?: return null
