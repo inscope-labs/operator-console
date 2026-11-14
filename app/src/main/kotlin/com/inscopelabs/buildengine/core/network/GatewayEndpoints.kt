@@ -122,6 +122,7 @@ object GatewayEndpoints {
     const val HEALTH: String = "/health"
     const val PLANS: String = "/plans"
     const val PLAN_STATUS: String = "/plans/{planId}/status"
+    const val PLAN_DECIDE: String = "/plans/{planId}/decide"
     const val PLAN_VALIDATE: String = "/plans/{planId}/validate"
     const val PLAN_RENDER_CHECK: String = "/plans/{planId}/render-check"
     const val TASKS_NEXT: String = "/tasks/next"
@@ -163,6 +164,9 @@ object GatewayEndpoints {
 
     /** `GET /plans/{planId}/status`. */
     fun planStatus(planId: String): String = path(PLAN_STATUS, "planId" to planId)
+
+    /** `POST /plans/{planId}/decide` (contract §3.18). */
+    fun planDecide(planId: String): String = path(PLAN_DECIDE, "planId" to planId)
 
     /** `POST /plans/{planId}/validate`. */
     fun planValidate(planId: String): String = path(PLAN_VALIDATE, "planId" to planId)
