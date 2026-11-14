@@ -1,8 +1,8 @@
 # Operator Console — Status Matrix
 
-**Authoritative project status document per Guide §10.3 and `RELEASE-PLAN.md` (Stage 0.2 / T0-202).**  
-Last updated: **2026-11-13 (Stage 3.1 sign-off & Stage 3.2 journal executor)**.  
-Reference plan of record: [`RELEASE-PLAN.md`](../RELEASE-PLAN.md).
+**Authoritative project status document per Guide §10.3 and `RELEASE-PLAN.md» (Stage 0.2 / T0-202).**  
+Last updated: **2026-11-14 (Stage 3.5 confirmation tier hardening)**.  
+Reference plan of record: [`RELEASE-PLAN.md»](../RELEASE-PLAN.md).
 
 ---
 
@@ -12,12 +12,12 @@ Reference plan of record: [`RELEASE-PLAN.md`](../RELEASE-PLAN.md).
 |---|---|
 | **implemented** | Code exists, adheres to contract, wire format, and rules; verified by executed tests. |
 | **reference only** | Document, schema, or vector intended as architectural guidance or specification; not executable runtime code. |
-| **scaffold** | Code compiles and structure exists, but carries `TODO`, placeholder logic, or mock returns. Unsafe for operational use. |
+| **scaffold** | Code compiles and structure exists, but carries `TODO», placeholder logic, or mock returns. Unsafe for operational use. |
 | **not started** | Required item for v0.6.0 whose code, tests, or documentation have not yet been authored. |
 | **not deployed** | Code exists and passes local verification, but has not been deployed to an active Cloudflare Worker or test environment. |
 | **unsupported** | Out of scope by architectural design (e.g., shell execution, on-device git worktree, broad storage access). |
 
-> **Critical Safety Constraint**: Nothing in this repository may be described as "production ready, deployed, and supported" until the gates in Phase 7 have passed with archived evidence in `docs/release/PHASE-7-EVIDENCE.md`.
+> **Critical Safety Constraint**: Nothing in this repository may be described as "production ready, deployed, and supported" until the gates in Phase 7 have passed with archived evidence in `docs/release/PHASE-7-EVIDENCE.md».
 
 ---
 
@@ -28,12 +28,12 @@ Reference plan of record: [`RELEASE-PLAN.md`](../RELEASE-PLAN.md).
 | **Phase 0** | **Baseline, Decisions & Hygiene** | | | | | | Gate 0 open |
 | Stage 0.1 | Decisions Record (ADR 0011, OP-0.1, BD-0.5) | partially | no | yes | no | **no** | BD-0.1–0.6 confirmed; ADR 0011 drafting assigned to Claude |
 | Stage 0.2 | Documentation Baseline | **implemented** | yes | yes | no | **yes** | README updated, STATUS.md created, ADR 0012 renumbered, Guide v2.1 published |
-| Stage 0.3 | Hygiene & Asset Cleanup | **implemented** | yes | yes | no | **yes** | Deleted 35 redundant files in `public/assets/aistudio/*` after mapping replacements |
+| Stage 0.3 | Hygiene & Asset Cleanup | **implemented** | yes | yes | no | **yes** | Deleted 35 redundant files in `public/assets/aistudio/*» after mapping replacements |
 | **Phase 1** | **Gateway A (Cloudflare Worker)** | | | | | | Gate 1 open |
 | Stage 1.1 | Fix Publish & Stubs 501 (T1-103) | **implemented** | pending CI | yes | no | **yes (fail-closed)** | Publish and stub routes return 501 NOT_IMPLEMENTED, zero 2xx on stubs, unit tests added |
 | Stage 1.2 | Environment Model (BD-1.1) | **implemented** | pending CI | yes | no | **yes** | Environments closed to test/staging/production; lenient mode and HMAC refused outside test |
 | Stage 1.3 | Contract Schemas & Error Catalogue Freeze (T1-201, ADR 0003) | **implemented** | pending CI | yes | no | **yes** | 22 JSON schemas published; code/error aligned; frozen error catalogue & spec G1–G15 numbering |
-| Stage 1.4 | CI Hardening (Fail-Closed) & Lockfile (T1-101, T1-102) | not started | no | no | no | **no** | Package lockfile, removal of `|| true`, workflow rename to gateway-*.yml |
+| Stage 1.4 | CI Hardening (Fail-Closed) & Lockfile (T1-101, T1-102) | not started | no | no | no | **no** | Package lockfile, removal of `|| true», workflow rename to gateway-*.yml |
 | Stage 1.5 | Phase 1 Completion Report & Sign-off | not started | no | no | no | **no** | Gate 1 completion report (Appendix A template) |
 | **Phase 2** | **Android Transport & Connectivity** | | | | | | Gate 2 open |
 | Stage 2.1 | Connectivity Remediation (BaseUrlStore, no init dial, timeouts, redirects, response cap) | **implemented** | yes | yes | no | **yes** | Stages 2–8 implemented: idle init, BaseUrlStore injection & URL validation, health snapshot persistence, staging banner, redacted activity log, redirect refusal, response size cap; 302 unit tests passing |
@@ -41,20 +41,20 @@ Reference plan of record: [`RELEASE-PLAN.md`](../RELEASE-PLAN.md).
 | Stage 2.3 | Certificate Pinning & Expiry Rules | **implemented** | yes | yes | no | **yes** | T2-302, T2-304, T2-305 implemented: CertificatePinning with primary/backup pins, BD-2.2 180-day expiry enforcement, release empty pin refusal, dynamic rotation without app update, OkHttp pinner & interceptor, docs/PIN-ROTATION.md, 17 pinning JVM tests passing (333 total) |
 | Stage 2.4 | Preflight Screen & Failure Vocabulary | **implemented** | yes | yes | no | **yes** | T2-401 (PreflightScreen with 8 independent checks: configured, reachable, TLS/pins, auth, clock skew <=10s, contract version, enrolment, posture/tier), T2-402 (extended failure states TLS_PINNING, AUTH, STALE, POLICY_REFUSED in ErrorMapper), T2-403 (Crashlytics reflection reporter & diagnostic hooks removed per BD-2.3; local redacted diagnostics preserved); 349 unit tests passing |
 | **Phase 3** | **Privileged Operations & Durable Recovery** | | | | | | Gate 3 open |
-| Stage 3.1 | Build-file Authorization (Room, WorkManager) | **implemented** | yes | yes | no | **yes** | T3-101 / BD-2.4 / BD-3.2 / BD-3.3 signed off: Room 2.8.5 (KSP schema export) and WorkManager 2.11.2 configured; Keystore AES-GCM field encryption chosen (no SQLCipher); Play Integrity removed from build/classpath; ProGuard rules updated for Room, WorkManager, Hilt `@EntryPoint`, and `data.local` serialization; manifest verified unchanged (2 permissions, non-expedited WorkManager) |
-| Stage 3.2 | Operation Journal & GET /operations/{id} Recovery | **implemented** | yes | yes | no | **yes (fakes/MockWebServer)** | T3-201–T3-205 completed: `OperationOutcome`, encrypted Room journal (`AndroidKeystoreJournalCipher`), `OperationRecoveryWorker`, `OperationRepositoryImpl` write-before-send/idempotency/lookup; 379+ JVM tests passing (live Gateway A & on-device Keystore/Room/WorkManager runtime deferred to device acceptance) |
-| Stage 3.3 | Guarded Publish Flow (full 40-char SHA confirmation) | **implemented in code; not accepted** | JVM pass; androidTest compiled (runtime unverified in-agent) | PR #66 code present; git/CI unverified in-agent | no | **no** | PR #66 + close-out tests verified (`PublishTaskUseCaseTest` 8, `PublishBannerPresenterTest` 7, `PublishViewModelTest` 10; `androidTest` Compose UI tests compiled, runtime unverified in-agent); `SCAFFOLD PLACEHOLDER` removed from `PublishFlowTest.kt`; see `docs/release/PHASE-3-EVIDENCE.md`. OPEN (1): Publish cannot run end to end: the capability `order` identifier has no source in the gateway contract or the Task model. PublishOrderResolver fails closed. Needs an operator decision and a contract revision (PR3-003, PR3-027, BD-1.3). OPEN (2): T3-303 'TTL expiry while the prompt is open' is not testable: ConfirmAndMintCapabilityUseCase reads approval time and the expiry check back to back, so ExpiredWhileConfirming cannot occur with a real clock. Needs an operator decision. |
+| Stage 3.1 | Build-file Authorization (Room, WorkManager) | **implemented** | yes | yes | no | **yes** | T3-101 / BD-2.4 / BD-3.2 / BD-3.3 signed off: Room 2.8.5 (KSP schema export) and WorkManager 2.11.2 configured; Keystore AES-GCM field encryption chosen (no SQLCipher); Play Integrity removed from build/classpath; ProGuard rules updated for Room, WorkManager, Hilt `@EntryPoint», and `data.local» serialization; manifest verified unchanged (2 permissions, non-expedited WorkManager) |
+| Stage 3.2 | Operation Journal & GET /operations/{id} Recovery | **implemented** | yes | yes | no | **yes (fakes/MockWebServer)** | T3-201–T3-205 completed: `OperationOutcome», encrypted Room journal (`AndroidKeystoreJournalCipher»), `OperationRecoveryWorker», `OperationRepositoryImpl» write-before-send/idempotency/lookup; 379+ JVM tests passing (live Gateway A & on-device Keystore/Room/WorkManager runtime deferred to device acceptance) |
+| Stage 3.3 | Guarded Publish Flow (full 40-char SHA confirmation) | **implemented in code; not accepted** | JVM pass; androidTest compiled (runtime unverified in-agent) | PR #66 code present; git/CI unverified in-agent | no | **no** | PR #66 + close-out tests verified (`PublishTaskUseCaseTest» 8, `PublishBannerPresenterTest» 7, `PublishViewModelTest» 10; `androidTest» Compose UI tests compiled, runtime unverified in-agent); `SCAFFOLD PLACEHOLDER» removed from `PublishFlowTest.kt»; see `docs/release/PHASE-3-EVIDENCE.md». OPEN (1): Publish cannot run end to end: the capability `order» identifier has no source in the gateway contract or the Task model. PublishOrderResolver fails closed. Needs an operator decision and a contract revision (PR3-003, PR3-027, BD-1.3). OPEN (2): T3-303 'TTL expiry while the prompt is open' is not testable: ConfirmAndMintCapabilityUseCase reads approval time and the expiry check back to back, so ExpiredWhileConfirming cannot occur with a real clock. Needs an operator decision. |
 | Stage 3.4 | Remaining Operations (halt, resume, upload, reconcile) | scaffold | no | yes | no | **no** | 25 app files carry TODO/SCAFFOLD placeholders |
-| Stage 3.5 | Confirmation Tier Hardening (degraded mode) | **implemented** | yes | yes | no | **yes (read/minter)** | `AuthTierResolver`, `BiometricGate`, 216 unit tests passing |
-| Stage 3.6 | Architecture Tests (single mint path, no exec) | **implemented** | yes | yes | no | **yes** | `ArchitectureTest` guards `.mint(` and package boundaries |
+| Stage 3.5 | Confirmation Tier Hardening (degraded mode) | **implemented in code; CI pending** | JVM tests added; CI pending on pushed SHA | yes | no | **no** | T3-501/T3-502/T3-503. Decision BD-3.1 closed by the operator as option (a): staging and production accept both confirmation tiers; DECIDE and RESUME require hardware_confirm when the device can provide it; the downgrade is explicit and visible, never silent. Implemented: `ConfirmationTierPolicy» (resolve + explainForSummary), tier enforcement in the single mint path (Step 3b of ConfirmAndMintCapabilityUseCase, `MintResult.TierNotAllowed»), publish confirmation summary shows the tier and why (`publish_tier_reason»), `POST /admin/revoke» per contract §3.21 (RevokeKeyDto, GatewayEndpoints.adminRevoke, GatewayApi.revokeKey, GatewayRepository), `RevokeDeviceKeyUseCase» (typed confirmation `REVOKE <kid>»; fail closed: local record retired and local key deleted only after the gateway confirms), `DeviceEnrollmentStore.retire». Tests: `ConfirmationTierPolicyTest» (9), `RevokeDeviceKeyUseCaseTest» (8), `ConfirmAndMintTierEnforcementTest» (3); not executed in-agent (no build environment in the agent sandbox) — CI on the pushed SHA is the verification of record. The NeedsReenrollment revocation UI flow is deferred to Stage 4.4 device management; the use case and store retire are the domain flow. |
+| Stage 3.6 | Architecture Tests (single mint path, no exec) | **implemented** | yes | yes | no | **yes** | `ArchitectureTest» guards `.mint(» and package boundaries |
 | **Phase 4** | **Operator Interface Completion** | | | | | | Gate 4 open |
 | Stage 4.1 | Shell & Dashboard (data age, halt visibility) | partially | yes | yes | no | **no** | Dashboard exists; data age and offline write-blocking needed |
 | Stage 4.2 | Plans & Tasks (discovery, executor classification) | partially | yes | yes | no | **no** | Read screens exist; executor classification pending |
 | Stage 4.3 | Intake & Review (submission inspection, blockers) | not started | no | no | no | **no** | Multi-failure blocker categorization pending |
 | Stage 4.4 | Governance & Audit Views (decision history, revoke) | not started | no | no | no | **no** | Decision history and key revocation UI pending |
-| Stage 4.5 | Theme & Accessibility Polish | scaffold | partially | yes | no | **no** | `Theme.kt`, `Color.kt`, `Type.kt` carry scaffold placeholders |
+| Stage 4.5 | Theme & Accessibility Polish | scaffold | partially | yes | no | **no** | `Theme.kt», `Color.kt», `Type.kt» carry scaffold placeholders |
 | **Phase 5** | **Lab Engine** | | | | | | Gate 5 open |
-| Stage 5.1 | Scenario Engine (runner, memory-only reports) | not started | no | no | no | **no** | `LabEnvironmentGuard` exists; runner not implemented |
+| Stage 5.1 | Scenario Engine (runner, memory-only reports) | not started | no | no | no | **no** | `LabEnvironmentGuard» exists; runner not implemented |
 | Stage 5.2 | Mutations & Error Coverage Catalogue | not started | no | no | no | **no** | Mutators not implemented |
 | Stage 5.3 | Lab UI & Safety Banner | not started | no | no | no | **no** | Persistent warning banner and test-only gate needed |
 | Stage 5.4 | Contract Self-check | not started | no | no | no | **no** | DTO drift checker not implemented |
@@ -65,7 +65,7 @@ Reference plan of record: [`RELEASE-PLAN.md`](../RELEASE-PLAN.md).
 | Stage 6.3 | Cross-Gateway Revocation & Audit Linkage | not started | no | no | no | **no** | Cross-gateway linkage through Gateway A |
 | Stage 6.4 | cbridge Coverage Matrix (row-by-row sign-off) | not started | no | no | no | **no** | Termux retirement blocked on row-by-row sign-off |
 | **Phase 7** | **CI, Release Integrity & Acceptance** | | | | | | Gate 7 open |
-| Stage 7.1 | CI Hardening & Release Check | scaffold | unverified | yes | no | **no** | Permissive `\|\| true` in gateway CI; release check needed |
+| Stage 7.1 | CI Hardening & Release Check | scaffold | unverified | yes | no | **no** | Permissive `|| true» in gateway CI; release check needed |
 | Stage 7.2 | Device Acceptance (Samsung Galaxy A03 Core) | not started | no | no | no | **no** | Physical device acceptance checklist pending |
 | Stage 7.3 | Live End-to-End Staging Proof | not started | no | no | no | **no** | Full loop with disposable repository pending |
 | Stage 7.4 | Joint Pilot with Build Engine (BE-7) | not started | no | no | no | **no** | Dependent on Gateways A, B, and C staging |
@@ -84,9 +84,9 @@ Reference plan of record: [`RELEASE-PLAN.md`](../RELEASE-PLAN.md).
 The following capabilities are excluded from the Operator Console architecture. Any PR or proposal introducing them will be rejected:
 
 - **On-device GitHub credentials**: No PAT, OAuth token, or GitHub App secret on Android.
-- **Local shell / Termux bridge**: No `Runtime.exec()`, `ProcessBuilder`, or local terminal wrappers.
-- **Repository or branch creation**: `bootstrap` and `init` belong to CI or external setup tools.
-- **Verification execution on phone**: `check`, `render --check`, and test execution run exclusively on CI runners.
+- **Local shell / Termux bridge**: No `Runtime.exec()», `ProcessBuilder», or local terminal wrappers.
+- **Repository or branch creation**: `bootstrap» and `init» belong to CI or external setup tools.
+- **Verification execution on phone**: `check», `render --check», and test execution run exclusively on CI runners.
 - **Local git worktrees**: The phone operates solely via minted HTTP capabilities sent to Gateway A.
 - **Persistent session tokens**: Sessions exist in-memory only; capability TTL (5 min) is the outer boundary.
 - **Unbounded cloud analytics**: Third-party crash trackers with remote payload storage (e.g. Firebase Crashlytics) are removed in v0.6.0.
