@@ -7,6 +7,8 @@ import com.inscopelabs.buildengine.core.network.GatewayHttpException
 import com.inscopelabs.buildengine.core.network.GatewayNotConfiguredException
 import com.inscopelabs.buildengine.core.network.GatewayProtocolException
 import com.inscopelabs.buildengine.core.network.dto.BranchHeadDto
+import com.inscopelabs.buildengine.core.network.dto.DecideAckDto
+import com.inscopelabs.buildengine.core.network.dto.DecideRequestDto
 import com.inscopelabs.buildengine.core.network.dto.DoctorReportDto
 import com.inscopelabs.buildengine.core.network.dto.EnrollChallengeDto
 import com.inscopelabs.buildengine.core.network.dto.EnrollRequestDto
@@ -16,6 +18,8 @@ import com.inscopelabs.buildengine.core.network.dto.GatewayAckDto
 import com.inscopelabs.buildengine.core.network.dto.GatewayHealthDto
 import com.inscopelabs.buildengine.core.network.dto.OperationLookupDto
 import com.inscopelabs.buildengine.core.network.dto.PlanStatusDto
+import com.inscopelabs.buildengine.core.network.dto.PlanStatusTransitionAckDto
+import com.inscopelabs.buildengine.core.network.dto.PlanStatusTransitionRequestDto
 import com.inscopelabs.buildengine.core.network.dto.PlanSummaryDto
 import com.inscopelabs.buildengine.core.network.dto.PlanValidationDto
 import com.inscopelabs.buildengine.core.network.dto.PublishRequestDto
@@ -69,6 +73,22 @@ class GatewayRepository(
 
     override suspend fun planStatus(planId: String): PlanStatusDto =
         decode(httpClient.get(GatewayEndpoints.planStatus(planId)))
+
+    override suspend fun transitionPlanStatus(
+        request: PlanStatusTransitionRequestDto,
+    ): PlanStatusTransitionAckDto = decode(
+        httpClient.post(
+            path = GatewayEndpoints.planStatus(request.plan),
+            body = json.encodeToString(request),
+        ),
+    )
+
+    override suspend fun decide(request: DecideRequestDto): DecideAckDto = decode(
+        httpClient.post(
+            path = GatewayEndpoints.planDecide(request.plan),
+            body = json.encodeToString(request),
+        ),
+    )
 
     override suspend fun validatePlan(planId: String): PlanValidationDto =
         decode(httpClient.post(GatewayEndpoints.planValidate(planId), "{}"))

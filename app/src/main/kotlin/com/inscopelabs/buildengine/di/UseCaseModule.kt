@@ -121,52 +121,97 @@ object UseCaseModule {
 
     @Provides
     @Singleton
-    fun provideSetTaskStatusUseCase(
-        taskRepository: TaskRepository,
-        confirmAndMint: ConfirmAndMintCapabilityUseCase,
-    ): SetTaskStatusUseCase = SetTaskStatusUseCase(taskRepository, confirmAndMint)
+    fun provideSyncBranchUseCase(planRepository: PlanRepository): com.inscopelabs.buildengine.domain.usecase.read.SyncBranchUseCase =
+        com.inscopelabs.buildengine.domain.usecase.read.SyncBranchUseCase(planRepository)
 
     @Provides
     @Singleton
-    fun provideCreateWorkOrderUseCase(
+    fun provideGetDoctorReportUseCase(planRepository: PlanRepository): com.inscopelabs.buildengine.domain.usecase.read.GetDoctorReportUseCase =
+        com.inscopelabs.buildengine.domain.usecase.read.GetDoctorReportUseCase(planRepository)
+
+    @Provides
+    @Singleton
+    fun provideSetTaskStatusUseCase(
         operationRepository: OperationRepository,
+        taskRepository: TaskRepository,
         confirmAndMint: ConfirmAndMintCapabilityUseCase,
-    ): CreateWorkOrderUseCase = CreateWorkOrderUseCase(operationRepository, confirmAndMint)
+        nonceSource: com.inscopelabs.buildengine.capability.NonceSource,
+        planRepository: PlanRepository,
+    ): SetTaskStatusUseCase = SetTaskStatusUseCase(
+        operationRepository = operationRepository,
+        taskRepository = taskRepository,
+        confirmAndMintCapability = confirmAndMint,
+        nonceSource = nonceSource,
+        planRepository = planRepository,
+    )
+
+    @Provides
+    @Singleton
+    fun provideCreateWorkOrderUseCase(): CreateWorkOrderUseCase = CreateWorkOrderUseCase()
 
     @Provides
     @Singleton
     fun provideUploadSubmissionUseCase(
         operationRepository: OperationRepository,
         confirmAndMint: ConfirmAndMintCapabilityUseCase,
-    ): UploadSubmissionUseCase = UploadSubmissionUseCase(operationRepository, confirmAndMint)
+        nonceSource: com.inscopelabs.buildengine.capability.NonceSource,
+    ): UploadSubmissionUseCase = UploadSubmissionUseCase(
+        operationRepository = operationRepository,
+        confirmAndMintCapability = confirmAndMint,
+        nonceSource = nonceSource,
+    )
 
     @Provides
     @Singleton
     fun provideReconcileUseCase(
         operationRepository: OperationRepository,
         confirmAndMint: ConfirmAndMintCapabilityUseCase,
-    ): ReconcileUseCase = ReconcileUseCase(operationRepository, confirmAndMint)
+        nonceSource: com.inscopelabs.buildengine.capability.NonceSource,
+    ): ReconcileUseCase = ReconcileUseCase(
+        operationRepository = operationRepository,
+        confirmAndMintCapability = confirmAndMint,
+        nonceSource = nonceSource,
+    )
 
     @Provides
     @Singleton
     fun provideDecideFrameworkUseCase(
         operationRepository: OperationRepository,
         confirmAndMint: ConfirmAndMintCapabilityUseCase,
-    ): DecideFrameworkUseCase = DecideFrameworkUseCase(operationRepository, confirmAndMint)
+        nonceSource: com.inscopelabs.buildengine.capability.NonceSource,
+    ): DecideFrameworkUseCase = DecideFrameworkUseCase(
+        operationRepository = operationRepository,
+        confirmAndMintCapability = confirmAndMint,
+        nonceSource = nonceSource,
+    )
 
     @Provides
     @Singleton
     fun provideHaltUseCase(
         operationRepository: OperationRepository,
         confirmAndMint: ConfirmAndMintCapabilityUseCase,
-    ): HaltUseCase = HaltUseCase(operationRepository, confirmAndMint)
+        nonceSource: com.inscopelabs.buildengine.capability.NonceSource,
+        planRepository: PlanRepository,
+    ): HaltUseCase = HaltUseCase(
+        operationRepository = operationRepository,
+        confirmAndMintCapability = confirmAndMint,
+        nonceSource = nonceSource,
+        planRepository = planRepository,
+    )
 
     @Provides
     @Singleton
     fun provideResumeUseCase(
         operationRepository: OperationRepository,
         confirmAndMint: ConfirmAndMintCapabilityUseCase,
-    ): ResumeUseCase = ResumeUseCase(operationRepository, confirmAndMint)
+        nonceSource: com.inscopelabs.buildengine.capability.NonceSource,
+        planRepository: PlanRepository,
+    ): ResumeUseCase = ResumeUseCase(
+        operationRepository = operationRepository,
+        confirmAndMintCapability = confirmAndMint,
+        nonceSource = nonceSource,
+        planRepository = planRepository,
+    )
 
     @Provides
     @Singleton

@@ -1,17 +1,22 @@
 package com.inscopelabs.buildengine.data.repository
 
 import com.inscopelabs.buildengine.core.network.ErrorMapper
-
+import com.inscopelabs.buildengine.core.network.dto.DoctorReportDto
 import com.inscopelabs.buildengine.core.network.dto.PlanStatusDto
 import com.inscopelabs.buildengine.core.network.dto.PlanSummaryDto
 import com.inscopelabs.buildengine.core.network.dto.PlanValidationDto
 import com.inscopelabs.buildengine.core.network.dto.RenderCheckDto
+import com.inscopelabs.buildengine.core.network.dto.SyncRequestDto
+import com.inscopelabs.buildengine.core.network.dto.SyncStatusDto
 import com.inscopelabs.buildengine.core.result.AppResult
 import com.inscopelabs.buildengine.data.remote.GatewayRepository
+import com.inscopelabs.buildengine.domain.model.DoctorCheck
+import com.inscopelabs.buildengine.domain.model.DoctorReport
 import com.inscopelabs.buildengine.domain.model.Plan
 import com.inscopelabs.buildengine.domain.model.PlanStatus
 import com.inscopelabs.buildengine.domain.model.PlanValidation
 import com.inscopelabs.buildengine.domain.model.RenderCheck
+import com.inscopelabs.buildengine.domain.model.SyncStatus
 import com.inscopelabs.buildengine.domain.repository.PlanRepository
 
 /**
@@ -55,6 +60,12 @@ class PlanRepositoryImpl(
 
     override suspend fun renderCheck(planId: String): AppResult<RenderCheck> =
         callGateway(errorMapper) { gateway.renderCheck(planId).toRenderCheck() }
+
+    override suspend fun sync(branch: String): AppResult<SyncStatus> =
+        callGateway(errorMapper) { gateway.sync(SyncRequestDto(branch = branch)).toSyncStatus() }
+
+    override suspend fun doctor(): AppResult<DoctorReport> =
+        callGateway(errorMapper) { gateway.doctor().toDoctorReport() }
 }
 
 /**
@@ -91,4 +102,21 @@ private fun RenderCheckDto.toRenderCheck(): RenderCheck = RenderCheck(
     ok = ok,
     planId = planId,
     renderIssues = renderIssues,
+)
+
+private fun SyncStatusDto.toSyncStatus(): SyncStatus = SyncStatus(
+    status = status,
+    headSha = headSha,
+    inSync = inSync,
+)
+
+private fun DoctorReportDto.toDoctorReport(): DoctorReport = DoctorReport(
+    healthy = healthy,
+    checks = checks.map { check ->
+        DoctorCheck(
+            name = check.name,
+            passed = check.passed,
+            details = check.details,
+        )
+    },
 )

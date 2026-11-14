@@ -225,4 +225,31 @@
     <string name="preflight_action_enrolment">Enrol Device Key</string>
     <string name="settings_run_preflight">Run Preflight Checks</string>
     <string name="action_back">Back</string>
+
+    <!-- Stage 3.4 Decision screen (T3-404 / PR3-003 / PR3-025) -->
+    <string name="decision_contract_blocked_heading">Blocked by unsettled contract (PR3-003 / PR3-025)</string>
+    <string name="decision_plan_label">Plan ID</string>
+    <string name="decision_task_label">Task ID</string>
+    <string name="decision_order_label">Work order ID</string>
+    <string name="decision_branch_label">Branch</string>
+    <string name="decision_head_label">Head SHA (40 hex)</string>
+    <string name="decision_choice_label">Decision</string>
+    <string name="decision_attribution_label">Attribution</string>
+    <string name="decision_rationale_label">Rationale</string>
+    <string name="decision_scope_label">Scope</string>
+    <string name="decision_evidence_label">Evidence</string>
+    <string name="decision_notes_label">Additional notes (optional)</string>
+    <string name="decision_confirm_button">Submit decision</string>
+    <string name="decision_submitting">Submitting decision…</string>
+
+    <!-- Stage 3.4 Dashboard sync and doctor diagnostics (T3-405) -->
+    <string name="dashboard_diagnostics_heading">Repository Diagnostics</string>
+    <string name="dashboard_sync_action">Sync check</string>
+    <string name="dashboard_doctor_action">Run doctor</string>
+    <string name="dashboard_sync_running">Checking repository sync…</string>
+    <string name="dashboard_sync_in_sync">In sync (%1$s)</string>
+    <string name="dashboard_sync_out_of_sync">Out of sync (%1$s)</string>
+    <string name="dashboard_doctor_running">Running gateway diagnostics…</string>
+    <string name="dashboard_doctor_healthy">Doctor healthy (%1$d checks)</string>
+    <string name="dashboard_doctor_unhealthy">Doctor reported failures (%1$d checks)</string>
 </resources>

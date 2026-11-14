@@ -1,6 +1,8 @@
 package com.inscopelabs.buildengine.testutil
 
 import com.inscopelabs.buildengine.core.network.dto.BranchHeadDto
+import com.inscopelabs.buildengine.core.network.dto.DecideAckDto
+import com.inscopelabs.buildengine.core.network.dto.DecideRequestDto
 import com.inscopelabs.buildengine.core.network.dto.DoctorReportDto
 import com.inscopelabs.buildengine.core.network.dto.EnrollChallengeDto
 import com.inscopelabs.buildengine.core.network.dto.EngineScopeRequestDto
@@ -9,6 +11,8 @@ import com.inscopelabs.buildengine.core.network.dto.EnrollResponseDto
 import com.inscopelabs.buildengine.core.network.dto.GatewayAckDto
 import com.inscopelabs.buildengine.core.network.dto.OperationLookupDto
 import com.inscopelabs.buildengine.core.network.dto.PlanStatusDto
+import com.inscopelabs.buildengine.core.network.dto.PlanStatusTransitionAckDto
+import com.inscopelabs.buildengine.core.network.dto.PlanStatusTransitionRequestDto
 import com.inscopelabs.buildengine.core.network.dto.PlanSummaryDto
 import com.inscopelabs.buildengine.core.network.dto.PlanValidationDto
 import com.inscopelabs.buildengine.core.network.dto.PublishRequestDto
@@ -38,9 +42,58 @@ class FakeGatewayApi : GatewayApi {
         )
     }
 
+    val transitionPlanStatusCalls = mutableListOf<PlanStatusTransitionRequestDto>()
+    var transitionPlanStatusResult: (PlanStatusTransitionRequestDto) -> PlanStatusTransitionAckDto = { request ->
+        PlanStatusTransitionAckDto(
+            accepted = true,
+            operation = "SET_IN_PROGRESS",
+            plan = request.plan,
+            task = request.task,
+            newStatus = request.targetStatus,
+            headSha = request.expectedHead,
+            auditRef = "ref-status-1",
+        )
+    }
+
+    val decideCalls = mutableListOf<DecideRequestDto>()
+    var decideResult: (DecideRequestDto) -> DecideAckDto = { request ->
+        DecideAckDto(
+            accepted = true,
+            operation = "DECIDE",
+            plan = request.plan,
+            decision = request.decision,
+            auditRef = "ref-decide-1",
+        )
+    }
+
+    val uploadCalls = mutableListOf<UploadRequestDto>()
+    var uploadResult: (UploadRequestDto) -> GatewayAckDto = {
+        GatewayAckDto(accepted = true, operation = "upload", auditRef = "ref-3")
+    }
+
+    var reconcileResult: (ReconcileRequestDto) -> GatewayAckDto = {
+        GatewayAckDto(accepted = true, operation = "reconcile", auditRef = "ref-2")
+    }
+
+    var haltResult: (EngineScopeRequestDto) -> GatewayAckDto = {
+        GatewayAckDto(accepted = true, operation = "halt", auditRef = "ref-4")
+    }
+
+    var resumeResult: (EngineScopeRequestDto) -> GatewayAckDto = {
+        GatewayAckDto(accepted = true, operation = "resume", auditRef = "ref-5")
+    }
+
     override suspend fun listPlans(): List<PlanSummaryDto> = emptyList()
     override suspend fun getPlan(planId: String): PlanSummaryDto = PlanSummaryDto(id = planId, title = "Plan", status = "active")
     override suspend fun planStatus(planId: String): PlanStatusDto = PlanStatusDto(id = planId, status = "active")
+    override suspend fun transitionPlanStatus(request: PlanStatusTransitionRequestDto): PlanStatusTransitionAckDto {
+        transitionPlanStatusCalls += request
+        return transitionPlanStatusResult(request)
+    }
+    override suspend fun decide(request: DecideRequestDto): DecideAckDto {
+        decideCalls += request
+        return decideResult(request)
+    }
     override suspend fun validatePlan(planId: String): PlanValidationDto = PlanValidationDto(valid = true, planId = planId)
     override suspend fun renderCheck(planId: String): RenderCheckDto = RenderCheckDto(ok = true, planId = planId)
     override suspend fun nextTasks(): List<TaskSummaryDto> = emptyList()
@@ -49,10 +102,13 @@ class FakeGatewayApi : GatewayApi {
 
     override suspend fun branchHead(branch: String): BranchHeadDto = BranchHeadDto(branch = branch, headSha = branchHeadResult(branch))
     override suspend fun publish(request: PublishRequestDto): GatewayAckDto = GatewayAckDto(accepted = true, operation = "publish", auditRef = "ref-1")
-    override suspend fun reconcile(request: ReconcileRequestDto): GatewayAckDto = GatewayAckDto(accepted = true, operation = "reconcile", auditRef = "ref-2")
-    override suspend fun upload(request: UploadRequestDto): GatewayAckDto = GatewayAckDto(accepted = true, operation = "upload", auditRef = "ref-3")
-    override suspend fun halt(request: EngineScopeRequestDto): GatewayAckDto = GatewayAckDto(accepted = true, operation = "halt", auditRef = "ref-4")
-    override suspend fun resume(request: EngineScopeRequestDto): GatewayAckDto = GatewayAckDto(accepted = true, operation = "resume", auditRef = "ref-5")
+    override suspend fun reconcile(request: ReconcileRequestDto): GatewayAckDto = reconcileResult(request)
+    override suspend fun upload(request: UploadRequestDto): GatewayAckDto {
+        uploadCalls += request
+        return uploadResult(request)
+    }
+    override suspend fun halt(request: EngineScopeRequestDto): GatewayAckDto = haltResult(request)
+    override suspend fun resume(request: EngineScopeRequestDto): GatewayAckDto = resumeResult(request)
     override suspend fun sync(request: SyncRequestDto): SyncStatusDto = SyncStatusDto(status = "synced", headSha = "0".repeat(40), inSync = true)
     override suspend fun doctor(): DoctorReportDto = DoctorReportDto(healthy = true, checks = emptyList())
     var lookupResult: (String) -> OperationLookupDto = { key ->

@@ -35,11 +35,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -70,6 +72,7 @@ fun DashboardScreen(
     onNavigateToPreflight: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsState()
+    val diagnosticsState by viewModel.diagnosticsState.collectAsState()
 
     Scaffold(
         modifier = modifier.fillMaxSize().testTag("dashboard_screen"),
@@ -119,10 +122,22 @@ fun DashboardScreen(
         ) {
             when (val currentState = state) {
                 is UiState.Idle -> {
-                    ErrorBanner(
-                        message = stringResource(R.string.data_not_loaded),
-                        onRetry = { viewModel.refresh() },
-                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        ErrorBanner(
+                            message = stringResource(R.string.data_not_loaded),
+                            onRetry = { viewModel.refresh() },
+                        )
+                        DashboardDiagnosticsCard(
+                            state = diagnosticsState,
+                            onSyncClick = { viewModel.syncBranch() },
+                            onDoctorClick = { viewModel.runDoctor() },
+                        )
+                    }
                 }
                 is UiState.Loading -> {
                     Box(
@@ -135,14 +150,29 @@ fun DashboardScreen(
                     }
                 }
                 is UiState.Error -> {
-                    ErrorBanner(
-                        message = currentState.message,
-                        onRetry = { viewModel.refresh() },
-                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        ErrorBanner(
+                            message = currentState.message,
+                            onRetry = { viewModel.refresh() },
+                        )
+                        DashboardDiagnosticsCard(
+                            state = diagnosticsState,
+                            onSyncClick = { viewModel.syncBranch() },
+                            onDoctorClick = { viewModel.runDoctor() },
+                        )
+                    }
                 }
                 is UiState.Success -> {
                     DashboardContent(
                         data = currentState.data,
+                        diagnosticsState = diagnosticsState,
+                        onSyncClick = { viewModel.syncBranch() },
+                        onDoctorClick = { viewModel.runDoctor() },
                         onPlanClick = onNavigateToPlan,
                         onTaskClick = onNavigateToTask,
                         onViewAllPlans = onNavigateToPlans,
@@ -156,6 +186,9 @@ fun DashboardScreen(
 @Composable
 private fun DashboardContent(
     data: DashboardData,
+    diagnosticsState: DashboardDiagnosticsState,
+    onSyncClick: () -> Unit,
+    onDoctorClick: () -> Unit,
     onPlanClick: (String) -> Unit,
     onTaskClick: (String) -> Unit,
     onViewAllPlans: () -> Unit,
@@ -342,6 +375,157 @@ private fun DashboardContent(
                     plan = plan,
                     onClick = { onPlanClick(plan.id) },
                 )
+            }
+        }
+
+        // 5. Sync & Doctor Diagnostics section (T3-405)
+        item {
+            Spacer(modifier = Modifier.height(8.dp))
+            DashboardDiagnosticsCard(
+                state = diagnosticsState,
+                onSyncClick = onSyncClick,
+                onDoctorClick = onDoctorClick,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DashboardDiagnosticsCard(
+    state: DashboardDiagnosticsState,
+    onSyncClick: () -> Unit,
+    onDoctorClick: () -> Unit,
+) {
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("dashboard_diagnostics_card"),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.dashboard_diagnostics_heading),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onClick = onSyncClick,
+                    enabled = !state.isSyncing,
+                    modifier = Modifier
+                        .weight(1f)
+                        .minimumInteractiveComponentSize()
+                        .testTag("dashboard_sync_button"),
+                ) {
+                    Text(stringResource(R.string.dashboard_sync_action))
+                }
+                OutlinedButton(
+                    onClick = onDoctorClick,
+                    enabled = !state.isRunningDoctor,
+                    modifier = Modifier
+                        .weight(1f)
+                        .minimumInteractiveComponentSize()
+                        .testTag("dashboard_doctor_button"),
+                ) {
+                    Text(stringResource(R.string.dashboard_doctor_action))
+                }
+            }
+
+            if (state.isSyncing) {
+                Text(
+                    text = stringResource(R.string.dashboard_sync_running),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.testTag("dashboard_sync_loading"),
+                )
+            } else {
+                state.syncError?.let { error ->
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.testTag("dashboard_sync_error"),
+                    )
+                }
+                state.syncStatus?.let { sync ->
+                    val label = if (sync.inSync) {
+                        stringResource(R.string.dashboard_sync_in_sync, sync.status)
+                    } else {
+                        stringResource(R.string.dashboard_sync_out_of_sync, sync.status)
+                    }
+                    Surface(
+                        color = if (sync.inSync) {
+                            MaterialTheme.colorScheme.secondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.errorContainer
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().testTag("dashboard_sync_card"),
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(text = label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                            if (sync.headSha.isNotBlank()) {
+                                Text(
+                                    text = sync.headSha,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = FontFamily.Monospace,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (state.isRunningDoctor) {
+                Text(
+                    text = stringResource(R.string.dashboard_doctor_running),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.testTag("dashboard_doctor_loading"),
+                )
+            } else {
+                state.doctorError?.let { error ->
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.testTag("dashboard_doctor_error"),
+                    )
+                }
+                state.doctorReport?.let { report ->
+                    val label = if (report.healthy) {
+                        stringResource(R.string.dashboard_doctor_healthy, report.checks.size)
+                    } else {
+                        stringResource(R.string.dashboard_doctor_unhealthy, report.checks.size)
+                    }
+                    Surface(
+                        color = if (report.healthy) {
+                            MaterialTheme.colorScheme.secondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.errorContainer
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().testTag("dashboard_doctor_card"),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(text = label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                            report.checks.forEach { check ->
+                                Text(
+                                    text = "${if (check.passed) "PASS" else "FAIL"}: ${check.name}" +
+                                        if (check.details.isNotBlank()) " — ${check.details}" else "",
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }

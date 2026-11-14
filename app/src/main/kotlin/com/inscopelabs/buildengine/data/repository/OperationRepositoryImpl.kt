@@ -6,10 +6,15 @@ import com.inscopelabs.buildengine.core.network.ErrorMapper
 import com.inscopelabs.buildengine.core.network.GatewayHttpException
 import com.inscopelabs.buildengine.core.network.GatewayNotConfiguredException
 import com.inscopelabs.buildengine.core.network.GatewayProtocolException
+import com.inscopelabs.buildengine.core.network.dto.DecideRequestDto
+import com.inscopelabs.buildengine.core.network.dto.EngineScopeRequestDto
 import com.inscopelabs.buildengine.core.network.dto.GatewayAckDto
 import com.inscopelabs.buildengine.core.network.dto.GatewayErrorDto
 import com.inscopelabs.buildengine.core.network.dto.OperationLookupDto
+import com.inscopelabs.buildengine.core.network.dto.PlanStatusTransitionRequestDto
 import com.inscopelabs.buildengine.core.network.dto.PublishRequestDto
+import com.inscopelabs.buildengine.core.network.dto.ReconcileRequestDto
+import com.inscopelabs.buildengine.core.network.dto.UploadRequestDto
 import com.inscopelabs.buildengine.core.time.Clock
 import com.inscopelabs.buildengine.core.time.SystemClock
 import com.inscopelabs.buildengine.data.local.DecryptedJournalRecord
@@ -24,7 +29,6 @@ import com.inscopelabs.buildengine.data.local.OperationJournalState
 import com.inscopelabs.buildengine.data.remote.GatewayApi
 import com.inscopelabs.buildengine.domain.model.OperationOutcome
 import com.inscopelabs.buildengine.domain.model.OperationRequest
-import com.inscopelabs.buildengine.domain.model.OperationResult
 import com.inscopelabs.buildengine.domain.repository.OperationRepository
 import com.inscopelabs.buildengine.util.Logger
 import java.io.IOException
@@ -330,6 +334,7 @@ class OperationRepositoryImpl(
                 OperationOutcome.Succeeded(
                     auditRef = ack.auditRef,
                     headSha = ack.headSha,
+                    outcome = ack.outcome.trim().takeIf { it.isNotEmpty() },
                 )
             }
             LiveHeadCheck.DRIFTED, LiveHeadCheck.UNAVAILABLE -> {
@@ -826,22 +831,30 @@ class OperationRepositoryImpl(
         val outcomes: Map<String, OperationOutcome>,
     )
 
-    // -- Privileged operation use-case facades (publish: Stage 3.3; the rest: Stages 3.4 and 3.5) --
+    // -- Privileged operation use-case facades (Stage 3.3 publish, Stage 3.4 remaining operations) --
+
+    private fun requireCapabilityMatchesRequest(
+        expectedOp: OperationType,
+        request: OperationRequest,
+        capability: SignedCapability,
+    ) {
+        val bound = capability.capability
+        require(request.op == expectedOp) { "Operation mismatch: expected $expectedOp, got ${request.op}" }
+        require(
+            bound.op == expectedOp &&
+                bound.branch == request.scope.branch &&
+                bound.head == request.scope.head &&
+                bound.plan == request.plan &&
+                bound.task == request.task,
+        ) { "Capability does not match the ${expectedOp.name.lowercase()} request" }
+    }
 
     /**
      * Stage 3.3: the only path to the public repository. The intent is journalled before the
      * single send; the capability travels on the wire only and is never persisted or logged.
      */
     override suspend fun publish(request: OperationRequest, capability: SignedCapability): OperationOutcome {
-        require(request.op == OperationType.PUBLISH) { "publish requires a PUBLISH request" }
-        val bound = capability.capability
-        require(
-            bound.op == OperationType.PUBLISH &&
-                bound.branch == request.scope.branch &&
-                bound.head == request.scope.head &&
-                bound.plan == request.plan &&
-                bound.task == request.task,
-        ) { "Capability does not match the publish request" }
+        requireCapabilityMatchesRequest(OperationType.PUBLISH, request, capability)
 
         val intent = OperationIntent(
             operation = OperationType.PUBLISH,
@@ -864,20 +877,248 @@ class OperationRepositoryImpl(
         }
     }
 
-    override suspend fun upload(request: OperationRequest): OperationResult =
-        TODO("SCAFFOLD: upload a submission (content-addressed, immutable).")
+    override suspend fun upload(
+        request: OperationRequest,
+        submissionId: String,
+        zipSha256: String,
+        zipBase64: String,
+        capability: SignedCapability,
+    ): OperationOutcome {
+        requireCapabilityMatchesRequest(OperationType.UPLOAD, request, capability)
+        require(submissionId.isNotBlank()) { "upload requires a non-blank submissionId" }
+        require(SHA256_HEX_REGEX.matches(zipSha256)) { "upload requires a 64-char hex zipSha256" }
+        require(zipBase64.isNotBlank()) { "upload requires a non-blank zipBase64 payload" }
 
-    override suspend fun reconcile(request: OperationRequest): OperationResult =
-        TODO("SCAFFOLD: reconcile after the operator's review.")
+        // Only submissionId and zipSha256 enter the encrypted journal; zipBase64 and capability travel
+        // on the wire only and are never written to Room or logs (PR3-022).
+        val intent = OperationIntent(
+            operation = OperationType.UPLOAD,
+            plan = request.plan,
+            task = request.task,
+            branch = request.scope.branch,
+            expectedHead = request.scope.head,
+            submissionId = submissionId,
+            zipSha256 = zipSha256.lowercase(),
+        )
+        return executeOperation(intent) { idempotencyKey ->
+            gateway.upload(
+                UploadRequestDto(
+                    plan = request.plan,
+                    task = request.task,
+                    branch = request.scope.branch,
+                    head = request.scope.head,
+                    submissionId = submissionId,
+                    zipSha256 = zipSha256.lowercase(),
+                    zipBase64 = zipBase64,
+                    capability = capability.toWire(),
+                    idempotencyKey = idempotencyKey,
+                ),
+            )
+        }
+    }
 
-    override suspend fun halt(request: OperationRequest): OperationResult =
-        TODO("SCAFFOLD: halt — repository-wide stop, separately scoped.")
+    override suspend fun reconcile(
+        request: OperationRequest,
+        submissionId: String,
+        capability: SignedCapability,
+    ): OperationOutcome {
+        requireCapabilityMatchesRequest(OperationType.RECONCILE, request, capability)
+        require(submissionId.isNotBlank()) { "reconcile requires a non-blank submissionId" }
 
-    override suspend fun resume(request: OperationRequest): OperationResult =
-        TODO("SCAFFOLD: resume — clears the halt marker.")
+        val intent = OperationIntent(
+            operation = OperationType.RECONCILE,
+            plan = request.plan,
+            task = request.task,
+            branch = request.scope.branch,
+            expectedHead = request.scope.head,
+            submissionId = submissionId,
+        )
+        return executeOperation(intent) { idempotencyKey ->
+            gateway.reconcile(
+                ReconcileRequestDto(
+                    plan = request.plan,
+                    task = request.task,
+                    branch = request.scope.branch,
+                    head = request.scope.head,
+                    submissionId = submissionId,
+                    capability = capability.toWire(),
+                    idempotencyKey = idempotencyKey,
+                ),
+            )
+        }
+    }
 
-    override suspend fun decide(request: OperationRequest): OperationResult =
-        TODO("SCAFFOLD: decide — the highest-authority action in the system.")
+    override suspend fun halt(
+        request: OperationRequest,
+        reason: String,
+        capability: SignedCapability,
+    ): OperationOutcome {
+        requireCapabilityMatchesRequest(OperationType.HALT, request, capability)
+        val trimmedReason = reason.trim()
+        require(trimmedReason.isNotEmpty()) { "halt requires a non-blank reason" }
+
+        val intent = OperationIntent(
+            operation = OperationType.HALT,
+            plan = request.plan,
+            task = request.task,
+            branch = request.scope.branch,
+            expectedHead = request.scope.head,
+            reason = trimmedReason,
+        )
+        return executeOperation(intent) { idempotencyKey ->
+            gateway.halt(
+                EngineScopeRequestDto(
+                    branch = request.scope.branch,
+                    head = request.scope.head,
+                    reason = trimmedReason,
+                    capability = capability.toWire(),
+                    idempotencyKey = idempotencyKey,
+                ),
+            )
+        }
+    }
+
+    override suspend fun resume(
+        request: OperationRequest,
+        reason: String,
+        capability: SignedCapability,
+    ): OperationOutcome {
+        requireCapabilityMatchesRequest(OperationType.RESUME, request, capability)
+        val trimmedReason = reason.trim()
+        require(trimmedReason.isNotEmpty()) { "resume requires a non-blank reason" }
+        val recordedCause = recordedHaltCause()
+        require(!recordedCause.isNullOrBlank()) {
+            "resume requires a recorded halt cause in the encrypted operation journal"
+        }
+        require(trimmedReason == recordedCause) {
+            "resume reason must match the recorded halt cause"
+        }
+
+        val intent = OperationIntent(
+            operation = OperationType.RESUME,
+            plan = request.plan,
+            task = request.task,
+            branch = request.scope.branch,
+            expectedHead = request.scope.head,
+            reason = trimmedReason,
+        )
+        return executeOperation(intent) { idempotencyKey ->
+            gateway.resume(
+                EngineScopeRequestDto(
+                    branch = request.scope.branch,
+                    head = request.scope.head,
+                    reason = trimmedReason,
+                    capability = capability.toWire(),
+                    idempotencyKey = idempotencyKey,
+                ),
+            )
+        }
+    }
+
+    override suspend fun recordedHaltCause(): String? {
+        val succeeded = journalDao.findByStates(listOf(OperationJournalState.TERMINAL_SUCCEEDED))
+        for (entity in succeeded.asReversed()) {
+            val decrypted = try {
+                OperationJournalCodec.decryptRecord(entity, cipher)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Fail closed: corrupted/unreadable journal history cannot supply a halt cause.
+                return null
+            }
+            when (decrypted.intent.operation) {
+                OperationType.HALT -> return decrypted.intent.reason.trim().takeIf { it.isNotEmpty() }
+                OperationType.RESUME -> return null
+                else -> Unit
+            }
+        }
+        return null
+    }
+
+    override suspend fun setTaskStatus(
+        request: OperationRequest,
+        targetStatus: String,
+        capability: SignedCapability,
+    ): OperationOutcome {
+        val expectedOp = when (targetStatus) {
+            "in_progress" -> OperationType.SET_IN_PROGRESS
+            "completed" -> OperationType.SET_DONE
+            else -> throw IllegalArgumentException("Unsupported status transition target '$targetStatus'")
+        }
+        requireCapabilityMatchesRequest(expectedOp, request, capability)
+
+        val intent = OperationIntent(
+            operation = expectedOp,
+            plan = request.plan,
+            task = request.task,
+            branch = request.scope.branch,
+            expectedHead = request.scope.head,
+            targetStatus = targetStatus,
+        )
+        return executeOperation(intent) { idempotencyKey ->
+            val ack = gateway.transitionPlanStatus(
+                PlanStatusTransitionRequestDto(
+                    plan = request.plan,
+                    task = request.task,
+                    branch = request.scope.branch,
+                    expectedHead = request.scope.head,
+                    targetStatus = targetStatus,
+                    idempotencyKey = idempotencyKey,
+                    capability = capability.toWire(),
+                ),
+            )
+            GatewayAckDto(
+                accepted = ack.accepted,
+                operation = ack.operation,
+                branch = request.scope.branch,
+                headSha = ack.headSha,
+                outcome = ack.newStatus,
+                auditRef = ack.auditRef,
+            )
+        }
+    }
+
+    override suspend fun decide(
+        request: OperationRequest,
+        decision: String,
+        notes: String?,
+        capability: SignedCapability,
+    ): OperationOutcome {
+        requireCapabilityMatchesRequest(OperationType.DECIDE, request, capability)
+        require(decision in ALLOWED_DECISIONS) { "Unsupported framework decision '$decision'" }
+
+        val intent = OperationIntent(
+            operation = OperationType.DECIDE,
+            plan = request.plan,
+            task = request.task,
+            branch = request.scope.branch,
+            expectedHead = request.scope.head,
+            decision = decision,
+        )
+        return executeOperation(intent) { idempotencyKey ->
+            val ack = gateway.decide(
+                DecideRequestDto(
+                    plan = request.plan,
+                    task = request.task,
+                    branch = request.scope.branch,
+                    decision = decision,
+                    notes = notes?.trim()?.takeIf { it.isNotEmpty() },
+                    idempotencyKey = idempotencyKey,
+                    capability = capability.toWire(),
+                ),
+            )
+            // Note: decide.schema.json omits headSha and branch; handleWriteAcknowledgement keeps
+            // such acknowledgements as UncertainCompletion rather than claiming unverified success.
+            GatewayAckDto(
+                accepted = ack.accepted,
+                operation = ack.operation,
+                branch = request.scope.branch,
+                headSha = "",
+                outcome = ack.decision,
+                auditRef = ack.auditRef,
+            )
+        }
+    }
 
     companion object {
         private const val TAG = "OperationJournal"
@@ -926,6 +1167,9 @@ class OperationRepositoryImpl(
             CODE_IDEMPOTENCY_KEY_REUSED,
             CODE_OPERATION_NOT_FOUND,
         )
+
+        private val SHA256_HEX_REGEX = Regex("^[0-9a-fA-F]{64}$")
+        private val ALLOWED_DECISIONS = setOf("APPROVED", "REJECTED", "DEFERRED")
 
         private val errorJson = Json { ignoreUnknownKeys = true }
     }

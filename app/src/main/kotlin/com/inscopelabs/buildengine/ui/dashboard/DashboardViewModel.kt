@@ -3,19 +3,24 @@ package com.inscopelabs.buildengine.ui.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.inscopelabs.buildengine.core.result.AppResult
+import com.inscopelabs.buildengine.domain.model.DoctorReport
 import com.inscopelabs.buildengine.domain.model.Plan
 import com.inscopelabs.buildengine.domain.model.PlanStatus
+import com.inscopelabs.buildengine.domain.model.SyncStatus
 import com.inscopelabs.buildengine.domain.model.Task
+import com.inscopelabs.buildengine.domain.usecase.read.GetDoctorReportUseCase
 import com.inscopelabs.buildengine.domain.usecase.read.GetNextTasksUseCase
 import com.inscopelabs.buildengine.domain.usecase.read.GetPlansUseCase
 import com.inscopelabs.buildengine.domain.usecase.read.GetStatusUseCase
+import com.inscopelabs.buildengine.domain.usecase.read.SyncBranchUseCase
 import com.inscopelabs.buildengine.ui.common.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 data class DashboardData(
     val plans: List<Plan> = emptyList(),
@@ -26,23 +31,70 @@ data class DashboardData(
 )
 
 /**
+ * State for user-triggered `POST /sync` and `GET /doctor` diagnostics on the Dashboard (T3-405).
+ */
+data class DashboardDiagnosticsState(
+    val isSyncing: Boolean = false,
+    val syncStatus: SyncStatus? = null,
+    val syncError: String? = null,
+    val isRunningDoctor: Boolean = false,
+    val doctorReport: DoctorReport? = null,
+    val doctorError: String? = null,
+)
+
+/**
  * Dashboard state holder.
  *
- * Reads plans, next actionable tasks, and system status.
- * Does not load in [init]: network access is deliberate (refresh / retry / after connect).
+ * Reads plans, next actionable tasks, system status, sync status, and doctor diagnostics.
+ * Does not load in [init]: network access is deliberate (refresh / retry / sync / doctor).
  */
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val getPlansUseCase: GetPlansUseCase,
     private val getNextTasksUseCase: GetNextTasksUseCase,
     private val getStatusUseCase: GetStatusUseCase,
+    private val syncBranchUseCase: SyncBranchUseCase,
+    private val getDoctorReportUseCase: GetDoctorReportUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<UiState<DashboardData>>(UiState.Idle)
     val uiState: StateFlow<UiState<DashboardData>> = _uiState.asStateFlow()
 
+    private val _diagnosticsState = MutableStateFlow(DashboardDiagnosticsState())
+    val diagnosticsState: StateFlow<DashboardDiagnosticsState> = _diagnosticsState.asStateFlow()
+
     fun refresh() {
         loadDashboard()
+    }
+
+    fun syncBranch(branch: String = "main") {
+        if (_diagnosticsState.value.isSyncing) return
+        viewModelScope.launch {
+            _diagnosticsState.update { it.copy(isSyncing = true, syncError = null) }
+            when (val result = syncBranchUseCase(branch)) {
+                is AppResult.Success -> _diagnosticsState.update {
+                    it.copy(isSyncing = false, syncStatus = result.value, syncError = null)
+                }
+                is AppResult.Failure -> _diagnosticsState.update {
+                    it.copy(isSyncing = false, syncError = result.message)
+                }
+            }
+        }
+    }
+
+    fun runDoctor() {
+        if (_diagnosticsState.value.isRunningDoctor) return
+        viewModelScope.launch {
+            _diagnosticsState.update { it.copy(isRunningDoctor = true, doctorError = null) }
+            when (val result = getDoctorReportUseCase()) {
+                is AppResult.Success -> _diagnosticsState.update {
+                    it.copy(isRunningDoctor = false, doctorReport = result.value, doctorError = null)
+                }
+                is AppResult.Failure -> _diagnosticsState.update {
+                    it.copy(isRunningDoctor = false, doctorError = result.message)
+                }
+            }
+        }
     }
 
     fun loadDashboard() {

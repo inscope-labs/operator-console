@@ -1,6 +1,8 @@
 package com.inscopelabs.buildengine.data.remote
 
 import com.inscopelabs.buildengine.core.network.dto.BranchHeadDto
+import com.inscopelabs.buildengine.core.network.dto.DecideAckDto
+import com.inscopelabs.buildengine.core.network.dto.DecideRequestDto
 import com.inscopelabs.buildengine.core.network.dto.DoctorReportDto
 import com.inscopelabs.buildengine.core.network.dto.EnrollChallengeDto
 import com.inscopelabs.buildengine.core.network.dto.EnrollRequestDto
@@ -9,6 +11,8 @@ import com.inscopelabs.buildengine.core.network.dto.EngineScopeRequestDto
 import com.inscopelabs.buildengine.core.network.dto.GatewayAckDto
 import com.inscopelabs.buildengine.core.network.dto.OperationLookupDto
 import com.inscopelabs.buildengine.core.network.dto.PlanStatusDto
+import com.inscopelabs.buildengine.core.network.dto.PlanStatusTransitionAckDto
+import com.inscopelabs.buildengine.core.network.dto.PlanStatusTransitionRequestDto
 import com.inscopelabs.buildengine.core.network.dto.PlanSummaryDto
 import com.inscopelabs.buildengine.core.network.dto.PlanValidationDto
 import com.inscopelabs.buildengine.core.network.dto.PublishRequestDto
@@ -50,6 +54,12 @@ interface GatewayApi {
 
     /** `GET /plans/{id}/status` — the status of one plan. */
     suspend fun planStatus(planId: String): PlanStatusDto
+
+    /** `POST /plans/{id}/status` — guarded plan/task status mutation (§3.17). */
+    suspend fun transitionPlanStatus(request: PlanStatusTransitionRequestDto): PlanStatusTransitionAckDto
+
+    /** `POST /plans/{id}/decide` — framework decision (§3.18). */
+    suspend fun decide(request: DecideRequestDto): DecideAckDto
 
     /** `POST /plans/{id}/validate` — read-only validation of a plan. */
     suspend fun validatePlan(planId: String): PlanValidationDto

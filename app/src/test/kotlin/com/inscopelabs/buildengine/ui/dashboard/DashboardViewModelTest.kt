@@ -2,13 +2,18 @@ package com.inscopelabs.buildengine.ui.dashboard
 
 import app.cash.turbine.test
 import com.inscopelabs.buildengine.core.result.AppResult
+import com.inscopelabs.buildengine.domain.model.DoctorCheck
+import com.inscopelabs.buildengine.domain.model.DoctorReport
 import com.inscopelabs.buildengine.domain.model.Plan
 import com.inscopelabs.buildengine.domain.model.PlanStatus
+import com.inscopelabs.buildengine.domain.model.SyncStatus
 import com.inscopelabs.buildengine.domain.model.Task
 import com.inscopelabs.buildengine.domain.model.TaskStatus
+import com.inscopelabs.buildengine.domain.usecase.read.GetDoctorReportUseCase
 import com.inscopelabs.buildengine.domain.usecase.read.GetNextTasksUseCase
 import com.inscopelabs.buildengine.domain.usecase.read.GetPlansUseCase
 import com.inscopelabs.buildengine.domain.usecase.read.GetStatusUseCase
+import com.inscopelabs.buildengine.domain.usecase.read.SyncBranchUseCase
 import com.inscopelabs.buildengine.testutil.FakePlanRepository
 import com.inscopelabs.buildengine.testutil.FakeTaskRepository
 import com.inscopelabs.buildengine.testutil.MainDispatcherRule
@@ -17,6 +22,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -33,6 +39,8 @@ class DashboardViewModelTest {
     private lateinit var getPlansUseCase: GetPlansUseCase
     private lateinit var getNextTasksUseCase: GetNextTasksUseCase
     private lateinit var getStatusUseCase: GetStatusUseCase
+    private lateinit var syncBranchUseCase: SyncBranchUseCase
+    private lateinit var getDoctorReportUseCase: GetDoctorReportUseCase
 
     @Before
     fun setUp() {
@@ -41,15 +49,21 @@ class DashboardViewModelTest {
         getPlansUseCase = GetPlansUseCase(planRepository)
         getNextTasksUseCase = GetNextTasksUseCase(taskRepository)
         getStatusUseCase = GetStatusUseCase(planRepository)
+        syncBranchUseCase = SyncBranchUseCase(planRepository)
+        getDoctorReportUseCase = GetDoctorReportUseCase(planRepository)
     }
+
+    private fun createViewModel(): DashboardViewModel = DashboardViewModel(
+        getPlansUseCase = getPlansUseCase,
+        getNextTasksUseCase = getNextTasksUseCase,
+        getStatusUseCase = getStatusUseCase,
+        syncBranchUseCase = syncBranchUseCase,
+        getDoctorReportUseCase = getDoctorReportUseCase,
+    )
 
     @Test
     fun `init leaves state Idle and performs zero repository calls`() = runTest {
-        val viewModel = DashboardViewModel(
-            getPlansUseCase = getPlansUseCase,
-            getNextTasksUseCase = getNextTasksUseCase,
-            getStatusUseCase = getStatusUseCase,
-        )
+        val viewModel = createViewModel()
 
         viewModel.uiState.test {
             assertEquals(UiState.Idle, awaitItem())
@@ -58,6 +72,8 @@ class DashboardViewModelTest {
         assertEquals(0, planRepository.getPlansCallCount)
         assertEquals(0, planRepository.getStatusCallCount)
         assertEquals(0, taskRepository.getNextTasksCallCount)
+        assertEquals(0, planRepository.syncCallCount)
+        assertEquals(0, planRepository.doctorCallCount)
     }
 
     @Test
@@ -81,11 +97,7 @@ class DashboardViewModelTest {
         taskRepository.nextTasksResult = AppResult.Success(testTasks)
         planRepository.statusResult = { AppResult.Success(testStatus) }
 
-        val viewModel = DashboardViewModel(
-            getPlansUseCase = getPlansUseCase,
-            getNextTasksUseCase = getNextTasksUseCase,
-            getStatusUseCase = getStatusUseCase,
-        )
+        val viewModel = createViewModel()
 
         viewModel.uiState.test {
             assertEquals(UiState.Idle, awaitItem())
@@ -111,11 +123,7 @@ class DashboardViewModelTest {
     fun `dashboard emits error when plans fail to load`() = runTest {
         planRepository.plansResult = AppResult.Failure(code = "gateway_offline", message = "Gateway offline")
 
-        val viewModel = DashboardViewModel(
-            getPlansUseCase = getPlansUseCase,
-            getNextTasksUseCase = getNextTasksUseCase,
-            getStatusUseCase = getStatusUseCase,
-        )
+        val viewModel = createViewModel()
 
         viewModel.uiState.test {
             assertEquals(UiState.Idle, awaitItem())
@@ -137,11 +145,7 @@ class DashboardViewModelTest {
         taskRepository.nextTasksResult = AppResult.Success(emptyList())
         planRepository.statusResult = { AppResult.Failure(code = "status_error", message = "Status unavailable") }
 
-        val viewModel = DashboardViewModel(
-            getPlansUseCase = getPlansUseCase,
-            getNextTasksUseCase = getNextTasksUseCase,
-            getStatusUseCase = getStatusUseCase,
-        )
+        val viewModel = createViewModel()
 
         viewModel.uiState.test {
             assertEquals(UiState.Idle, awaitItem())
@@ -161,11 +165,7 @@ class DashboardViewModelTest {
     fun `refresh updates dashboard state`() = runTest {
         planRepository.plansResult = AppResult.Failure(code = "error", message = "Initial failure")
 
-        val viewModel = DashboardViewModel(
-            getPlansUseCase = getPlansUseCase,
-            getNextTasksUseCase = getNextTasksUseCase,
-            getStatusUseCase = getStatusUseCase,
-        )
+        val viewModel = createViewModel()
 
         viewModel.uiState.test {
             assertEquals(UiState.Idle, awaitItem())
@@ -187,5 +187,51 @@ class DashboardViewModelTest {
             assertEquals("plan-2", (updated as UiState.Success).data.plans[0].id)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun `syncBranch updates diagnosticsState on success and failure`() = runTest {
+        val expectedHead = "a".repeat(40)
+        planRepository.syncResult = { branch ->
+            assertEquals("main", branch)
+            AppResult.Success(SyncStatus(status = "up_to_date", headSha = expectedHead, inSync = true))
+        }
+        val viewModel = createViewModel()
+
+        viewModel.syncBranch("main")
+        val afterSuccess = viewModel.diagnosticsState.value
+        assertFalse(afterSuccess.isSyncing)
+        assertNull(afterSuccess.syncError)
+        assertEquals(SyncStatus("up_to_date", expectedHead, true), afterSuccess.syncStatus)
+        assertEquals(1, planRepository.syncCallCount)
+
+        planRepository.syncResult = { AppResult.Failure(code = "unreachable", message = "Sync unreachable") }
+        viewModel.syncBranch("main")
+        val afterFailure = viewModel.diagnosticsState.value
+        assertFalse(afterFailure.isSyncing)
+        assertEquals("Sync unreachable", afterFailure.syncError)
+    }
+
+    @Test
+    fun `runDoctor updates diagnosticsState on success and failure`() = runTest {
+        val report = DoctorReport(
+            healthy = true,
+            checks = listOf(DoctorCheck(name = "github_token", passed = true, details = "valid")),
+        )
+        planRepository.doctorResult = { AppResult.Success(report) }
+        val viewModel = createViewModel()
+
+        viewModel.runDoctor()
+        val afterSuccess = viewModel.diagnosticsState.value
+        assertFalse(afterSuccess.isRunningDoctor)
+        assertNull(afterSuccess.doctorError)
+        assertEquals(report, afterSuccess.doctorReport)
+        assertEquals(1, planRepository.doctorCallCount)
+
+        planRepository.doctorResult = { AppResult.Failure(code = "halt_active", message = "Engine halted") }
+        viewModel.runDoctor()
+        val afterFailure = viewModel.diagnosticsState.value
+        assertFalse(afterFailure.isRunningDoctor)
+        assertEquals("Engine halted", afterFailure.doctorError)
     }
 }

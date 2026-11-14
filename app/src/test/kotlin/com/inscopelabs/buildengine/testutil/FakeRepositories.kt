@@ -1,10 +1,12 @@
 package com.inscopelabs.buildengine.testutil
 
 import com.inscopelabs.buildengine.core.result.AppResult
+import com.inscopelabs.buildengine.domain.model.DoctorReport
 import com.inscopelabs.buildengine.domain.model.Plan
 import com.inscopelabs.buildengine.domain.model.PlanStatus
 import com.inscopelabs.buildengine.domain.model.PlanValidation
 import com.inscopelabs.buildengine.domain.model.RenderCheck
+import com.inscopelabs.buildengine.domain.model.SyncStatus
 import com.inscopelabs.buildengine.domain.model.Task
 import com.inscopelabs.buildengine.domain.model.TaskBranch
 import com.inscopelabs.buildengine.domain.model.TaskStatus
@@ -15,6 +17,9 @@ class FakePlanRepository : PlanRepository {
     var getPlansCallCount: Int = 0
     var getPlanCallCount: Int = 0
     var getStatusCallCount: Int = 0
+    var syncCallCount: Int = 0
+    var doctorCallCount: Int = 0
+    var lastSyncBranch: String? = null
     var plansResult: AppResult<List<Plan>> = AppResult.Success(emptyList())
     var singlePlanResult: (String) -> AppResult<Plan> = { id ->
         AppResult.Failure(code = "not_found", message = "Plan not found: $id")
@@ -27,6 +32,12 @@ class FakePlanRepository : PlanRepository {
     }
     var renderCheckResult: (String) -> AppResult<RenderCheck> = { id ->
         AppResult.Success(RenderCheck(ok = true, planId = id, renderIssues = emptyList()))
+    }
+    var syncResult: (String) -> AppResult<SyncStatus> = {
+        AppResult.Success(SyncStatus(status = "synced", headSha = "0".repeat(40), inSync = true))
+    }
+    var doctorResult: () -> AppResult<DoctorReport> = {
+        AppResult.Success(DoctorReport(healthy = true, checks = emptyList()))
     }
 
     override suspend fun getPlans(): AppResult<List<Plan>> {
@@ -43,6 +54,15 @@ class FakePlanRepository : PlanRepository {
     }
     override suspend fun validate(planId: String): AppResult<PlanValidation> = validateResult(planId)
     override suspend fun renderCheck(planId: String): AppResult<RenderCheck> = renderCheckResult(planId)
+    override suspend fun sync(branch: String): AppResult<SyncStatus> {
+        syncCallCount++
+        lastSyncBranch = branch
+        return syncResult(branch)
+    }
+    override suspend fun doctor(): AppResult<DoctorReport> {
+        doctorCallCount++
+        return doctorResult()
+    }
 }
 
 class FakeTaskRepository : TaskRepository {

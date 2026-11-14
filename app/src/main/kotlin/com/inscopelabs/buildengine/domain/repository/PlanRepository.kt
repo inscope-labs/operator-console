@@ -1,10 +1,12 @@
 package com.inscopelabs.buildengine.domain.repository
 
 import com.inscopelabs.buildengine.core.result.AppResult
+import com.inscopelabs.buildengine.domain.model.DoctorReport
 import com.inscopelabs.buildengine.domain.model.Plan
 import com.inscopelabs.buildengine.domain.model.PlanStatus
 import com.inscopelabs.buildengine.domain.model.PlanValidation
 import com.inscopelabs.buildengine.domain.model.RenderCheck
+import com.inscopelabs.buildengine.domain.model.SyncStatus
 
 /**
  * The plans of record.
@@ -44,4 +46,10 @@ interface PlanRepository {
 
     /** Whether a plan's generated views are current. */
     suspend fun renderCheck(planId: String): AppResult<RenderCheck>
+
+    /** Verifies consumer repository sync against upstream tracking (`POST /sync`, §3.13). */
+    suspend fun sync(branch: String = "main"): AppResult<SyncStatus>
+
+    /** Runs the gateway diagnostic health check (`GET /doctor`, §3.14). */
+    suspend fun doctor(): AppResult<DoctorReport>
 }

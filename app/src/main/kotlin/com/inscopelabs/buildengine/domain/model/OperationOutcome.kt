@@ -16,6 +16,7 @@ sealed interface OperationOutcome {
     data class Succeeded(
         val auditRef: String,
         val headSha: String,
+        val outcome: String? = null,
     ) : OperationOutcome {
         init {
             require(auditRef.isNotBlank()) { "Succeeded requires a non-blank auditRef" }

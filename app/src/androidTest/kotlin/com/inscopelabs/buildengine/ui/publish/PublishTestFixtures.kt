@@ -143,11 +143,46 @@ internal object PublishTestFixtures {
             return onPublish(request, capability)
         }
 
-        override suspend fun upload(request: OperationRequest): OperationResult = error("unused")
-        override suspend fun reconcile(request: OperationRequest): OperationResult = error("unused")
-        override suspend fun halt(request: OperationRequest): OperationResult = error("unused")
-        override suspend fun resume(request: OperationRequest): OperationResult = error("unused")
-        override suspend fun decide(request: OperationRequest): OperationResult = error("unused")
+        override suspend fun upload(
+            request: OperationRequest,
+            submissionId: String,
+            zipSha256: String,
+            zipBase64: String,
+            capability: SignedCapability,
+        ): OperationOutcome = error("unused")
+
+        override suspend fun reconcile(
+            request: OperationRequest,
+            submissionId: String,
+            capability: SignedCapability,
+        ): OperationOutcome = error("unused")
+
+        override suspend fun halt(
+            request: OperationRequest,
+            reason: String,
+            capability: SignedCapability,
+        ): OperationOutcome = error("unused")
+
+        override suspend fun resume(
+            request: OperationRequest,
+            reason: String,
+            capability: SignedCapability,
+        ): OperationOutcome = error("unused")
+
+        override suspend fun recordedHaltCause(): String? = null
+
+        override suspend fun setTaskStatus(
+            request: OperationRequest,
+            targetStatus: String,
+            capability: SignedCapability,
+        ): OperationOutcome = error("unused")
+
+        override suspend fun decide(
+            request: OperationRequest,
+            decision: String,
+            notes: String?,
+            capability: SignedCapability,
+        ): OperationOutcome = error("unused")
     }
 
     class InMemorySharedPreferences : SharedPreferences {
