@@ -152,7 +152,7 @@ fun DeviceManagementScreen(
     state: UiState<DeviceManagementData>,
     modifier: Modifier = Modifier,
     onRefresh: () -> Unit = {},
-    onRevoke: (kid: String, reason: String) -> Unit = {},
+    onRevoke: (kid: String, reason: String) -> Unit = { _, _ -> },
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize().testTag("device_management_screen"),
