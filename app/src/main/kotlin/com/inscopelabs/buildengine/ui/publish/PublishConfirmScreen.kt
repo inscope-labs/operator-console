@@ -29,8 +29,8 @@ import com.inscopelabs.buildengine.core.security.AuthTier
 /**
  * Design review §12: publish is the only action that crosses to the public repository.
  * The screen shows the operation, plan, task and order, the branch, the full 40-character
- * head, the environment, the confirmation tier, the capability lifetime and the guard
- * summary before anything is signed (T3-301).
+ * head, the environment, the confirmation tier (and why it applies, T3-501), the
+ * capability lifetime and the guard summary before anything is signed (T3-301).
  */
 @Composable
 fun PublishConfirmScreen(
@@ -127,6 +127,11 @@ private fun SummaryBlock(summary: PublishSummary) {
             null -> stringResource(R.string.publish_tier_unknown)
         },
         tag = "publish_tier",
+    )
+    Text(
+        text = summary.tierReason,
+        style = MaterialTheme.typography.bodySmall,
+        modifier = Modifier.testTag("publish_tier_reason"),
     )
     Text(
         text = stringResource(R.string.publish_confirm_ttl, summary.ttlSeconds.toInt()),

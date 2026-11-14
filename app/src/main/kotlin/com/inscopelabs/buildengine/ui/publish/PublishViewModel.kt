@@ -4,8 +4,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.inscopelabs.buildengine.capability.CapabilityMinter
+import com.inscopelabs.buildengine.capability.model.OperationType
 import com.inscopelabs.buildengine.core.result.AppResult
 import com.inscopelabs.buildengine.core.security.AuthTier
+import com.inscopelabs.buildengine.core.security.ConfirmationTierPolicy
 import com.inscopelabs.buildengine.data.enrollment.DeviceEnrollmentStore
 import com.inscopelabs.buildengine.data.local.HealthSnapshotStore
 import com.inscopelabs.buildengine.domain.repository.TaskRepository
@@ -36,6 +38,12 @@ data class PublishSummary(
 ) {
     /** Publish needs a resolvable order and a known enrolment tier; otherwise it fails closed. */
     val canConfirm: Boolean get() = !order.isNullOrBlank() && tier != null
+
+    /**
+     * Why this confirmation tier applies (T3-501): the summary shows the tier and why.
+     */
+    val tierReason: String
+        get() = ConfirmationTierPolicy.explainForSummary(OperationType.PUBLISH, tier)
 
     /** The typed head prefix the in-app tier asks for (first 7 characters). */
     val typedHeadPrefix: String get() = headSha.take(TYPED_HEAD_LENGTH)
