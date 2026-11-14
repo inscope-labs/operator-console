@@ -18,6 +18,8 @@ import com.inscopelabs.buildengine.core.network.dto.PlanValidationDto
 import com.inscopelabs.buildengine.core.network.dto.PublishRequestDto
 import com.inscopelabs.buildengine.core.network.dto.ReconcileRequestDto
 import com.inscopelabs.buildengine.core.network.dto.RenderCheckDto
+import com.inscopelabs.buildengine.core.network.dto.RevokeKeyRequestDto
+import com.inscopelabs.buildengine.core.network.dto.RevokeKeyResponseDto
 import com.inscopelabs.buildengine.core.network.dto.RotateKeyRequestDto
 import com.inscopelabs.buildengine.core.network.dto.SyncRequestDto
 import com.inscopelabs.buildengine.core.network.dto.SyncStatusDto
@@ -93,6 +95,14 @@ class FakeGatewayApi : GatewayApi {
     override suspend fun decide(request: DecideRequestDto): DecideAckDto {
         decideCalls += request
         return decideResult(request)
+    }
+    val revokeKeyCalls = mutableListOf<RevokeKeyRequestDto>()
+    var revokeKeyResult: (RevokeKeyRequestDto) -> RevokeKeyResponseDto = { request ->
+        RevokeKeyResponseDto(revoked = true, kid = request.kid, revokedAt = 1700000000L)
+    }
+    override suspend fun revokeKey(request: RevokeKeyRequestDto): RevokeKeyResponseDto {
+        revokeKeyCalls += request
+        return revokeKeyResult(request)
     }
     override suspend fun validatePlan(planId: String): PlanValidationDto = PlanValidationDto(valid = true, planId = planId)
     override suspend fun renderCheck(planId: String): RenderCheckDto = RenderCheckDto(ok = true, planId = planId)
