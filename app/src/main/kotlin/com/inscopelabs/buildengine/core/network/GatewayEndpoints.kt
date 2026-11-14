@@ -141,6 +141,9 @@ object GatewayEndpoints {
     const val ENROLL_ROTATE: String = "/enroll/rotate"
     const val ENROLL_CHALLENGE: String = "/enroll/challenge"
 
+    /** `POST /admin/revoke` — device key revocation (contract §3.21, BD-1.10). */
+    const val ADMIN_REVOKE: String = "/admin/revoke"
+
     /**
      * The framework decision endpoint.
      *
@@ -167,10 +170,10 @@ object GatewayEndpoints {
     /** `GET /plans/{planId}/render-check`. */
     fun planRenderCheck(planId: String): String = path(PLAN_RENDER_CHECK, "planId" to planId)
 
-    /** `GET /tasks/next` — the next actionable tasks. */
+    /** `GET /tasks/next`. */
     fun tasksNext(): String = TASKS_NEXT
 
-    /** `GET /branches/{branchName}/head` — the current remote head of a branch. */
+    /** `GET /branches/{branchName}/head`. */
     fun branchHead(branchName: String): String = path(BRANCH_HEAD, "branchName" to branchName)
 
     /** `POST /tasks/{taskId}/publish`. */
@@ -202,6 +205,9 @@ object GatewayEndpoints {
 
     /** `POST /enroll/challenge` — attestation challenge. */
     fun enrollChallenge(): String = ENROLL_CHALLENGE
+
+    /** `POST /admin/revoke` — device key revocation (§3.21, BD-1.10). */
+    fun adminRevoke(): String = ADMIN_REVOKE
 
     /** `POST /decisions/{decisionId}` — the framework decision. */
     fun decision(decisionId: String): String = path(DECISION, "decisionId" to decisionId)
