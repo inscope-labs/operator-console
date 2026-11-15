@@ -145,17 +145,6 @@ object GatewayEndpoints {
     /** `POST /admin/revoke` — device key revocation (contract §3.21, BD-1.10). */
     const val ADMIN_REVOKE: String = "/admin/revoke"
 
-    /**
-     * The framework decision endpoint.
-     *
-     * `DECIDE` is the highest-authority action in the operator surface (D-e) and it
-     * is in the closed `OperationType` enumeration, but the gateway contract does not
-     * yet define a route for it. The path is kept so the surface is complete, and it
-     * is called out here because a route the contract does not define is a route the
-     * gateway does not serve.
-     */
-    const val DECISION: String = "/decisions/{decisionId}"
-
     /** `GET /health` — the liveness and environment probe. */
     fun health(): String = HEALTH
 
@@ -212,9 +201,6 @@ object GatewayEndpoints {
 
     /** `POST /admin/revoke` — device key revocation (§3.21, BD-1.10). */
     fun adminRevoke(): String = ADMIN_REVOKE
-
-    /** `POST /decisions/{decisionId}` — the framework decision. */
-    fun decision(decisionId: String): String = path(DECISION, "decisionId" to decisionId)
 
     /** `GET /operations/{id}` — operation outcome lookup keyed by idempotency key (§3.19). */
     fun operationLookup(operationId: String): String = path(OPERATION_LOOKUP, "operationId" to operationId)
