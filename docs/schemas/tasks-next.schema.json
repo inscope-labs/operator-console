@@ -18,9 +18,14 @@
       "headSha": {
         "type": "string",
         "pattern": "^[0-9a-f]{40}$"
+      },
+      "order": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Work-order identifier under which the task was issued (contract section 3.6); copied unchanged into the capability order field"
       }
     },
-    "required": ["id", "planId", "title", "branch", "status", "headSha"],
+    "required": ["id", "planId", "title", "branch", "status", "headSha", "order"],
     "additionalProperties": false
   }
 }

@@ -266,15 +266,8 @@ class ContractConformanceTest {
         assertTrue((checkRequired - checkItemSchema.properties).isEmpty())
         assertEquals(checkItemSchema.properties, checkDtoElements)
 
-        // Known gap tracked by ADR 0014 D1: GET /tasks/next schema + TaskSummaryDto lack work-order ID in rev 1.1
-        val tasksSchema = ContractSchemaSupport.extractSchemaSection(
-            ContractSchemaSupport.readSchemaObject(repoRoot, "tasks-next.schema.json"),
-        )
-        val taskDtoFields = ContractSchemaSupport.descriptorElementNames(TaskSummaryDto.serializer().descriptor)
-        if ("order" !in tasksSchema.properties && "order" !in taskDtoFields) {
-            actualDiscrepancies["tasks_next:missing_work_order_id"] =
-                "tasks-next.schema.json and TaskSummaryDto lack work-order identifier in contract revision 1.1 (pending revision 1.2)"
-        }
+        // Contract revision 1.2 makes `order` required on the GET /tasks/next item (ADR 0014 D1, ADR 0015).
+        // The generic required-field check above reports it until TaskSummaryDto consumes it; see the baseline.
 
         ContractSchemaSupport.verifyRatchet(
             checkName = "Response DTO / schema conformance",
@@ -486,9 +479,9 @@ class ContractConformanceTest {
                 reference = "PR3-003, contract §3.16, enroll-rotate.schema.json",
             ),
             ContractSchemaSupport.RatchetEntry(
-                id = "tasks_next:missing_work_order_id",
-                justification = "GET /tasks/next schema and TaskSummaryDto carry no work-order identifier in contract revision 1.1; resolved via future contract revision 1.2",
-                reference = "ADR 0014 D1",
+                id = "response_missing_required:tasks-next:order",
+                justification = "Contract revision 1.2 defines the required order field on the GET /tasks/next item; TaskSummaryDto and PublishOrderResolver adopt it in the console run that follows the gateway change",
+                reference = "ADR 0014 D1, ADR 0015, contract section 3.6",
             ),
         )
 

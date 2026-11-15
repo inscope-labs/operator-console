@@ -16,6 +16,7 @@
         },
         "targetStatus": {
           "type": "string",
+          "description": "Supported in contract revision 1.2: in_progress (op SET_IN_PROGRESS) and completed (op SET_DONE). The other values are reserved and refused with BAD_ENCODING (contract section 3.17).",
           "enum": ["draft", "ready", "in_progress", "completed", "halted", "archived"]
         },
         "idempotencyKey": { "type": "string", "pattern": "^[0-9a-f]{32}$", "description": "Client-generated operation idempotency key (contract section 1.6); not the capability nonce" },
