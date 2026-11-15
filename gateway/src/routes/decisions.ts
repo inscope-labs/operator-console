@@ -1,9 +1,10 @@
 /**
- * POST /plans/:id/decide — Stage 3.6 (BD-1.3).
+ * POST /plans/:id/decide — Stage 3.6 (BD-1.3) / ADR 0014 D2.
  * Also registers legacy POST /decisions/:id/decide for compatibility.
  *
- * Required body fields (plan Stage 3.6): attribution, rationale, scope, evidence.
- * Contract §3.18 also accepts decision/notes; notes maps to rationale when present.
+ * Contract §3.18 and decide.schema.json: required = plan, decision (APPROVED|REJECTED|DEFERRED),
+ * idempotencyKey, capability. notes is optional. Attribution is derived server-side from the
+ * enrolled device key identifier (kid); never from the request body.
  */
 
 import { register, type RouteHandler } from './router';
@@ -45,26 +46,20 @@ interface DecideBody {
   base?: string;
 }
 
+const ALLOWED_DECISIONS = new Set(['APPROVED', 'REJECTED', 'DEFERRED']);
+
 function requireFields(body: DecideBody): { ok: true } | { ok: false; message: string } {
-  const attribution = body.attribution?.trim();
-  const rationale = (body.rationale ?? body.notes)?.trim();
-  const scope = body.scope?.trim();
-  const evidence = body.evidence?.trim();
+  // Contract §3.18 / decide.schema.json: plan, decision, idempotencyKey, capability are required.
+  // notes is optional. attribution/scope/evidence are NOT required on the request (ADR 0014 D2).
   const decision = body.decision?.trim();
-  if (!attribution) {
-    return { ok: false, message: 'attribution required' };
-  }
-  if (!rationale) {
-    return { ok: false, message: 'rationale (or notes) required' };
-  }
-  if (!scope) {
-    return { ok: false, message: 'scope required' };
-  }
-  if (!evidence) {
-    return { ok: false, message: 'evidence required' };
-  }
   if (!decision) {
     return { ok: false, message: 'decision required' };
+  }
+  if (!ALLOWED_DECISIONS.has(decision)) {
+    return { ok: false, message: `decision must be one of APPROVED|REJECTED|DEFERRED (got ${decision})` };
+  }
+  if (!body.plan?.trim() && !body.capability) {
+    // plan can also come from capability / path; require at least decision here.
   }
   return { ok: true };
 }
@@ -102,11 +97,9 @@ const decideHandler: RouteHandler = async (request, env, _ctx, params) => {
     return await finishFromResponse(env, _idemCred, _idemKey, errorResponse('BAD_ENCODING', fields.message, requestId));
   }
 
-  const attribution = body.attribution!.trim();
-  const rationale = (body.rationale ?? body.notes)!.trim();
-  const scope = body.scope!.trim();
-  const evidence = body.evidence!.trim();
   const decision = body.decision!.trim();
+  // notes may be empty; rationale for audit is notes (or empty).
+  const rationale = (body.notes ?? body.rationale ?? '').trim();
 
   const allowModelA = (env.ENVIRONMENT ?? 'test') !== 'production';
   const gate = await gateCapability(env, {
@@ -123,6 +116,12 @@ const decideHandler: RouteHandler = async (request, env, _ctx, params) => {
   }
 
   const cap = gate.capability;
+  // ADR 0014 D2: attribution = enrolled device key identifier (kid) from verified capability.
+  // Never trust a body-supplied attribution.
+  const attribution = cap.kid;
+  const scope = `${body.plan ?? planId ?? cap.plan}/${body.task ?? cap.task}/${body.branch ?? cap.branch}`;
+  // evidence is not required; leave empty for audit compatibility.
+  const evidence = '';
   if (cap.op !== 'decide') {
     return await finishFromResponse(env, _idemCred, _idemKey, errorResponse(
       'UNKNOWN_OP',

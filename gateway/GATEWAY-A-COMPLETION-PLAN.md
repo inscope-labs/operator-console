@@ -548,3 +548,21 @@ write routes (`tasks`, `halt`, `decisions`, plan status), `GET /operations/:id`,
 - [ ] Gateway CI green on the pushed SHA
 - [ ] No capability/signature/nonce/credential stored in operation records
 
+
+---
+
+## Amendment — Contract alignment for Phase 3 (ADR 0014 D1-D3)
+
+**Status:** in progress (authorized for this run only)
+
+**Paths:** `gateway/src/routes/plans.ts`, `gateway/src/routes/decisions.ts`, related tests, `gateway/docs/**` (not parent docs/**).
+
+**Work (Parts A–C):**
+- **Part A — POST /plans/:id/status (ADR 0014 D3, contract §3.17):** G-STAT-1 through G-STAT-7 (register route, schema validation, capability mapping, guards, mutation or fail-closed 501, response/lookup).
+- **Part B — decide contract alignment (ADR 0014 D2):** G-DEC-1 through G-DEC-5 (required fields per schema/contract, server-side attribution from kid, tests, operator-decision report items).
+- **Part C — work-order identifier on GET /tasks/next (ADR 0014 D1):** Run only if contract revision ≥1.2 defines the field; otherwise skip and report blocked.
+
+**Exit criteria:**
+- [ ] Gateway CI green on the PR head SHA
+- [ ] Report in agent-reports/ with all required sections
+- [ ] No inventing of storage scheme, fields, or error codes
