@@ -3,6 +3,10 @@
 This document defines the HTTP API surface of the Cloudflare Operator Gateway (`cbridge` replacement)
 and the contract between the Operator Console Android application and the gateway.
 
+> **Revision 1.2 (ADR 0014, ADR 0015):** adds the required `order` field to the `GET /tasks/next` item (§3.6), states the
+> wire status vocabulary (§1.7), pins the transition rules of `POST /plans/{id}/status` (§3.17) and records how `decide`
+> derives attribution (§3.18). Pending operator merge; Gateway A and the console do not implement it yet.
+>
 > **Revision 1.1 (BD-1.7, ADR 0013):** adds the client-generated `idempotencyKey` on every write request, the
 > operation lookup semantics of §3.19, the status mapping of §4.3 and error codes `IDEMPOTENCY_KEY_INVALID`,
 > `IDEMPOTENCY_KEY_REUSED`, `OPERATION_NOT_FOUND`. Pending operator merge; Gateway A does not implement it yet.
@@ -84,6 +88,12 @@ Requests sent to the gateway require two distinct authorization components:
   holds it. Records are kept for at least 7 days.
 - **Client rule:** the console never resends automatically. A resend after an uncertain outcome is a new operation
   with a new key, a new capability and a fresh operator confirmation, after review.
+
+### 1.7 Wire status vocabulary (revision 1.2)
+- **Task status** on the wire: `draft`, `ready`, `in_progress`, `completed`, `blocked` (`tasks-next.schema.json`).
+- **Plan status** on the wire: `draft`, `ready`, `in_progress`, `completed`, `halted`, `archived` (`plan-status.schema.json`).
+- These values are authoritative. An implementation that stores other internal names (for example `done`) maps them to
+  the wire vocabulary at every route boundary, in both directions, and never leaks the internal name.
 
 ---
 
@@ -213,10 +223,16 @@ Lists next available unassigned or ready tasks.
     "title": "Refactor parser",
     "branch": "task-10008-refactor-parser",
     "status": "ready",
-    "headSha": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d"
+    "headSha": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+    "order": "order-7731"
   }
 ]
 ```
+- `order` (required, non-empty string): the work-order identifier under which the task was issued. The console copies it
+  unchanged into the `order` field of the capability for this task and never derives or invents one. Work orders are
+  created by engine tooling (BD-1.3 option B); the gateway reports the value it holds for the task. A task for which the
+  gateway holds no work-order identifier is not listed as ready. A client that receives an item without `order` treats
+  the task as not publishable.
 
 ---
 
@@ -512,6 +528,26 @@ Guarded plan status mutation with compare-and-swap (BD-1.3, BD-1.4).
 }
 ```
 
+**Transition rules (revision 1.2).** The operation changes the status of one task recorded by the gateway. It does not
+commit to the consumer repository. Supported transitions:
+
+| `targetStatus` | Capability `op` | Task status afterwards | `operation` in the response |
+|---|---|---|---|
+| `in_progress` | `SET_IN_PROGRESS` | `in_progress` | `SET_IN_PROGRESS` |
+| `completed` | `SET_DONE` | `completed` | `SET_DONE` |
+
+The other `targetStatus` values in the schema (`draft`, `ready`, `halted`, `archived`) and capability op `SET` are reserved
+and not supported in revision 1.2; the gateway refuses them with `400 BAD_ENCODING` and changes nothing. `newStatus` in the
+response uses the wire vocabulary of §1.7.
+
+Checks, in this order after the idempotency record is created (§1.6): the capability `op` must match the table
+(`UNKNOWN_OP`); the capability branch must equal the request branch, and the task's recorded branch, when it has one, must
+equal it too (`BRANCH_MISMATCH`); the capability head, the request `expectedHead` and the live branch head must all be equal
+(`HEAD_MOVED`; a branch that does not exist is `BRANCH_MISSING`); a halt blocks the operation (`HALT_ACTIVE`); the capability
+nonce is single use (`NONCE_REPLAYED`). An unknown plan or task is refused with `400 BAD_ENCODING` and a message that
+names what was not found. If the gateway's record of the plan changed between its read and its write, the operation is
+refused with `409 RECONCILE_REQUIRED` and nothing is changed. Every refusal and failure updates the operation record (§3.19).
+
 ---
 
 ### 3.18 `POST /plans/{id}/decide`
@@ -540,6 +576,10 @@ Submits an operator decision on a plan milestone or review point (BD-1.3).
   "auditRef": "audit-20261030-98240"
 }
 ```
+- `decision` must be `APPROVED`, `REJECTED` or `DEFERRED`; `notes` is optional.
+- There are no `attribution`, `scope` or `evidence` request fields. The gateway records attribution server-side as the
+  enrolled device key identifier (`kid`) of the verified capability, records `notes` as the rationale, and derives scope from
+  the plan, task and branch. A body-supplied attribution is never trusted (ADR 0014 D2).
 
 ---
 

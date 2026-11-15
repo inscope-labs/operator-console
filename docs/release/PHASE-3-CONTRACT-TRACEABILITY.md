@@ -5,7 +5,7 @@
 - **Operator Decisions:** [`docs/adr/0014-phase-3-operator-decisions.md`](../adr/0014-phase-3-operator-decisions.md) (`D1`–`D5`)
 - **Workspace HEAD SHA:** `unverified (no .git metadata in sandbox)`
 - **Verification Scope:** Android client (`GatewayEndpoints`, `GatewayApi`, `GatewayRepository`, `core/network/dto/*`, `ErrorMapper`, `OperationRepositoryImpl`) vs frozen contract Revision 1.1 and `docs/schemas/*.schema.json`. Gateway implementation status is out of scope.
-- **Closure Note:** `PR3-003` does **not** close in this run; `D1` (work-order ID on task read) and `D3` (`POST /plans/{id}/status` server route) require a separate contract Revision 1.2 and gateway change.
+- **Closure Note:** `PR3-003` does **not** close in this run; `D1` (work-order ID on task read) is defined by contract Revision 1.2 (ADR 0015) but the console does not consume it yet, and `D3` (`POST /plans/{id}/status` server route) still needs the gateway change.
 
 ---
 
@@ -30,7 +30,7 @@ Closed status set: `matched` | `client-missing` | `contract-only` (not consumed 
 | §3.3 | `GET /plans/{id}/status` | `plan-status.schema.json` | `PLAN_STATUS` / `planStatus(planId)` | `GatewayApi.planStatus(planId)` | *(none)* | `PlanStatusDto` | `ErrorMapper` via callers | `matched` | Shares `PLAN_STATUS` path constant with §3.17 `POST`. |
 | §3.4 | `POST /plans/{id}/validate` | `plan-validate.schema.json` | `PLAN_VALIDATE` / `planValidate(planId)` | `GatewayApi.validatePlan(planId)` | `"{}"` literal *(schema `{}`)* | `PlanValidationDto` | `ErrorMapper` via callers | `matched` | All schema fields consumed. |
 | §3.5 | `GET /plans/{id}/render-check` | `plan-render-check.schema.json` | `PLAN_RENDER_CHECK` / `planRenderCheck(planId)` | `GatewayApi.renderCheck(planId)` | *(none)* | `RenderCheckDto` | `ErrorMapper` via callers | `matched` | All schema fields consumed. |
-| §3.6 | `GET /tasks/next` | `tasks-next.schema.json` | `TASKS_NEXT` / `tasksNext()` | `GatewayApi.nextTasks()` | *(none)* | `List<TaskSummaryDto>` | `ErrorMapper` via callers | `matched` | **Known gap (`ADR 0014 D1`, ratchet baseline):** `tasks-next.schema.json` (rev 1.1) and `TaskSummaryDto` lack work-order identifier; resolved in future contract rev 1.2. |
+| §3.6 | `GET /tasks/next` | `tasks-next.schema.json` | `TASKS_NEXT` / `tasksNext()` | `GatewayApi.nextTasks()` | *(none)* | `List<TaskSummaryDto>` | `ErrorMapper` via callers | `matched` | **Known gap (`ADR 0014 D1`, ratchet baseline `response_missing_required:tasks-next:order`):** contract rev 1.2 defines the required `order` field; `TaskSummaryDto` does not consume it yet. |
 | §3.7 | `GET /branches/{name}/head` | `branch-head.schema.json` | `BRANCH_HEAD` / `branchHead(branchName)` | `GatewayApi.branchHead(branch)` | *(none)* | `BranchHeadDto` | `ErrorMapper` / `verifyLiveHead` | `matched` | All schema fields consumed. |
 | §3.8 | `POST /tasks/{id}/publish` | `publish.schema.json` | `PUBLISH` / `publish(taskId)` | `GatewayApi.publish(request)` | `PublishRequestDto` | `GatewayAckDto` | `OperationRepositoryImpl` (`KNOWN_GATEWAY_CODES`, `CONFLICT_CODES`) | `matched` | Request includes `idempotencyKey`; `GatewayAckDto.outcome` defaulted `""` (populated only by `reconcile`). |
 | §3.9 | `POST /tasks/{id}/reconcile` | `reconcile.schema.json` | `RECONCILE` / `reconcile(taskId)` | `GatewayApi.reconcile(request)` | `ReconcileRequestDto` | `GatewayAckDto` | `OperationRepositoryImpl` (`KNOWN_GATEWAY_CODES`, `CONFLICT_CODES`) | `matched` | Request includes `idempotencyKey`; all response fields consumed. |
@@ -112,7 +112,7 @@ Contract §4.1 defines **43** error codes (39 table rows, 4 containing `/` alias
 |---|---|---|---|
 | §3.1 `GET /health` (`health.schema.json`) | `config` (`{valid, missing}`) | `GatewayHealthDto` | **not consumed** — ignored via `Json { ignoreUnknownKeys = true }` |
 | §3.16 `POST /enroll/rotate` (`enroll-rotate.schema.json`) | `rotatedAt` | `EnrollResponseDto` | **not consumed / mismatch** — `GatewayApi.rotateKey` reuses `EnrollResponseDto` (`enrolledAt`), which reads `0L` instead of `rotatedAt` |
-| §3.6 `GET /tasks/next` (`tasks-next.schema.json`) | *(work-order identifier not yet in rev 1.1)* | `TaskSummaryDto` | **Known gap (`ADR 0014 D1`)** — pending contract Revision 1.2 + gateway update |
+| §3.6 `GET /tasks/next` (`tasks-next.schema.json`) | `order` (required, contract rev 1.2) | `TaskSummaryDto` | **Known gap (`ADR 0014 D1`)** — `TaskSummaryDto` adoption and gateway implementation pending |
 
 ---
 
