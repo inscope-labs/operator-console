@@ -197,30 +197,121 @@ describe('POST /plans/:id/decide', () => {
     ).toBe(true);
   });
 
-  it('refuses missing attribution/rationale/scope/evidence', async () => {
-    const cap = await signedCap();
-    const res = await dispatch(
+  // ADR 0014 D2 / contract 3.18: the request carries only plan, task, branch, decision, notes,
+  // idempotencyKey and capability. Attribution, scope and evidence are NOT request fields.
+  async function postDecide(body: Record<string, unknown>, env: Env = baseEnv()): Promise<Response> {
+    return dispatch(
       new Request('https://gw.test/plans/atlas/decide', {
         method: 'POST',
         headers: {
           authorization: 'Bearer tok',
           'content-type': 'application/json',
         },
-        body: JSON.stringify({
-          idempotencyKey: idemKey(),
-          capability: cap,
-          decision: 'APPROVED',
-          branch: BRANCH,
-          head: HEAD,
-        }),
+        body: JSON.stringify(body),
       }),
-      baseEnv(),
+      env,
       ctx
     );
+  }
+
+  it('accepts exactly the contract fields (no attribution, scope or evidence)', async () => {
+    const cap = await signedCap();
+    const res = await postDecide({
+      plan: 'atlas',
+      task: '7',
+      branch: BRANCH,
+      decision: 'APPROVED',
+      notes: 'Reviewed test coverage and verification log',
+      idempotencyKey: idemKey(),
+      capability: cap,
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.accepted).toBe(true);
+    expect(body.operation).toBe('DECIDE');
+    expect(body.plan).toBe('atlas');
+    expect(body.decision).toBe('APPROVED');
+    expect(String(body.auditRef)).toMatch(/^audit-/);
+  });
+
+  it('notes is optional', async () => {
+    const cap = await signedCap();
+    const res = await postDecide({
+      plan: 'atlas',
+      task: '7',
+      branch: BRANCH,
+      decision: 'DEFERRED',
+      idempotencyKey: idemKey(),
+      capability: cap,
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it('refuses a missing decision', async () => {
+    const cap = await signedCap();
+    const res = await postDecide({
+      plan: 'atlas',
+      task: '7',
+      branch: BRANCH,
+      idempotencyKey: idemKey(),
+      capability: cap,
+    });
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: string; message: string };
     expect(body.error).toBe('BAD_ENCODING');
-    expect(body.message).toMatch(/attribution|rationale|scope|evidence/);
+    expect(body.message).toMatch(/decision required/);
+  });
+
+  it('refuses a decision value outside APPROVED|REJECTED|DEFERRED', async () => {
+    const cap = await signedCap();
+    const res = await postDecide({
+      plan: 'atlas',
+      task: '7',
+      branch: BRANCH,
+      decision: 'MAYBE',
+      idempotencyKey: idemKey(),
+      capability: cap,
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe('BAD_ENCODING');
+    expect(body.message).toMatch(/APPROVED\|REJECTED\|DEFERRED/);
+  });
+
+  it('derives attribution from the capability kid, never from the request body', async () => {
+    const written: string[] = [];
+    const spy = {
+      ...mockConsumer(),
+      putFile: async (o: { path: string; contentBytes: Uint8Array }) => {
+        written.push(new TextDecoder().decode(o.contentBytes));
+        return { contentSha: 'd'.repeat(40), path: o.path };
+      },
+    };
+    const env = baseEnv({ __adapter: { consumer: () => spy, product: () => spy } });
+    const cap = await signedCap();
+    const res = await postDecide(
+      {
+        plan: 'atlas',
+        task: '7',
+        branch: BRANCH,
+        decision: 'APPROVED',
+        notes: 'coverage sufficient',
+        attribution: 'mallory@example',
+        evidence: 'forged',
+        idempotencyKey: idemKey(),
+        capability: cap,
+      },
+      env
+    );
+    expect(res.status).toBe(200);
+    expect(written).toHaveLength(1);
+    const record = JSON.parse(written[0]) as Record<string, unknown>;
+    expect(record.attribution).toBe('lab1');
+    expect(record.rationale).toBe('coverage sufficient');
+    expect(record.scope).toBe(`atlas/7/${BRANCH}`);
+    // The signed capability, its signature and nonce never reach the persisted record.
+    expect(written[0]).not.toContain('ctxop-v1');
+    expect(written[0]).not.toContain('nonce-');
   });
 
   it('happy path returns DECIDE + auditRef', async () => {
