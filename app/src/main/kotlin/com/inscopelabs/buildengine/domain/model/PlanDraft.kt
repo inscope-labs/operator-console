@@ -57,7 +57,7 @@ data class PlanDraft(
     val phases: List<PlanPhase> = emptyList(),
     /** `stages.json` → `stages`. */
     val stages: List<PlanStage> = emptyList(),
-    /** `tasks/*.json`, in authoring order. */
+    /** The task documents, in authoring order. */
     val tasks: List<PlanTaskDraft> = emptyList(),
     /** `coverage_exempt.json` → `items`. */
     val coverageExemptions: List<PlanCoverageExemption> = emptyList(),
