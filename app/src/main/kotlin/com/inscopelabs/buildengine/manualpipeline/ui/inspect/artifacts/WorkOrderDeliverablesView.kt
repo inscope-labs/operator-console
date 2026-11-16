@@ -106,7 +106,7 @@ fun WorkOrderDeliverablesView(
             )
             workOrder.acceptanceCriteria.forEach { criterion ->
                 Text(
-                    text = "• [${criterion.id}] ${criterion.statement}",
+                    text = "• [${criterion.id}] ${criterion.description}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -5,6 +5,7 @@ import com.inscopelabs.buildengine.manualpipeline.data.local.entity.DeliverableM
 import com.inscopelabs.buildengine.manualpipeline.domain.model.Deliverable
 import com.inscopelabs.buildengine.manualpipeline.domain.model.SubmissionManifest
 import com.inscopelabs.buildengine.manualpipeline.domain.port.Clock
+import com.inscopelabs.buildengine.manualpipeline.domain.port.DeliverableManifestPort
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -15,8 +16,9 @@ import javax.inject.Singleton
 class DeliverableRepositoryImpl @Inject constructor(
     private val workflowRecordDao: WorkflowRecordDao,
     private val clock: Clock,
-) {
-    suspend fun saveManifest(manifest: SubmissionManifest, deliverables: List<Deliverable>) {
+) : DeliverableManifestPort {
+
+    override suspend fun saveManifest(manifest: SubmissionManifest, deliverables: List<Deliverable>) {
         val now = clock.nowEpochMillis()
         val entities = deliverables.mapIndexed { idx, item ->
             DeliverableManifestEntity(
@@ -34,7 +36,7 @@ class DeliverableRepositoryImpl @Inject constructor(
         workflowRecordDao.upsertDeliverables(entities)
     }
 
-    suspend fun loadForTask(taskId: String): List<Deliverable> =
+    override suspend fun loadForTask(taskId: String): List<Deliverable> =
         workflowRecordDao.getDeliverablesForTask(taskId).map { entity ->
             Deliverable(
                 relativePath = entity.relativePath,

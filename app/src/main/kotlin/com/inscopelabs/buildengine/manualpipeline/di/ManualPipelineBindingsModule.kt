@@ -4,11 +4,13 @@ import com.inscopelabs.buildengine.manualpipeline.data.integration.ExistingMinti
 import com.inscopelabs.buildengine.manualpipeline.data.integration.OperatorCredentialAdapter
 import com.inscopelabs.buildengine.manualpipeline.data.integration.RedactorAdapter
 import com.inscopelabs.buildengine.manualpipeline.data.integration.SystemClock
+import com.inscopelabs.buildengine.manualpipeline.data.repository.DeliverableRepositoryImpl
 import com.inscopelabs.buildengine.manualpipeline.data.repository.HandoffRepositoryImpl
 import com.inscopelabs.buildengine.manualpipeline.data.repository.OperatorActionRepositoryImpl
 import com.inscopelabs.buildengine.manualpipeline.data.repository.WorkflowRecordRepositoryImpl
 import com.inscopelabs.buildengine.manualpipeline.domain.port.AuthorityPort
 import com.inscopelabs.buildengine.manualpipeline.domain.port.Clock
+import com.inscopelabs.buildengine.manualpipeline.domain.port.DeliverableManifestPort
 import com.inscopelabs.buildengine.manualpipeline.domain.port.HandoffEvidenceStore
 import com.inscopelabs.buildengine.manualpipeline.domain.port.MintingPort
 import com.inscopelabs.buildengine.manualpipeline.domain.port.OperatorActionStore
@@ -51,4 +53,8 @@ abstract class ManualPipelineBindingsModule {
     @Binds
     @Singleton
     abstract fun bindHandoffEvidenceStore(impl: HandoffRepositoryImpl): HandoffEvidenceStore
+
+    @Binds
+    @Singleton
+    abstract fun bindDeliverableManifestPort(impl: DeliverableRepositoryImpl): DeliverableManifestPort
 }

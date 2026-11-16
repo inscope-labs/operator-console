@@ -42,6 +42,14 @@ class VerifyHandoffUseCase @Inject constructor(
         if (!zipSha256.matches(Regex("^[0-9a-fA-F]{64}$"))) missing += "zipSha256"
         if (uploadAuditRef.isBlank()) missing += "upload auditRef"
         if (transitionAuditRef.isBlank()) missing += "transition auditRef"
+        // The handoff state is defined by what the console can verify, and the task status
+        // read back from Gateway A is one of those facts: `completed` is reachable only
+        // through a `SET_DONE` that Gateway A accepted against a seal it cross-checked
+        // (assessment §3.2). A handoff is never declared ready on a task the gateway still
+        // reports as in flight (I-06).
+        if (observedStatus != TaskStatus.COMPLETED) {
+            missing += "verified completed task status (read back as '${observedStatus.wireValue}')"
+        }
 
         val liveHead = branchHeadPort.fetchLiveHead(task.branch).getOrNull()?.headSha
         val verifiedHead = if (liveHead != null && headFreshnessValidator.isFullSha(liveHead)) {

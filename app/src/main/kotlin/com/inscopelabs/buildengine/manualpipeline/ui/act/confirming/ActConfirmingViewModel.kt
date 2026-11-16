@@ -101,7 +101,7 @@ class ActConfirmingViewModel @Inject constructor(
                                     outcome = OperationOutcome.Refused(res.code, res.reason),
                                     guardRefusal = presentConcurrencyGuardUseCase.fromCode(res.code, res.reason),
                                     errorPresentation = ErrorPresentation.from(
-                                        FailureCategoryMapper.fromGatewayCode(res.code),
+                                        FailureCategoryMapper.fromGatewayCode(res.code, res.reason),
                                         res.code,
                                         res.reason,
                                     ),
@@ -152,7 +152,7 @@ class ActConfirmingViewModel @Inject constructor(
                                     outcome = OperationOutcome.Refused(res.code, res.reason),
                                     guardRefusal = presentConcurrencyGuardUseCase.fromCode(res.code, res.reason),
                                     errorPresentation = ErrorPresentation.from(
-                                        FailureCategoryMapper.fromGatewayCode(res.code),
+                                        FailureCategoryMapper.fromGatewayCode(res.code, res.reason),
                                         res.code,
                                         res.reason,
                                     ),
@@ -209,11 +209,11 @@ class ActConfirmingViewModel @Inject constructor(
         } else {
             val guard = presentConcurrencyGuardUseCase.fromOutcome(outcome)
             val errPres = when (outcome) {
-                is OperationOutcome.Refused -> ErrorPresentation.from(FailureCategoryMapper.fromGatewayCode(outcome.code), outcome.code, outcome.message)
-                is OperationOutcome.Conflict -> ErrorPresentation.from(FailureCategoryMapper.fromGatewayCode(outcome.code), outcome.code, outcome.message)
-                is OperationOutcome.Timeout -> ErrorPresentation.from(FailureCategoryMapper.fromGatewayCode("TIMEOUT"), "TIMEOUT", outcome.message)
-                is OperationOutcome.UncertainCompletion -> ErrorPresentation.from(FailureCategoryMapper.fromGatewayCode("RECONCILE_REQUIRED"), "UNCERTAIN", outcome.message)
-                is OperationOutcome.RecoveryRequired -> ErrorPresentation.from(FailureCategoryMapper.fromGatewayCode(outcome.code), outcome.code, outcome.message)
+                is OperationOutcome.Refused -> ErrorPresentation.from(FailureCategoryMapper.fromGatewayCode(outcome.code, outcome.message), outcome.code, outcome.message)
+                is OperationOutcome.Conflict -> ErrorPresentation.from(FailureCategoryMapper.fromGatewayCode(outcome.code, outcome.message), outcome.code, outcome.message)
+                is OperationOutcome.Timeout -> ErrorPresentation.from(FailureCategoryMapper.fromGatewayCode("TIMEOUT", outcome.message), "TIMEOUT", outcome.message)
+                is OperationOutcome.UncertainCompletion -> ErrorPresentation.from(FailureCategoryMapper.fromGatewayCode("RECONCILE_REQUIRED", outcome.message), "UNCERTAIN", outcome.message)
+                is OperationOutcome.RecoveryRequired -> ErrorPresentation.from(FailureCategoryMapper.fromGatewayCode(outcome.code, outcome.message), outcome.code, outcome.message)
                 is OperationOutcome.Succeeded -> null
             }
             stateMachine.enterOutcome(

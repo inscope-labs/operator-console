@@ -11,7 +11,9 @@ data class GatewayRefusal(
 ) {
     val isSealRefusal: Boolean
         get() = code.equals("SUBMISSION_IMMUTABLE", ignoreCase = true) ||
-            code.equals("SEALED", ignoreCase = true)
+            code.equals("SEALED", ignoreCase = true) ||
+            code.equals("SEAL_NOT_ATTESTED", ignoreCase = true) ||
+            code.equals("SEAL_FACT_UNAVAILABLE", ignoreCase = true)
 
     val isHaltRefusal: Boolean
         get() = code.equals("HALT_ACTIVE", ignoreCase = true)
