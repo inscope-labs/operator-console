@@ -27,6 +27,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -111,6 +112,7 @@ class SetTaskStatusUseCaseTest {
         val invalidPairs = listOf(
             TaskStatus.PENDING to TaskStatus.PENDING,
             TaskStatus.PENDING to TaskStatus.UNKNOWN,
+            TaskStatus.PENDING to TaskStatus.DONE,
             TaskStatus.IN_PROGRESS to TaskStatus.PENDING,
             TaskStatus.IN_PROGRESS to TaskStatus.IN_PROGRESS,
             TaskStatus.IN_PROGRESS to TaskStatus.UNKNOWN,
@@ -131,7 +133,7 @@ class SetTaskStatusUseCaseTest {
     @Test
     fun `transitioning to DONE requires non-blank completion evidence before prompt or send`() = runTest {
         val missing = useCase()(baseTarget(current = TaskStatus.IN_PROGRESS, target = TaskStatus.DONE, evidence = null))
-        val blank = useCase()(baseTarget(current = TaskStatus.PENDING, target = TaskStatus.DONE, evidence = "   "))
+        val blank = useCase()(baseTarget(current = TaskStatus.IN_PROGRESS, target = TaskStatus.DONE, evidence = "   "))
 
         assertTrue(missing is SetTaskStatusResult.MissingEvidence)
         assertTrue(blank is SetTaskStatusResult.MissingEvidence)
@@ -159,9 +161,21 @@ class SetTaskStatusUseCaseTest {
             baseTarget(current = TaskStatus.IN_PROGRESS, target = TaskStatus.DONE, evidence = "CI run #412 green"),
         ) as SetTaskStatusResult.Executed
         assertEquals(TaskStatus.DONE, done.authoritativeTask?.status)
+        assertTrue(inProgress.readBackConfirmed)
+        assertTrue(done.readBackConfirmed)
         assertEquals("completed", operationRepository.statusTransitions[1].second)
         assertEquals(OperationType.SET_DONE, operationRepository.statusTransitions[1].first.op)
         assertEquals(2, planRepository.getStatusCallCount)
+    }
+
+    @Test
+    fun `an acknowledged success whose read-back disagrees is not confirmed`() = runTest {
+        refreshedTaskStatus = TaskStatus.PENDING
+        val res = useCase()(baseTarget(current = TaskStatus.PENDING, target = TaskStatus.IN_PROGRESS))
+            as SetTaskStatusResult.Executed
+        assertTrue(res.outcome is OperationOutcome.Succeeded)
+        assertEquals(TaskStatus.PENDING, res.authoritativeTask?.status)
+        assertFalse(res.readBackConfirmed)
     }
 
     @Test
@@ -171,6 +185,7 @@ class SetTaskStatusUseCaseTest {
             as SetTaskStatusResult.Executed
         assertNull(res.authoritativeTask)
         assertNull(res.authoritativePlanStatus)
+        assertFalse(res.readBackConfirmed)
         assertEquals(0, planRepository.getStatusCallCount)
     }
 
