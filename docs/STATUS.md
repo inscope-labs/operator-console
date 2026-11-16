@@ -1,7 +1,7 @@
 # Operator Console — Status Matrix
 
 **Authoritative project status document per Guide §10.3 and `RELEASE-PLAN.md» (Stage 0.2 / T0-202).**  
-Last updated: **2026-11-14 (PR3-001 Phase 3 baseline reconciliation; HEAD SHA unverified — no `.git` in sandbox)**.  
+Last updated: **2026-11-14 (PR3-001 Phase 3 baseline reconciliation; HEAD SHA unverified — no `.git` in sandbox)**. **2026-11-16:** the Manual Pipeline module detail was added below ("Manual Pipeline module detail") for PR #75 — module repaired, 121 JVM tests added, CI green on `44b5022`; not merged, not operator-accepted.  
 Reference plan of record: [`RELEASE-PLAN.md»](../RELEASE-PLAN.md).
 
 ---
@@ -101,6 +101,31 @@ Per-task baseline reconciliation as of `PR3-001` (`2026-11-14`; `HEAD` SHA `unve
 | `T3-502` / 3.5 (`PR3-031`) | No-biometric typed prefix path, no silent downgrade | **yes** | `ConfirmationTierPolicyTest`, `ConfirmAndMintTierEnforcementTest`, `PublishViewModelTest` (CI unverified) | no (device/emulator `PR3-031` record absent) | no | no |
 | `T3-503` / 3.5 (`PR3-032`) | Key invalidation, `NeedsReenrollment`, gateway revoke | **partial** (`NeedsReenrollment` UI deferred to Stage 4.4) | `RevokeDeviceKeyUseCaseTest`, `DeviceEnrollmentStoreTest`, `ConfirmAndMintCapabilityUseCaseTest` (CI unverified — `75bb8e9` failed missing `FakeGatewayApi.revokeKey`; post-sync unverified) | no (crypto `androidTest` files are `SCAFFOLD PLACEHOLDER`) | no (live `/admin/revoke` unverified) | no |
 | `T3-601` / 3.6 (`PR3-033`) | `ArchitectureTest` (5 invariants) | **partial (1 of 5 checks only)** | `ArchitectureTest` (`.mint(` check only green at `476e447`/`3e795dd`; 4 checks missing) | no (n/a) | no (n/a) | no |
+
+---
+
+## Manual Pipeline module detail
+
+The `manualpipeline` feature module (`app/src/main/kotlin/com/inscopelabs/buildengine/manualpipeline/`, 198 files) landed on `main` in `c63adbf` **outside the staged release plan** — it has no stage row above, and it arrived with **13 Kotlin compile errors**, so `:app:compileDebugKotlin` failed and `android-ci` has been red on `main` since that commit (`43931514001` → failure). The module was also **unregistered**: no ADR, no register item, and no tests.
+
+PR #75 (`feat/manual-pipeline-poc`) repairs the compile errors, adds the module's first test suite (**121 JVM tests**), and fixes a layering violation those tests exposed. CI is green on `44b5022` (`43934686186`: `:app:testDebugUnitTest` **678/678, 0 failed, 0 ignored**; `:app:assembleDebug` succeeded). **Not merged, not operator-accepted.**
+
+| Area | Implemented in code | JVM-tested (test class + CI SHA) | Android-runtime-tested | Integration-tested | Operator-accepted |
+|---|---|---|---|---|---|
+| Task discovery, work-order interpretation, advisory eligibility (MP-001, MP-002, MP-004) | **yes** (`c63adbf`; `InterpretWorkOrderUseCase` never invents an `orderId`) | `InterpretWorkOrderAndEligibilityTest` (12), `ManualPipelineValidatorsTest` (17) (`44b5022`) | no | no | no |
+| Artifact integrity and immutable upload (MP-005, MP-006, MP-008) | **yes** (`zipSha256` computed from the exact uploaded bytes; one archive per submission) | `ArtifactIntegrityAndHandoffTest` (21), `SubmitUploadUseCaseTest` (9) (`44b5022`) | no (SAF picker runtime unverified) | no (`PR3-042`) | no |
+| Lifecycle transitions (MP-003) | **partial** — client-side `POST /plans/{id}/status` exists (`GatewayApi.transitionPlanStatus`), but Gateway A registers `GET /plans/:id/status` only (**PR3-026 / ADR 0014 D3**), so transitions cannot succeed against the deployed gateway. `SET_DONE` is additionally held (`SET_DONE_AWAITS_SEAL_ROUTE`) because a console upload produces no Gateway C seal and no route defines one (**BE-MP-12**) | `RequestTransitionUseCaseTest` (16), `TransitionPreconditionValidatorTest` (12) (`44b5022`) | no | no (route missing + `PR3-042`) | no |
+| Recovery and handoff (MP-010, MP-014) | **yes** (lookup-only; `PRE_TRANSFER_HANDOFF_READY` requires the status read back as `completed`) | `ReconcileOperationUseCaseTest` (9), `ArtifactIntegrityAndHandoffTest` (21) (`44b5022`) | no (`PR3-041` WorkManager) | no (`PR3-042`) | no |
+| Failure vocabulary and refusal classification (MP-012) | **yes** (`fromGatewayCode` / `fromThrowable`; the contract's `SEAL_NOT_ATTESTED` and `SEAL_FACT_UNAVAILABLE` reach the seal-refusal surface) | `FailureCategoryMapperTest` (16) (`44b5022`) | no | no | no |
+| Module architecture rules (module-scoped extension of PR3-033) | **yes** (`domain`/`ui` independent of the host app; `ui` never reaches `data`; no HTTP, shell, Git, or GitHub client; no capability persisted) | `ManualPipelineArchitectureTest` (9) (`44b5022`) | no (n/a) | no (n/a) | no |
+
+**OPEN (1):** `POST /plans/{id}/status` is not implemented in Gateway A. The module is client-complete against contract rev 1.2 but cannot advance a task status until the route exists (I-10 — a missing contract route is a release blocker, not permission to invent an endpoint).
+
+**OPEN (2):** no seal route exists for a console upload, so `SET_DONE` is held locally and can never be dispatched. Resolution is `BE-MP-12` (or an operator-approved operator-executor exception to the seal rule), and it needs an ADR.
+
+**OPEN (3):** the module has **no ADR and no register item**. The manual pipeline's approval, the `SET_DONE` question, and the archive-building question (build the archive from operator-selected files, or accept a prepared ZIP) are operator decisions that have not been recorded.
+
+**OPEN (4):** Android-runtime and device evidence are absent (instrumented CI `PR3-043`); all evidence above is JVM-level with fakes.
 
 ---
 
