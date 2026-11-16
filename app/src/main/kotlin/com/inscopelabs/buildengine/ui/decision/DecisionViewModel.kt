@@ -15,6 +15,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/**
+ * Form state for owner framework decisions.
+ *
+ * Per ADR 0014 D2 the operator-visible fields that are sent on the wire are
+ * plan, task, branch, decision and notes (rationale). Attribution and evidence
+ * are not collected; the gateway derives attribution from the enrolled key.
+ */
 data class DecisionFormState(
     val decisionId: String = "",
     val plan: String = "",
@@ -23,13 +30,9 @@ data class DecisionFormState(
     val headSha: String = "",
     val order: String = "",
     val selectedDecision: FrameworkDecision = FrameworkDecision.APPROVED,
-    val attribution: String = "",
-    val rationale: String = "",
-    val scope: String = "",
-    val evidence: String = "",
     val notes: String = "",
     val isSubmitting: Boolean = false,
-    val contractBlockedReason: String? = DecideFrameworkUseCase.PR3_003_BLOCKER_MESSAGE,
+    val contractBlockedReason: String? = null,
     val lastResult: DecideResult? = null,
 ) {
     val hasRequiredFields: Boolean
@@ -37,11 +40,7 @@ data class DecisionFormState(
             task.isNotBlank() &&
             branch.isNotBlank() &&
             headSha.isNotBlank() &&
-            order.isNotBlank() &&
-            attribution.isNotBlank() &&
-            rationale.isNotBlank() &&
-            scope.isNotBlank() &&
-            evidence.isNotBlank()
+            order.isNotBlank()
 
     val canSubmit: Boolean
         get() = !isSubmitting && hasRequiredFields && contractBlockedReason == null
@@ -50,8 +49,7 @@ data class DecisionFormState(
 /**
  * State holder for owner framework decisions (`POST /plans/{id}/decide`, T3-404 / PR3-025).
  *
- * Captures the required attribution, rationale, scope, and evidence fields while failing closed
- * until the PR3-003 schema/route contract blocker is resolved.
+ * Implements ADR 0014 D2: only schema-faithful fields are collected and submitted.
  */
 @HiltViewModel
 class DecisionViewModel @Inject constructor(
@@ -79,10 +77,6 @@ class DecisionViewModel @Inject constructor(
     fun updateHeadSha(value: String) = _uiState.update { it.copy(headSha = value, lastResult = null) }
     fun updateOrder(value: String) = _uiState.update { it.copy(order = value, lastResult = null) }
     fun selectDecision(value: FrameworkDecision) = _uiState.update { it.copy(selectedDecision = value, lastResult = null) }
-    fun updateAttribution(value: String) = _uiState.update { it.copy(attribution = value, lastResult = null) }
-    fun updateRationale(value: String) = _uiState.update { it.copy(rationale = value, lastResult = null) }
-    fun updateScope(value: String) = _uiState.update { it.copy(scope = value, lastResult = null) }
-    fun updateEvidence(value: String) = _uiState.update { it.copy(evidence = value, lastResult = null) }
     fun updateNotes(value: String) = _uiState.update { it.copy(notes = value, lastResult = null) }
 
     fun submitDecision(typedHeadConfirmation: String? = null) {
@@ -99,10 +93,6 @@ class DecisionViewModel @Inject constructor(
                     headSha = current.headSha,
                     order = current.order,
                     decision = current.selectedDecision,
-                    attribution = current.attribution,
-                    rationale = current.rationale,
-                    scope = current.scope,
-                    evidence = current.evidence,
                     notes = current.notes.takeIf { it.isNotBlank() },
                 ),
                 typedHeadConfirmation = typedHeadConfirmation,
