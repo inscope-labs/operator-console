@@ -28,6 +28,9 @@ class PlanDraftValidatorTest {
     private fun fields(draft: com.inscopelabs.buildengine.domain.model.PlanDraft) =
         errors(draft).map { it.field }
 
+    private fun messages(draft: com.inscopelabs.buildengine.domain.model.PlanDraft) =
+        errors(draft).map { it.message }
+
     @Test
     fun `a complete plan passes the canonical rules`() {
         val report = validator.validate(PlanDraftFixtures.draft())
@@ -148,7 +151,7 @@ class PlanDraftValidatorTest {
             tasks = listOf(PlanDraftFixtures.task(deliverables = listOf("../outside.txt"))),
         )
 
-        assertTrue(fields(draft).any { it.contains("unsafe deliverable path") })
+        assertTrue(messages(draft).any { it.contains("unsafe deliverable path") })
     }
 
     @Test
@@ -157,7 +160,7 @@ class PlanDraftValidatorTest {
             tasks = listOf(PlanDraftFixtures.task(deliverables = listOf("/etc/passwd"))),
         )
 
-        assertTrue(fields(draft).any { it.contains("unsafe deliverable path") })
+        assertTrue(messages(draft).any { it.contains("unsafe deliverable path") })
     }
 
     @Test
@@ -167,7 +170,7 @@ class PlanDraftValidatorTest {
             tasks = listOf(PlanDraftFixtures.task(deliverables = listOf("docs/readme.md"))),
         )
 
-        assertTrue(fields(draft).any { it.contains("outside deliverable_roots") })
+        assertTrue(messages(draft).any { it.contains("outside deliverable_roots") })
     }
 
     @Test
@@ -177,7 +180,7 @@ class PlanDraftValidatorTest {
             tasks = listOf(PlanDraftFixtures.task(deliverables = listOf("docs/readme.md"))),
         )
 
-        assertTrue(fields(draft).any { it.contains("does not match deliverable_patterns") })
+        assertTrue(messages(draft).any { it.contains("does not match deliverable_patterns") })
     }
 
     @Test
@@ -196,7 +199,7 @@ class PlanDraftValidatorTest {
             ),
         )
 
-        assertTrue(fields(draft).any { it.contains("unsafe context path") })
+        assertTrue(messages(draft).any { it.contains("unsafe context path") })
     }
 
     @Test
@@ -210,7 +213,7 @@ class PlanDraftValidatorTest {
             ),
         )
 
-        assertTrue(fields(draft).any { it.contains("blocked_by unknown task") })
+        assertTrue(messages(draft).any { it.contains("blocked_by unknown task") })
     }
 
     @Test
