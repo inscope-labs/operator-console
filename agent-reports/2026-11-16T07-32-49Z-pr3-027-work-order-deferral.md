@@ -167,8 +167,45 @@ failures), **43824896807** on `8ec4fa4` — success (536 tests, 0 failures; that
 commit of the branch head with `main`, which proved the branch merges cleanly with the PR3-025 work
 before the rebase), and **43825323550** on `34772d9` — success (536 tests, 0 failures).
 
-The commit that follows this one changes only the CI wording in the `docs/STATUS.md` `T3-404` row and
-this paragraph. The CI result for the branch head is recorded in the pull request.
+### The first run of the branch head failed, on a pre-existing flake
+
+Attempt 1 of run **43826457955** on the branch head `379c17f` **failed**:
+
+```
+SettingsViewModelTest > testConnection success persists health snapshot FAILED
+    java.lang.AssertionError at Assert.java:87
+      Caused by: java.lang.AssertionError at SettingsViewModelTest.kt:222
+536 tests completed, 1 failed
+```
+
+This is **not** caused by this branch:
+
+- The failing file is `app/src/test/kotlin/.../ui/settings/SettingsViewModelTest.kt` and the assertion is
+  at `SettingsViewModelTest.kt:222`. This branch touches no file under `ui/settings` and no settings code
+  at all — `git log 560882c..HEAD -- app/src/test/.../ui/settings/` is empty.
+- The head commit `379c17f` changed only `docs/STATUS.md` and this report — not one line of code.
+- **The same test failed identically on `main`**, at `b686730`, in run **43816881326**
+  (`495 tests completed, 1 failed`) — a commit that predates this branch.
+- The test drives a MockWebServer call inside `runTest` + Turbine, so it races the virtual clock. It is
+  green on `main` at `2904a44` and `560882c`, and green on this branch at `34772d9` and `cceb72f`.
+
+The failed job was re-run (attempt 2 of the same run id) and is green: **536 tests, 0 failures, 0
+ignored**.
+
+The flake was **not** fixed here. It is unrelated code, and repairing it inside a register item about
+work-order deferral would be scope creep. It is flagged for the operator: `SettingsViewModelTest` is
+intermittently red and has now failed twice across `main` and PR runs.
+
+### Every run of this branch, for the audit trail
+
+| Run | Head | Result |
+|---|---|---|
+| 43824183321 | `bc711fa` | success — 524 tests, 0 failures |
+| 43824896807 | `8ec4fa4` | success — 536 tests, 0 failures (merge commit with `main`, proving a clean merge with PR3-025) |
+| 43825323550 | `34772d9` | success — 536 tests, 0 failures |
+| 43825849231 | `cceb72f` | success — 536 tests, 0 failures |
+| 43826457955 attempt 1 | `379c17f` | **failure** — 1 failure, `SettingsViewModelTest` (pre-existing flake, above) |
+| 43826457955 attempt 2 | `379c17f` | **success** — 536 tests, 0 failures |
 
 | Class | Tests | Failures | Ignored |
 |---|---:|---:|---:|
