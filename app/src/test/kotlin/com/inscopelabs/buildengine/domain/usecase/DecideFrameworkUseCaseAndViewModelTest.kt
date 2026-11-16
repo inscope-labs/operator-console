@@ -35,12 +35,13 @@ import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
 /**
- * Stage 3.4 (T3-404 / PR3-003 / PR3-025): DecideFrameworkUseCase + DecisionViewModel.
+ * Stage 3.4 (T3-404 / PR3-025): DecideFrameworkUseCase + DecisionViewModel under ADR 0014 D2.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class DecideFrameworkUseCaseAndViewModelTest {
@@ -75,10 +76,6 @@ class DecideFrameworkUseCaseAndViewModelTest {
         headSha = head,
         order = "order-7731",
         decision = FrameworkDecision.APPROVED,
-        attribution = "Lead Architect",
-        rationale = "Matches security boundary ADR",
-        scope = "Module: parser",
-        evidence = "ADR-0005 review log #14",
         notes = "Approved after review",
     )
 
@@ -90,58 +87,29 @@ class DecideFrameworkUseCaseAndViewModelTest {
     )
 
     @Test
-    fun `missing required attribution, rationale, scope, or evidence returns InvalidTarget before prompt or send`() = runTest {
+    fun `missing plan task order branch or head returns InvalidTarget before prompt or send`() = runTest {
         val uc = DecideFrameworkUseCase(recordingRepo, confirmAndMint(), nonceSource)
 
-        assertTrue(uc(sampleTarget().copy(attribution = " ")) is DecideResult.InvalidTarget)
-        assertTrue(uc(sampleTarget().copy(rationale = "")) is DecideResult.InvalidTarget)
-        assertTrue(uc(sampleTarget().copy(scope = "")) is DecideResult.InvalidTarget)
-        assertTrue(uc(sampleTarget().copy(evidence = " ")) is DecideResult.InvalidTarget)
+        assertTrue(uc(sampleTarget().copy(plan = " ")) is DecideResult.InvalidTarget)
+        assertTrue(uc(sampleTarget().copy(task = "")) is DecideResult.InvalidTarget)
+        assertTrue(uc(sampleTarget().copy(order = "")) is DecideResult.InvalidTarget)
+        assertTrue(uc(sampleTarget().copy(branch = "")) is DecideResult.InvalidTarget)
+        assertTrue(uc(sampleTarget().copy(headSha = "")) is DecideResult.InvalidTarget)
         assertEquals(0, prompts)
         assertTrue(recordingRepo.decides.isEmpty())
     }
 
     @Test
-    fun `default configuration fails closed with ContractBlocked under PR3-003 without minting or sending`() = runTest {
+    fun `forbidden patterns in notes return InvalidTarget`() = runTest {
         val uc = DecideFrameworkUseCase(recordingRepo, confirmAndMint(), nonceSource)
-
-        val result = uc(sampleTarget())
-
-        assertTrue(result is DecideResult.ContractBlocked)
-        assertTrue((result as DecideResult.ContractBlocked).reason.contains("PR3-003"))
+        val result = uc(sampleTarget().copy(notes = "ghp_abcdefghijklmnopqrstuvwxyz0123456789"))
+        assertTrue(result is DecideResult.InvalidTarget)
         assertEquals(0, prompts)
         assertTrue(recordingRepo.decides.isEmpty())
     }
 
     @Test
-    fun `DecisionViewModel exposes PR3-003 blocker, disables submission, and never sends when blocked`() = runTest {
-        val uc = DecideFrameworkUseCase(recordingRepo, confirmAndMint(), nonceSource)
-        val vm = DecisionViewModel(SavedStateHandle(mapOf("decisionId" to "D-01")), uc)
-
-        vm.updatePlan("atlas")
-        vm.updateTask("10008")
-        vm.updateOrder("order-7731")
-        vm.updateBranch(branch)
-        vm.updateHeadSha(head)
-        vm.selectDecision(FrameworkDecision.REJECTED)
-        vm.updateAttribution("Lead Architect")
-        vm.updateRationale("Does not satisfy T3-302")
-        vm.updateScope("gateway/decisions")
-        vm.updateEvidence("Schema diff audit")
-
-        val state = vm.uiState.value
-        assertTrue(state.hasRequiredFields)
-        assertFalse(state.canSubmit)
-        assertNotNull(state.contractBlockedReason)
-
-        vm.submitDecision()
-        assertTrue(vm.uiState.value.lastResult is DecideResult.ContractBlocked)
-        assertEquals(0, prompts)
-        assertTrue(recordingRepo.decides.isEmpty())
-    }
-
-    @Test
-    fun `when schema is settled, decide mints single DECIDE capability and executor keeps missing headSha as UncertainCompletion`() = runTest {
+    fun `default settled path mints single DECIDE capability and journals via repository`() = runTest {
         val dao = InMemoryOperationJournalDao()
         val cipher = RecordingFakeJournalCipher()
         val gateway = FakeGatewayApi().apply { branchHeadResult = { head } }
@@ -156,10 +124,11 @@ class DecideFrameworkUseCaseAndViewModelTest {
             operationRepository = realRepo,
             confirmAndMintCapability = confirmAndMint(),
             nonceSource = nonceSource,
-            contractSchemaSettled = true,
+            // default is settled = true (ADR 0014 D2)
         )
 
         val result = uc(sampleTarget()) as DecideResult.Executed
+        // Ack lacks headSha → UncertainCompletion is correct fail-closed behaviour (I-06)
         assertTrue(
             "Expected UncertainCompletion when decide ack lacks headSha, got ${result.outcome}",
             result.outcome is OperationOutcome.UncertainCompletion,
@@ -170,6 +139,46 @@ class DecideFrameworkUseCaseAndViewModelTest {
         assertEquals("APPROVED", sent.decision)
         assertEquals("Approved after review", sent.notes)
         assertTrue(sent.capability.contains("\n${OperationType.DECIDE.name}\n"))
+    }
+
+    @Test
+    fun `explicit unsettled construction still blocks for regression`() = runTest {
+        val uc = DecideFrameworkUseCase(
+            operationRepository = recordingRepo,
+            confirmAndMintCapability = confirmAndMint(),
+            nonceSource = nonceSource,
+            contractSchemaSettled = false,
+        )
+        val result = uc(sampleTarget())
+        assertTrue(result is DecideResult.ContractBlocked)
+        assertEquals(0, prompts)
+        assertTrue(recordingRepo.decides.isEmpty())
+    }
+
+    @Test
+    fun `DecisionViewModel under D2 has no contract blocker and submits schema fields only`() = runTest {
+        val uc = DecideFrameworkUseCase(recordingRepo, confirmAndMint(), nonceSource)
+        val vm = DecisionViewModel(SavedStateHandle(mapOf("decisionId" to "d1")), uc)
+
+        assertNull(vm.uiState.value.contractBlockedReason)
+        assertFalse(vm.uiState.value.canSubmit)
+
+        vm.updatePlan("atlas")
+        vm.updateTask("10008")
+        vm.updateBranch(branch)
+        vm.updateHeadSha(head)
+        vm.updateOrder("order-7731")
+        vm.updateNotes("Matches security boundary ADR")
+
+        val state = vm.uiState.value
+        assertTrue(state.hasRequiredFields)
+        assertTrue(state.canSubmit)
+
+        vm.submitDecision()
+        val last = vm.uiState.value.lastResult
+        assertTrue(last is DecideResult.Executed || last is DecideResult.NotAuthorized)
+        // Repository was reached (or auth gate); never ContractBlocked under settled default
+        assertFalse(last is DecideResult.ContractBlocked)
     }
 
     @Test
