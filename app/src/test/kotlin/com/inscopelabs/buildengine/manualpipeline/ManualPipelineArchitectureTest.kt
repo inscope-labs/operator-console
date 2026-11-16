@@ -198,10 +198,9 @@ class ManualPipelineArchitectureTest {
     fun `no module record declares a capability signature nonce or credential`() {
         val sensitive = Regex("""(?i)(nonce|signature|capability|capabilityWire|privateKey|secret|token|credential|bearer)""")
         val violations = moduleFiles()
+            .filter { it.readText().contains("@Entity") }
             .flatMap { file ->
                 val content = file.readText()
-                if (!content.contains("@Entity")) return@flatMap emptyList()
-
                 val property = Regex(
                     """(?:^|[,(\s;])(?:(?:private|internal|public|protected|override|const|lateinit)\s+)*(?:val|var)\s+([A-Za-z_][A-Za-z0-9_]*)\b""",
                 )
@@ -209,6 +208,7 @@ class ManualPipelineArchitectureTest {
                     .map { it.groupValues[1] }
                     .filter { sensitive.containsMatchIn(it) }
                     .map { "${relative(file)} declares '$it'" }
+                    .toList()
             }
             .toList()
 

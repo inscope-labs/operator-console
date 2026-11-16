@@ -6,6 +6,7 @@ import com.inscopelabs.buildengine.manualpipeline.FixedTestClock
 import com.inscopelabs.buildengine.manualpipeline.RecordingHandoffEvidenceStore
 import com.inscopelabs.buildengine.manualpipeline.domain.model.Deliverable
 import com.inscopelabs.buildengine.manualpipeline.domain.model.HandoffEvidence
+import com.inscopelabs.buildengine.manualpipeline.domain.model.ManualTask
 import com.inscopelabs.buildengine.manualpipeline.domain.model.TaskStatus
 import com.inscopelabs.buildengine.manualpipeline.domain.usecase.BuildIdempotencyKeyUseCase
 import com.inscopelabs.buildengine.manualpipeline.domain.usecase.VerifyHandoffUseCase
@@ -206,7 +207,7 @@ class ArtifactIntegrityAndHandoffTest {
 
     private suspend fun verify(
         useCase: VerifyHandoffUseCase = handoffUseCase(),
-        task = Fixtures.task(),
+        task: ManualTask = Fixtures.task(),
         submissionId: String = Fixtures.SUBMISSION_ID,
         zipSha256: String = Fixtures.ZIP_SHA256,
         uploadAuditRef: String = "audit-upload",
