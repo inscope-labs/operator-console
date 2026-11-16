@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 /**
  * Wire DTOs for `POST /plans/{id}/status` strictly matching
  * `docs/schemas/plan-status-transition.schema.json` (`additionalProperties: false`)
- * and contract revision 1.1 §3.17.
+ * and contract revision 1.2 §3.17.
  */
 @Serializable
 data class PlanStatusTransitionRequestDto(

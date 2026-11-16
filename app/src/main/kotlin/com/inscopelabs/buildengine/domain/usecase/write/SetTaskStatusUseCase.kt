@@ -34,6 +34,12 @@ sealed interface SetTaskStatusResult {
         val outcome: OperationOutcome,
         val authoritativeTask: Task? = null,
         val authoritativePlanStatus: PlanStatus? = null,
+        /**
+         * True only when the operation succeeded AND the authoritative read-back shows the task in
+         * the requested status (I-06). A success acknowledgement without a matching read-back must
+         * not be presented as a completed transition.
+         */
+        val readBackConfirmed: Boolean = false,
     ) : SetTaskStatusResult
 
     data class InvalidTransition(val reason: String) : SetTaskStatusResult
@@ -45,8 +51,9 @@ sealed interface SetTaskStatusResult {
 /**
  * Operator-executed task status change (`POST /plans/{id}/status`, §3.17).
  *
- * Enforces the allowed transition table (`PENDING -> IN_PROGRESS`, `PENDING -> DONE`,
- * `IN_PROGRESS -> DONE`), requires completion [SetTaskStatusTarget.evidence] when transitioning
+ * Enforces the allowed transition table (`PENDING -> IN_PROGRESS`, `IN_PROGRESS -> DONE`; a task
+ * must be started before it can be completed, matching the transition contract's `SET_DONE`
+ * source states), requires completion [SetTaskStatusTarget.evidence] when transitioning
  * to [TaskStatus.DONE], obtains its scoped capability (`SET_IN_PROGRESS` / `SET_DONE`) solely via
  * [ConfirmAndMintCapabilityUseCase], executes through the journal-backed [OperationRepository],
  * and refreshes authoritative task/plan state after verified success.
@@ -132,6 +139,8 @@ class SetTaskStatusUseCase(
             outcome = outcome,
             authoritativeTask = refreshedTask,
             authoritativePlanStatus = refreshedPlanStatus,
+            readBackConfirmed = outcome is OperationOutcome.Succeeded &&
+                refreshedTask?.status == target.targetStatus,
         )
     }
 
@@ -144,7 +153,6 @@ class SetTaskStatusUseCase(
         when (current to target) {
             TaskStatus.PENDING to TaskStatus.IN_PROGRESS ->
                 TransitionSpec(OperationType.SET_IN_PROGRESS, "in_progress")
-            TaskStatus.PENDING to TaskStatus.DONE,
             TaskStatus.IN_PROGRESS to TaskStatus.DONE ->
                 TransitionSpec(OperationType.SET_DONE, "completed")
             else -> null
