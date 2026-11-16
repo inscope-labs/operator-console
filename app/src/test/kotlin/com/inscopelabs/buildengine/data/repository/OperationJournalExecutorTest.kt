@@ -168,7 +168,13 @@ class OperationJournalExecutorTest {
         val outcome = freshRepo.executeOperation(sampleIntent()) { key ->
             sendCalls++
             sentKey = key
-            GatewayAckDto(accepted = true, headSha = HEAD_SHA_1, auditRef = "audit-ok")
+            GatewayAckDto(
+                accepted = true,
+                operation = "PUBLISH",
+                branch = "task-10008-refactor-parser",
+                headSha = HEAD_SHA_1,
+                auditRef = "audit-ok",
+            )
         }
 
         assertEquals(1, sendCalls)
@@ -666,7 +672,13 @@ class OperationJournalExecutorTest {
         val tap3 = timeoutRepo.executeOperation(sampleIntent(task = "10099")) { key ->
             writeCalls++
             sentKeys.add(key)
-            GatewayAckDto(accepted = true, headSha = HEAD_SHA_1, auditRef = "audit-other-intent")
+            GatewayAckDto(
+                accepted = true,
+                operation = "PUBLISH",
+                branch = "task-10008-refactor-parser",
+                headSha = HEAD_SHA_1,
+                auditRef = "audit-other-intent",
+            )
         }
         assertEquals(2, writeCalls)
         assertEquals(2, dao.getAll().size)
@@ -856,7 +868,13 @@ class OperationJournalExecutorTest {
         )
         val outcome = repo.executeOperation(sampleIntent()) {
             sends++
-            GatewayAckDto(accepted = true, branch = "task-10008-refactor-parser", headSha = HEAD_SHA_1, auditRef = "audit-drift")
+            GatewayAckDto(
+                accepted = true,
+                operation = "PUBLISH",
+                branch = "task-10008-refactor-parser",
+                headSha = HEAD_SHA_1,
+                auditRef = "audit-drift",
+            )
         }
 
         assertEquals(
@@ -880,27 +898,45 @@ class OperationJournalExecutorTest {
             },
         )
         val outcome = repo.executeOperation(sampleIntent()) {
-            GatewayAckDto(accepted = true, headSha = HEAD_SHA_1, auditRef = "audit-unavailable")
+            GatewayAckDto(
+                accepted = true,
+                operation = "PUBLISH",
+                branch = "task-10008-refactor-parser",
+                headSha = HEAD_SHA_1,
+                auditRef = "audit-unavailable",
+            )
         }
         assertTrue(outcome is OperationOutcome.UncertainCompletion)
         assertEquals(OperationJournalState.UNCERTAIN, dao.getAll().single().state)
     }
 
     @Test
-    fun `T3-302 accepted ack naming a different branch is UncertainCompletion`() = runTest {
+    fun `T3-302 accepted ack naming a different branch fails closed to RecoveryRequired`() = runTest {
         val repo = newExecutor()
         val outcome = repo.executeOperation(sampleIntent()) {
-            GatewayAckDto(accepted = true, branch = "task-99999-other", headSha = HEAD_SHA_1, auditRef = "audit-other")
+            GatewayAckDto(
+                accepted = true,
+                operation = "PUBLISH",
+                branch = "task-99999-other",
+                headSha = HEAD_SHA_1,
+                auditRef = "audit-other",
+            )
         }
-        assertTrue(outcome is OperationOutcome.UncertainCompletion)
-        assertEquals(OperationJournalState.UNCERTAIN, dao.getAll().single().state)
+        assertTrue(outcome is OperationOutcome.RecoveryRequired)
+        assertEquals(OperationJournalState.RECOVERY_REQUIRED, dao.getAll().single().state)
     }
 
     @Test
     fun `T3-302 accepted ack with a matching live head is Succeeded`() = runTest {
         val repo = newExecutor()
         val outcome = repo.executeOperation(sampleIntent()) {
-            GatewayAckDto(accepted = true, branch = "task-10008-refactor-parser", headSha = HEAD_SHA_1, auditRef = "audit-match")
+            GatewayAckDto(
+                accepted = true,
+                operation = "PUBLISH",
+                branch = "task-10008-refactor-parser",
+                headSha = HEAD_SHA_1,
+                auditRef = "audit-match",
+            )
         }
         assertEquals(OperationOutcome.Succeeded(auditRef = "audit-match", headSha = HEAD_SHA_1), outcome)
         assertEquals(OperationJournalState.TERMINAL_SUCCEEDED, dao.getAll().single().state)
@@ -1054,6 +1090,278 @@ class OperationJournalExecutorTest {
         assertEquals(1, sends)
         assertEquals(1, dao.getAll().size)
         assertEquals(OperationOutcome.Succeeded(auditRef = "audit-lookup", headSha = HEAD_SHA_1), second)
+    }
+
+    // -- PR3-013: Unified ack + lookup verification, scope/ID/SHA checks, monotonicity --------
+
+    @Test
+    fun `PR3-013 synchronous ack with mismatched or missing operation fails closed and never succeeds`() = runTest {
+        val repo = newExecutor()
+
+        val mismatched = repo.executeOperation(sampleIntent(task = "10008")) {
+            GatewayAckDto(
+                accepted = true,
+                operation = "RECONCILE",
+                branch = "task-10008-refactor-parser",
+                headSha = HEAD_SHA_1,
+                auditRef = "audit-wrong-op",
+            )
+        }
+        assertTrue(mismatched is OperationOutcome.RecoveryRequired)
+        assertEquals(OperationJournalState.RECOVERY_REQUIRED, dao.getAll().last().state)
+
+        val missingOp = repo.executeOperation(sampleIntent(task = "10009")) {
+            GatewayAckDto(
+                accepted = true,
+                operation = "",
+                branch = "task-10008-refactor-parser",
+                headSha = HEAD_SHA_1,
+                auditRef = "audit-missing-op",
+            )
+        }
+        assertTrue(missingOp is OperationOutcome.RecoveryRequired)
+        assertEquals(OperationJournalState.RECOVERY_REQUIRED, dao.getAll().last().state)
+    }
+
+    @Test
+    fun `PR3-013 synchronous ack with mismatched branch fails closed to RecoveryRequired`() = runTest {
+        val repo = newExecutor()
+        val outcome = repo.executeOperation(sampleIntent()) {
+            GatewayAckDto(
+                accepted = true,
+                operation = "PUBLISH",
+                branch = "task-99999-other",
+                headSha = HEAD_SHA_1,
+                auditRef = "audit-wrong-branch",
+            )
+        }
+        assertTrue(outcome is OperationOutcome.RecoveryRequired)
+        assertEquals(OperationJournalState.RECOVERY_REQUIRED, dao.getAll().single().state)
+    }
+
+    @Test
+    fun `PR3-013 synchronous ack and lookup reject non-40-char short headSha even if branchHead matches`() = runTest {
+        val shortSha = "9f2c1b7"
+        val repo = newExecutor(
+            object : GatewayApi by fakeGateway {
+                override suspend fun branchHead(branch: String): BranchHeadDto =
+                    BranchHeadDto(branch = branch, headSha = shortSha)
+            },
+        )
+        val ackOutcome = repo.executeOperation(sampleIntent(task = "10008")) {
+            GatewayAckDto(
+                accepted = true,
+                operation = "PUBLISH",
+                branch = "task-10008-refactor-parser",
+                headSha = shortSha,
+                auditRef = "audit-short-ack",
+            )
+        }
+        assertTrue(ackOutcome is OperationOutcome.RecoveryRequired)
+
+        val key = seedUncertainEntry(task = "10009")
+        val lookupRepo = newExecutor(
+            lookupGateway(
+                lookupResponse = {
+                    OperationLookupDto(
+                        id = it,
+                        operation = "PUBLISH",
+                        status = "completed",
+                        branch = "task-10008-refactor-parser",
+                        headSha = shortSha,
+                        auditRef = "audit-short-lookup",
+                        timestamp = 1761840050L,
+                    )
+                },
+                liveHeadSha = shortSha,
+            ),
+        )
+        val lookupOutcome = lookupRepo.lookupOperation(key)
+        assertTrue(lookupOutcome is OperationOutcome.RecoveryRequired)
+        assertEquals(OperationJournalState.RECOVERY_REQUIRED, dao.findByKey(key)?.state)
+    }
+
+    @Test
+    fun `PR3-013 lookup with mismatched id, operation, branch, or contradictory completed code fails closed`() = runTest {
+        val cases = listOf(
+            // 1. Mismatched operation id
+            { key: String ->
+                OperationLookupDto(
+                    id = "f".repeat(32),
+                    operation = "PUBLISH",
+                    status = "completed",
+                    branch = "task-10008-refactor-parser",
+                    headSha = HEAD_SHA_1,
+                    auditRef = "audit-bad-id",
+                    timestamp = 1761840050L,
+                )
+            },
+            // 2. Mismatched operation type
+            { key: String ->
+                OperationLookupDto(
+                    id = key,
+                    operation = "HALT",
+                    status = "completed",
+                    branch = "task-10008-refactor-parser",
+                    headSha = HEAD_SHA_1,
+                    auditRef = "audit-bad-op",
+                    timestamp = 1761840050L,
+                )
+            },
+            // 3. Mismatched branch
+            { key: String ->
+                OperationLookupDto(
+                    id = key,
+                    operation = "PUBLISH",
+                    status = "completed",
+                    branch = "task-other-branch",
+                    headSha = HEAD_SHA_1,
+                    auditRef = "audit-bad-branch",
+                    timestamp = 1761840050L,
+                )
+            },
+            // 4. Contradictory completed status carrying error code
+            { key: String ->
+                OperationLookupDto(
+                    id = key,
+                    operation = "PUBLISH",
+                    status = "completed",
+                    branch = "task-10008-refactor-parser",
+                    headSha = HEAD_SHA_1,
+                    auditRef = "audit-contradictory",
+                    code = "HEAD_DRIFT",
+                    timestamp = 1761840050L,
+                )
+            },
+        )
+
+        cases.forEachIndexed { idx, responseFactory ->
+            dao = FakeOperationJournalDao()
+            val key = seedUncertainEntry(task = "4000$idx")
+            val repo = newExecutor(
+                lookupGateway(
+                    lookupResponse = responseFactory,
+                    liveHeadSha = HEAD_SHA_1,
+                ),
+            )
+            val outcome = repo.lookupOperation(key)
+            assertTrue("Case $idx must fail closed to RecoveryRequired, was $outcome", outcome is OperationOutcome.RecoveryRequired)
+            assertEquals(OperationJournalState.RECOVERY_REQUIRED, dao.findByKey(key)?.state)
+        }
+    }
+
+    @Test
+    fun `PR3-013 decryption failure during ack keeps RECOVERY_REQUIRED instead of overwriting to UNCERTAIN`() = runTest {
+        val repo = newExecutor()
+        val outcome = repo.executeOperation(sampleIntent()) {
+            cipher.failOnDecrypt = true
+            GatewayAckDto(
+                accepted = true,
+                operation = "PUBLISH",
+                branch = "task-10008-refactor-parser",
+                headSha = HEAD_SHA_1,
+                auditRef = "audit-decrypt-fail",
+            )
+        }
+        assertTrue(outcome is OperationOutcome.RecoveryRequired)
+        assertEquals(OperationJournalState.RECOVERY_REQUIRED, dao.getAll().single().state)
+    }
+
+    @Test
+    fun `PR3-013 live head check with contradicting branch name or GatewayNotConfigured fails closed`() = runTest {
+        val contradictingBranchRepo = newExecutor(
+            object : GatewayApi by fakeGateway {
+                override suspend fun branchHead(branch: String): BranchHeadDto =
+                    BranchHeadDto(branch = "task-wrong-branch", headSha = HEAD_SHA_1)
+            },
+        )
+        val ackOutcome = contradictingBranchRepo.executeOperation(sampleIntent(task = "10008")) {
+            GatewayAckDto(
+                accepted = true,
+                operation = "PUBLISH",
+                branch = "task-10008-refactor-parser",
+                headSha = HEAD_SHA_1,
+                auditRef = "audit-live-branch-mismatch",
+            )
+        }
+        assertTrue(ackOutcome is OperationOutcome.UncertainCompletion)
+        assertEquals(OperationJournalState.UNCERTAIN, dao.getAll().last().state)
+
+        dao = FakeOperationJournalDao()
+        val key = seedUncertainEntry(task = "10009")
+        val unconfiguredLookupRepo = newExecutor(
+            object : GatewayApi by fakeGateway {
+                override suspend fun lookupOperation(idempotencyKey: String): OperationLookupDto =
+                    OperationLookupDto(
+                        id = idempotencyKey,
+                        operation = "PUBLISH",
+                        status = "completed",
+                        branch = "task-10008-refactor-parser",
+                        headSha = HEAD_SHA_1,
+                        auditRef = "audit-unconfigured",
+                        timestamp = 1761840050L,
+                    )
+
+                override suspend fun branchHead(branch: String): BranchHeadDto =
+                    throw com.inscopelabs.buildengine.core.network.GatewayNotConfiguredException("not configured")
+            },
+        )
+        val lookupSummary = unconfiguredLookupRepo.recoverUncertainOperations()
+        assertEquals(0, lookupSummary.resolvedCount)
+        assertEquals(1, lookupSummary.retryCount)
+        assertTrue(lookupSummary.outcomes[key] is OperationOutcome.UncertainCompletion)
+    }
+
+    @Test
+    fun `PR3-013 terminal refusal and conflict are monotonic and cannot be overwritten as success by lookup`() = runTest {
+        var lookupCalls = 0
+        val gateway = object : GatewayApi by fakeGateway {
+            override suspend fun lookupOperation(idempotencyKey: String): OperationLookupDto {
+                lookupCalls++
+                return OperationLookupDto(
+                    id = idempotencyKey,
+                    operation = "PUBLISH",
+                    status = "completed",
+                    branch = "task-10008-refactor-parser",
+                    headSha = HEAD_SHA_1,
+                    auditRef = "audit-late-completed",
+                    timestamp = 1761840060L,
+                )
+            }
+
+            override suspend fun branchHead(branch: String): BranchHeadDto =
+                BranchHeadDto(branch = branch, headSha = HEAD_SHA_1)
+        }
+        val repo = newExecutor(gateway)
+
+        val refusedOutcome = repo.executeOperation(sampleIntent(task = "10008")) {
+            throw GatewayHttpException(
+                statusCode = 423,
+                body = """{"code": "HALT_ACTIVE", "message": "halted"}""",
+                message = "halted",
+            )
+        }
+        assertEquals(OperationOutcome.Refused(code = "HALT_ACTIVE"), refusedOutcome)
+        val refusedKey = dao.getAll().single().idempotencyKey
+
+        val lookupAfterRefusal = repo.lookupOperation(refusedKey)
+        assertEquals(OperationOutcome.Refused(code = "HALT_ACTIVE"), lookupAfterRefusal)
+        assertEquals(OperationJournalState.TERMINAL_REFUSED, dao.findByKey(refusedKey)?.state)
+
+        val conflictOutcome = repo.executeOperation(sampleIntent(task = "10009")) {
+            throw GatewayHttpException(
+                statusCode = 409,
+                body = """{"code": "HEAD_DRIFT", "message": "drifted"}""",
+                message = "drifted",
+            )
+        }
+        assertEquals(OperationOutcome.Conflict(code = "HEAD_DRIFT"), conflictOutcome)
+        val conflictKey = dao.getAll().last().idempotencyKey
+
+        val lookupAfterConflict = repo.lookupOperation(conflictKey)
+        assertEquals(OperationOutcome.Conflict(code = "HEAD_DRIFT"), lookupAfterConflict)
+        assertEquals(OperationJournalState.TERMINAL_CONFLICT, dao.findByKey(conflictKey)?.state)
+        assertEquals(0, lookupCalls)
     }
 
     // -- Helpers & Fakes --------------------------------------------------------

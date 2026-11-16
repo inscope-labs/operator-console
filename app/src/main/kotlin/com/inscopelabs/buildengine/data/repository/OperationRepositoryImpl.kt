@@ -102,6 +102,9 @@ class OperationRepositoryImpl(
         } else {
             null
         }
+        if (existing != null && existing.state in TERMINAL_OUTCOME_STATES) {
+            return outcomeFromTerminalEntity(existing, decrypted!!)
+        }
         return when (val result = resolveViaGatewayLookup(idempotencyKey, existing, decrypted)) {
             is LookupResolution.Resolved -> result.outcome
             is LookupResolution.TransientRetry -> result.fallbackOutcome
@@ -303,47 +306,215 @@ class OperationRepositoryImpl(
         )
         journalDao.update(ackedEntity)
 
-        if (!ack.accepted || ack.auditRef.isBlank() || ack.headSha.isBlank()) {
-            markUncertain(ackedEntity)
+        val decrypted = decryptOrFailClosed(ackedEntity)
+            ?: return OperationOutcome.RecoveryRequired(
+                idempotencyKey = key,
+                auditRef = ack.auditRef.trim().takeIf { it.isNotEmpty() },
+            )
+
+        if (!ack.accepted) {
+            Logger.w(TAG, "Gateway ack accepted=false for key=$key; failing closed to UncertainCompletion")
+            markUncertainWithResult(
+                ackedEntity,
+                headSha = ack.headSha.trim().takeIf { it.isNotEmpty() },
+                auditRef = ack.auditRef.trim().takeIf { it.isNotEmpty() },
+            )
             return OperationOutcome.UncertainCompletion(
                 idempotencyKey = key,
-                headSha = ack.headSha.takeIf { it.isNotBlank() },
-                auditRef = ack.auditRef.takeIf { it.isNotBlank() },
+                headSha = ack.headSha.trim().takeIf { it.isNotEmpty() },
+                auditRef = ack.auditRef.trim().takeIf { it.isNotEmpty() },
             )
         }
 
-        // T3-302: an accepted acknowledgement is not enough. Success also needs the live branch
-        // head to match the head the gateway reports; anything else stays UncertainCompletion.
-        val intentBranch = decryptOrFailClosed(ackedEntity)?.intent?.branch?.trim().orEmpty()
-        val ackBranch = ack.branch.trim()
-        if (intentBranch.isEmpty() || (ackBranch.isNotEmpty() && ackBranch != intentBranch)) {
-            Logger.w(TAG, "Acknowledgement branch missing or contradicting intent for key=$key; UncertainCompletion")
-            markUncertainWithResult(ackedEntity, headSha = ack.headSha, auditRef = ack.auditRef)
-            return OperationOutcome.UncertainCompletion(
-                idempotencyKey = key,
-                headSha = ack.headSha,
-                auditRef = ack.auditRef,
+        val resolution = verifyAndFinalizeCompletedOperation(
+            key = key,
+            source = CompletionSource.ACK,
+            existingEntity = ackedEntity,
+            decryptedRecord = decrypted,
+            reportedOperation = ack.operation,
+            reportedBranch = ack.branch,
+            reportedHeadSha = ack.headSha,
+            reportedAuditRef = ack.auditRef,
+            reportedOutcome = ack.outcome.trim().takeIf { it.isNotEmpty() },
+        )
+        return when (resolution) {
+            is LookupResolution.Resolved -> resolution.outcome
+            is LookupResolution.TransientRetry -> resolution.fallbackOutcome
+        }
+    }
+
+    /**
+     * Single shared terminal-success verification path for BOTH synchronous write acknowledgements
+     * and `GET /operations/{id}` recovery lookups (PR3-013, T3-302, I-06).
+     *
+     * Guarantees:
+     * - Nonblank `auditRef` / `headSha` alone is never sufficient for [OperationOutcome.Succeeded].
+     * - Reported operation and branch must match the journalled intent (never silently overridden).
+     * - `headSha` must be a full 40-character hexadecimal SHA matching the live branch head.
+     * - Terminal refusal/conflict/recovery states are monotonic and never overwritten as success.
+     */
+    private suspend fun verifyAndFinalizeCompletedOperation(
+        key: String,
+        source: CompletionSource,
+        existingEntity: OperationJournalEntity?,
+        decryptedRecord: DecryptedJournalRecord?,
+        reportedOperation: String?,
+        reportedBranch: String?,
+        reportedHeadSha: String?,
+        reportedAuditRef: String?,
+        reportedOutcome: String? = null,
+    ): LookupResolution {
+        if (existingEntity != null && existingEntity.state in TERMINAL_OUTCOME_STATES && decryptedRecord != null) {
+            Logger.w(TAG, "Monotonicity guard: refusing to overwrite terminal state ${existingEntity.state} for key=$key")
+            return LookupResolution.Resolved(outcomeFromTerminalEntity(existingEntity, decryptedRecord))
+        }
+
+        val auditRef = reportedAuditRef?.trim()?.takeIf { it.isNotEmpty() }
+        val headSha = reportedHeadSha?.trim()?.takeIf { it.isNotEmpty() }
+
+        val expectedOp = decryptedRecord?.intent?.operation?.name
+        val cleanReportedOp = reportedOperation?.trim()?.takeIf { it.isNotEmpty() }
+        if (expectedOp != null && (cleanReportedOp == null || !cleanReportedOp.equals(expectedOp, ignoreCase = true))) {
+            Logger.w(
+                TAG,
+                "Operation mismatch on $source for key=$key (expected=$expectedOp, got=${cleanReportedOp ?: "<missing>"}); failing closed",
+            )
+            existingEntity?.let { markRecoveryRequired(it, code = null, auditRef = auditRef) }
+            return LookupResolution.Resolved(
+                OperationOutcome.RecoveryRequired(
+                    idempotencyKey = key,
+                    code = null,
+                    auditRef = auditRef,
+                ),
             )
         }
-        return when (verifyLiveHead(key, intentBranch, ack.headSha)) {
-            LiveHeadCheck.MATCH -> {
-                if (!markTerminalSucceeded(ackedEntity, auditRef = ack.auditRef, headSha = ack.headSha)) {
-                    return OperationOutcome.RecoveryRequired(idempotencyKey = key, auditRef = ack.auditRef)
+
+        val expectedBranch = decryptedRecord?.intent?.branch?.trim()?.takeIf { it.isNotEmpty() }
+        val cleanReportedBranch = reportedBranch?.trim()?.takeIf { it.isNotEmpty() }
+        if (expectedBranch != null && cleanReportedBranch != null && cleanReportedBranch != expectedBranch) {
+            Logger.w(TAG, "Contradictory branch on $source for key=$key; failing closed")
+            existingEntity?.let { markRecoveryRequired(it, code = null, auditRef = auditRef) }
+            return LookupResolution.Resolved(
+                OperationOutcome.RecoveryRequired(
+                    idempotencyKey = key,
+                    code = null,
+                    auditRef = auditRef,
+                ),
+            )
+        }
+
+        if (auditRef == null || headSha == null) {
+            return when (source) {
+                CompletionSource.ACK -> {
+                    existingEntity?.let { markUncertainWithResult(it, headSha = headSha, auditRef = auditRef) }
+                    LookupResolution.Resolved(
+                        OperationOutcome.UncertainCompletion(
+                            idempotencyKey = key,
+                            headSha = headSha,
+                            auditRef = auditRef,
+                        ),
+                    )
                 }
-                Logger.i(TAG, "Operation key=$key acknowledged, live head verified, recorded TERMINAL_SUCCEEDED")
-                OperationOutcome.Succeeded(
-                    auditRef = ack.auditRef,
-                    headSha = ack.headSha,
-                    outcome = ack.outcome.trim().takeIf { it.isNotEmpty() },
-                )
+                CompletionSource.LOOKUP -> {
+                    Logger.w(TAG, "Lookup completed missing auditRef or headSha for key=$key; failing closed")
+                    existingEntity?.let { markRecoveryRequired(it, code = null, auditRef = auditRef) }
+                    LookupResolution.Resolved(
+                        OperationOutcome.RecoveryRequired(
+                            idempotencyKey = key,
+                            auditRef = auditRef,
+                        ),
+                    )
+                }
             }
-            LiveHeadCheck.DRIFTED, LiveHeadCheck.UNAVAILABLE -> {
-                Logger.w(TAG, "Live head not verified after acknowledgement for key=$key; UncertainCompletion")
-                markUncertainWithResult(ackedEntity, headSha = ack.headSha, auditRef = ack.auditRef)
+        }
+
+        if (source == CompletionSource.ACK && expectedBranch != null && cleanReportedBranch == null) {
+            Logger.w(TAG, "Acknowledgement missing required branch for key=$key; failing closed")
+            existingEntity?.let { markUncertainWithResult(it, headSha = headSha, auditRef = auditRef) }
+            return LookupResolution.Resolved(
                 OperationOutcome.UncertainCompletion(
                     idempotencyKey = key,
-                    headSha = ack.headSha,
-                    auditRef = ack.auditRef,
+                    headSha = headSha,
+                    auditRef = auditRef,
+                ),
+            )
+        }
+
+        if (!FULL_SHA_REGEX.matches(headSha)) {
+            Logger.w(TAG, "Reported headSha is not a full 40-char SHA on $source for key=$key; failing closed")
+            existingEntity?.let { markRecoveryRequired(it, code = null, auditRef = auditRef) }
+            return LookupResolution.Resolved(
+                OperationOutcome.RecoveryRequired(
+                    idempotencyKey = key,
+                    code = null,
+                    auditRef = auditRef,
+                ),
+            )
+        }
+
+        val effectiveBranch = expectedBranch ?: cleanReportedBranch
+        if (effectiveBranch == null) {
+            Logger.w(TAG, "Completed operation without branch for live-head check on key=$key")
+            existingEntity?.let { markUncertainWithResult(it, headSha = headSha, auditRef = auditRef) }
+            return LookupResolution.Resolved(
+                OperationOutcome.UncertainCompletion(
+                    idempotencyKey = key,
+                    headSha = headSha,
+                    auditRef = auditRef,
+                ),
+            )
+        }
+
+        return when (verifyLiveHead(key, effectiveBranch, headSha)) {
+            LiveHeadCheck.MATCH -> {
+                val persisted = if (existingEntity != null) {
+                    markTerminalSucceeded(existingEntity, auditRef = auditRef, headSha = headSha)
+                } else {
+                    true
+                }
+                if (!persisted) {
+                    return LookupResolution.Resolved(
+                        OperationOutcome.RecoveryRequired(idempotencyKey = key, auditRef = auditRef),
+                    )
+                }
+                Logger.i(TAG, "Operation key=$key verified via $source + live head; recorded TERMINAL_SUCCEEDED")
+                LookupResolution.Resolved(
+                    OperationOutcome.Succeeded(
+                        auditRef = auditRef,
+                        headSha = headSha,
+                        outcome = reportedOutcome,
+                    ),
+                )
+            }
+            LiveHeadCheck.TRANSIENT_UNAVAILABLE -> {
+                if (source == CompletionSource.LOOKUP) {
+                    LookupResolution.TransientRetry(
+                        OperationOutcome.UncertainCompletion(
+                            idempotencyKey = key,
+                            headSha = headSha,
+                            auditRef = auditRef,
+                        ),
+                    )
+                } else {
+                    existingEntity?.let { markUncertainWithResult(it, headSha = headSha, auditRef = auditRef) }
+                    LookupResolution.Resolved(
+                        OperationOutcome.UncertainCompletion(
+                            idempotencyKey = key,
+                            headSha = headSha,
+                            auditRef = auditRef,
+                        ),
+                    )
+                }
+            }
+            LiveHeadCheck.DRIFTED, LiveHeadCheck.UNAVAILABLE -> {
+                Logger.w(TAG, "Live head not verified via $source for key=$key; UncertainCompletion")
+                existingEntity?.let { markUncertainWithResult(it, headSha = headSha, auditRef = auditRef) }
+                LookupResolution.Resolved(
+                    OperationOutcome.UncertainCompletion(
+                        idempotencyKey = key,
+                        headSha = headSha,
+                        auditRef = auditRef,
+                    ),
                 )
             }
         }
@@ -354,32 +525,43 @@ class OperationRepositoryImpl(
             gateway.branchHead(branch)
         } catch (e: TimeoutCancellationException) {
             Logger.w(TAG, "Live-head check timed out for key=$key")
-            return LiveHeadCheck.UNAVAILABLE
+            return LiveHeadCheck.TRANSIENT_UNAVAILABLE
         } catch (e: UnknownHostException) {
             Logger.w(TAG, "Live-head check host unreachable for key=$key")
-            return LiveHeadCheck.UNAVAILABLE
+            return LiveHeadCheck.TRANSIENT_UNAVAILABLE
         } catch (e: IOException) {
             Logger.w(TAG, "Live-head check IO error for key=$key")
-            return LiveHeadCheck.UNAVAILABLE
+            return LiveHeadCheck.TRANSIENT_UNAVAILABLE
         } catch (e: GatewayNotConfiguredException) {
             Logger.w(TAG, "Live-head check: gateway not configured for key=$key")
-            return LiveHeadCheck.UNAVAILABLE
+            return LiveHeadCheck.TRANSIENT_UNAVAILABLE
         } catch (e: GatewayHttpException) {
             Logger.w(TAG, "Live-head check HTTP ${e.statusCode} for key=$key")
-            return LiveHeadCheck.UNAVAILABLE
+            return if (e.statusCode in TRANSIENT_HTTP_STATUSES) {
+                LiveHeadCheck.TRANSIENT_UNAVAILABLE
+            } else {
+                LiveHeadCheck.UNAVAILABLE
+            }
         } catch (e: GatewayProtocolException) {
             Logger.w(TAG, "Live-head check malformed response for key=$key")
             return LiveHeadCheck.UNAVAILABLE
         }
+        val liveBranch = live.branch.trim()
+        if (liveBranch.isNotEmpty() && liveBranch != branch) {
+            Logger.w(TAG, "Live-head response branch contradicted requested branch for key=$key")
+            return LiveHeadCheck.DRIFTED
+        }
         val liveSha = live.headSha.trim()
-        return if (liveSha.isNotEmpty() && liveSha.equals(expectedHead.trim(), ignoreCase = true)) {
+        return if (FULL_SHA_REGEX.matches(liveSha) && liveSha.equals(expectedHead.trim(), ignoreCase = true)) {
             LiveHeadCheck.MATCH
         } else {
             LiveHeadCheck.DRIFTED
         }
     }
 
-    private enum class LiveHeadCheck { MATCH, DRIFTED, UNAVAILABLE }
+    private enum class CompletionSource { ACK, LOOKUP }
+
+    private enum class LiveHeadCheck { MATCH, DRIFTED, TRANSIENT_UNAVAILABLE, UNAVAILABLE }
 
     private suspend fun handleWriteHttpException(
         sentEntity: OperationJournalEntity,
@@ -479,110 +661,79 @@ class OperationRepositoryImpl(
         decryptedRecord: DecryptedJournalRecord?,
         lookup: OperationLookupDto,
     ): LookupResolution {
-        val status = lookup.status.trim().lowercase()
+        if (existingEntity != null && existingEntity.state in TERMINAL_OUTCOME_STATES && decryptedRecord != null) {
+            Logger.w(TAG, "Monotonicity guard: refusing to overwrite terminal state ${existingEntity.state} on lookup for key=$key")
+            return LookupResolution.Resolved(outcomeFromTerminalEntity(existingEntity, decryptedRecord))
+        }
+
         val auditRef = lookup.auditRef?.trim()?.takeIf { it.isNotEmpty() }
+        val lookupId = lookup.id.trim()
+        if (lookupId != key) {
+            Logger.w(TAG, "Lookup response id mismatch for key=$key; failing closed")
+            existingEntity?.let { markRecoveryRequired(it, code = null, auditRef = auditRef) }
+            return LookupResolution.Resolved(
+                OperationOutcome.RecoveryRequired(
+                    idempotencyKey = key,
+                    code = null,
+                    auditRef = auditRef,
+                ),
+            )
+        }
+
+        val expectedOp = decryptedRecord?.intent?.operation?.name
+        val lookupOp = lookup.operation.trim().takeIf { it.isNotEmpty() }
+        if (expectedOp != null && (lookupOp == null || !lookupOp.equals(expectedOp, ignoreCase = true))) {
+            Logger.w(TAG, "Lookup operation mismatch for key=$key; failing closed")
+            existingEntity?.let { markRecoveryRequired(it, code = null, auditRef = auditRef) }
+            return LookupResolution.Resolved(
+                OperationOutcome.RecoveryRequired(
+                    idempotencyKey = key,
+                    code = null,
+                    auditRef = auditRef,
+                ),
+            )
+        }
+
+        val expectedBranch = decryptedRecord?.intent?.branch?.trim()?.takeIf { it.isNotEmpty() }
+        val lookupBranch = lookup.branch?.trim()?.takeIf { it.isNotEmpty() }
+        if (expectedBranch != null && lookupBranch != null && lookupBranch != expectedBranch) {
+            Logger.w(TAG, "Lookup branch mismatch for key=$key; failing closed")
+            existingEntity?.let { markRecoveryRequired(it, code = null, auditRef = auditRef) }
+            return LookupResolution.Resolved(
+                OperationOutcome.RecoveryRequired(
+                    idempotencyKey = key,
+                    code = null,
+                    auditRef = auditRef,
+                ),
+            )
+        }
+
+        val status = lookup.status.trim().lowercase()
         val headSha = lookup.headSha?.trim()?.takeIf { it.isNotEmpty() }
 
         return when (status) {
             STATUS_COMPLETED -> {
-                if (auditRef == null || headSha == null) {
-                    Logger.w(TAG, "Lookup completed missing auditRef or headSha for key=$key; failing closed")
-                    existingEntity?.let { markRecoveryRequired(it, code = null) }
+                if (!lookup.code.isNullOrBlank()) {
+                    Logger.w(TAG, "Contradictory lookup completed status with error code for key=$key; failing closed")
+                    existingEntity?.let { markRecoveryRequired(it, code = null, auditRef = auditRef) }
                     return LookupResolution.Resolved(
                         OperationOutcome.RecoveryRequired(
                             idempotencyKey = key,
+                            code = null,
                             auditRef = auditRef,
                         ),
                     )
                 }
-                val branch = lookup.branch?.trim()?.takeIf { it.isNotEmpty() }
-                    ?: decryptedRecord?.intent?.branch?.trim()?.takeIf { it.isNotEmpty() }
-                if (branch == null) {
-                    Logger.w(TAG, "Lookup completed without branch for live-head check on key=$key")
-                    existingEntity?.let { markUncertainWithResult(it, headSha = headSha, auditRef = auditRef) }
-                    return LookupResolution.Resolved(
-                        OperationOutcome.UncertainCompletion(
-                            idempotencyKey = key,
-                            headSha = headSha,
-                            auditRef = auditRef,
-                        ),
-                    )
-                }
-
-                val liveHead = try {
-                    gateway.branchHead(branch)
-                } catch (e: TimeoutCancellationException) {
-                    Logger.w(TAG, "Live-head check timed out for key=$key; leaving entry unchanged")
-                    return LookupResolution.TransientRetry(
-                        OperationOutcome.UncertainCompletion(key, headSha = headSha, auditRef = auditRef),
-                    )
-                } catch (e: UnknownHostException) {
-                    Logger.w(TAG, "Live-head check host unreachable for key=$key; leaving entry unchanged")
-                    return LookupResolution.TransientRetry(
-                        OperationOutcome.UncertainCompletion(key, headSha = headSha, auditRef = auditRef),
-                    )
-                } catch (e: IOException) {
-                    Logger.w(TAG, "Live-head check IO error for key=$key; leaving entry unchanged")
-                    return LookupResolution.TransientRetry(
-                        OperationOutcome.UncertainCompletion(key, headSha = headSha, auditRef = auditRef),
-                    )
-                } catch (e: GatewayHttpException) {
-                    if (e.statusCode in TRANSIENT_HTTP_STATUSES) {
-                        Logger.w(TAG, "Live-head check HTTP ${e.statusCode} for key=$key; entry unchanged")
-                        return LookupResolution.TransientRetry(
-                            OperationOutcome.UncertainCompletion(key, headSha = headSha, auditRef = auditRef),
-                        )
-                    }
-                    Logger.w(TAG, "Live-head check HTTP ${e.statusCode} for key=$key -> UncertainCompletion")
-                    existingEntity?.let { markUncertainWithResult(it, headSha = headSha, auditRef = auditRef) }
-                    return LookupResolution.Resolved(
-                        OperationOutcome.UncertainCompletion(
-                            idempotencyKey = key,
-                            headSha = headSha,
-                            auditRef = auditRef,
-                        ),
-                    )
-                } catch (e: GatewayProtocolException) {
-                    Logger.w(TAG, "Live-head check malformed response for key=$key -> UncertainCompletion")
-                    existingEntity?.let { markUncertainWithResult(it, headSha = headSha, auditRef = auditRef) }
-                    return LookupResolution.Resolved(
-                        OperationOutcome.UncertainCompletion(
-                            idempotencyKey = key,
-                            headSha = headSha,
-                            auditRef = auditRef,
-                        ),
-                    )
-                }
-
-                val liveSha = liveHead.headSha.trim()
-                if (liveSha.isNotEmpty() && liveSha.equals(headSha, ignoreCase = true)) {
-                    val persisted = if (existingEntity != null) {
-                        markTerminalSucceeded(existingEntity, auditRef = auditRef, headSha = headSha)
-                    } else {
-                        true
-                    }
-                    if (!persisted) {
-                        return LookupResolution.Resolved(
-                            OperationOutcome.RecoveryRequired(idempotencyKey = key, auditRef = auditRef),
-                        )
-                    }
-                    LookupResolution.Resolved(
-                        OperationOutcome.Succeeded(
-                            auditRef = auditRef,
-                            headSha = headSha,
-                        ),
-                    )
-                } else {
-                    Logger.w(TAG, "Live branch head drifted from completed headSha for key=$key -> UncertainCompletion")
-                    existingEntity?.let { markUncertainWithResult(it, headSha = headSha, auditRef = auditRef) }
-                    LookupResolution.Resolved(
-                        OperationOutcome.UncertainCompletion(
-                            idempotencyKey = key,
-                            headSha = headSha,
-                            auditRef = auditRef,
-                        ),
-                    )
-                }
+                verifyAndFinalizeCompletedOperation(
+                    key = key,
+                    source = CompletionSource.LOOKUP,
+                    existingEntity = existingEntity,
+                    decryptedRecord = decryptedRecord,
+                    reportedOperation = lookup.operation,
+                    reportedBranch = lookup.branch,
+                    reportedHeadSha = headSha,
+                    reportedAuditRef = auditRef,
+                )
             }
 
             STATUS_PENDING -> {
@@ -699,7 +850,50 @@ class OperationRepositoryImpl(
             null
         }
 
+    private suspend fun isAlreadyTerminal(key: String): Boolean =
+        journalDao.findByKey(key)?.state in TERMINAL_OUTCOME_STATES
+
+    private fun outcomeFromTerminalEntity(
+        entity: OperationJournalEntity,
+        record: DecryptedJournalRecord,
+    ): OperationOutcome = when (entity.state) {
+        OperationJournalState.TERMINAL_SUCCEEDED -> {
+            val auditRef = record.auditRef?.trim()?.takeIf { it.isNotEmpty() }
+            val headSha = record.resultHeadSha?.trim()?.takeIf { FULL_SHA_REGEX.matches(it) }
+            if (auditRef != null && headSha != null) {
+                OperationOutcome.Succeeded(auditRef = auditRef, headSha = headSha)
+            } else {
+                OperationOutcome.RecoveryRequired(
+                    idempotencyKey = entity.idempotencyKey,
+                    auditRef = auditRef,
+                )
+            }
+        }
+        OperationJournalState.TERMINAL_REFUSED -> OperationOutcome.Refused(
+            code = record.lastErrorCode?.takeIf { it.isNotBlank() } ?: CODE_REFUSED_UNKNOWN,
+            auditRef = record.auditRef,
+        )
+        OperationJournalState.TERMINAL_CONFLICT -> OperationOutcome.Conflict(
+            code = record.lastErrorCode?.takeIf { it.isNotBlank() } ?: CODE_CONFLICT_UNKNOWN,
+            auditRef = record.auditRef,
+        )
+        OperationJournalState.RECOVERY_REQUIRED -> OperationOutcome.RecoveryRequired(
+            idempotencyKey = entity.idempotencyKey,
+            code = record.lastErrorCode,
+            auditRef = record.auditRef,
+        )
+        OperationJournalState.INTENT_RECORDED,
+        OperationJournalState.SENT,
+        OperationJournalState.ACKNOWLEDGED,
+        OperationJournalState.UNCERTAIN -> OperationOutcome.UncertainCompletion(
+            idempotencyKey = entity.idempotencyKey,
+            headSha = record.resultHeadSha,
+            auditRef = record.auditRef,
+        )
+    }
+
     private suspend fun markUncertain(entity: OperationJournalEntity) {
+        if (isAlreadyTerminal(entity.idempotencyKey)) return
         runCatching {
             journalDao.update(
                 entity.copy(
@@ -715,6 +909,7 @@ class OperationRepositoryImpl(
         headSha: String?,
         auditRef: String?,
     ) {
+        if (isAlreadyTerminal(entity.idempotencyKey)) return
         try {
             val encHead = headSha?.let { cipher.encrypt(it) } ?: entity.encryptedResultHeadSha
             val encAudit = auditRef?.let { cipher.encrypt(it) } ?: entity.encryptedAuditRef
@@ -736,20 +931,27 @@ class OperationRepositoryImpl(
         entity: OperationJournalEntity,
         auditRef: String,
         headSha: String,
-    ): Boolean = try {
-        journalDao.update(
-            entity.copy(
-                state = OperationJournalState.TERMINAL_SUCCEEDED,
-                updatedAtEpochMs = nowEpochMillis(),
-                encryptedAuditRef = cipher.encrypt(auditRef),
-                encryptedResultHeadSha = cipher.encrypt(headSha),
-            ),
-        )
-        true
-    } catch (e: Exception) {
-        Logger.e(TAG, "Encryption failed recording terminal success for key=${entity.idempotencyKey}", e)
-        markRecoveryRequired(entity, code = null, auditRef = null)
-        false
+    ): Boolean {
+        val current = journalDao.findByKey(entity.idempotencyKey)
+        if (current != null && current.state in NON_SUCCEEDED_TERMINAL_STATES) {
+            Logger.w(TAG, "Monotonicity guard: blocked transition from ${current.state} to TERMINAL_SUCCEEDED for key=${entity.idempotencyKey}")
+            return false
+        }
+        return try {
+            journalDao.update(
+                entity.copy(
+                    state = OperationJournalState.TERMINAL_SUCCEEDED,
+                    updatedAtEpochMs = nowEpochMillis(),
+                    encryptedAuditRef = cipher.encrypt(auditRef),
+                    encryptedResultHeadSha = cipher.encrypt(headSha),
+                ),
+            )
+            true
+        } catch (e: Exception) {
+            Logger.e(TAG, "Encryption failed recording terminal success for key=${entity.idempotencyKey}", e)
+            markRecoveryRequired(entity, code = null, auditRef = null)
+            false
+        }
     }
 
     private suspend fun markTerminalRefusal(
@@ -757,22 +959,25 @@ class OperationRepositoryImpl(
         state: OperationJournalState,
         code: String,
         auditRef: String?,
-    ): Boolean = try {
-        val encCode = cipher.encrypt(code)
-        val encAudit = auditRef?.let { cipher.encrypt(it) } ?: entity.encryptedAuditRef
-        journalDao.update(
-            entity.copy(
-                state = state,
-                updatedAtEpochMs = nowEpochMillis(),
-                encryptedLastErrorCode = encCode,
-                encryptedAuditRef = encAudit,
-            ),
-        )
-        true
-    } catch (e: Exception) {
-        Logger.e(TAG, "Encryption failed recording refusal for key=${entity.idempotencyKey}", e)
-        markRecoveryRequired(entity, code = null, auditRef = null)
-        false
+    ): Boolean {
+        if (isAlreadyTerminal(entity.idempotencyKey)) return false
+        return try {
+            val encCode = cipher.encrypt(code)
+            val encAudit = auditRef?.let { cipher.encrypt(it) } ?: entity.encryptedAuditRef
+            journalDao.update(
+                entity.copy(
+                    state = state,
+                    updatedAtEpochMs = nowEpochMillis(),
+                    encryptedLastErrorCode = encCode,
+                    encryptedAuditRef = encAudit,
+                ),
+            )
+            true
+        } catch (e: Exception) {
+            Logger.e(TAG, "Encryption failed recording refusal for key=${entity.idempotencyKey}", e)
+            markRecoveryRequired(entity, code = null, auditRef = null)
+            false
+        }
     }
 
     private suspend fun markRecoveryRequired(
@@ -780,6 +985,10 @@ class OperationRepositoryImpl(
         code: String?,
         auditRef: String? = null,
     ) {
+        val current = journalDao.findByKey(entity.idempotencyKey)
+        if (current != null && (current.state == OperationJournalState.TERMINAL_REFUSED || current.state == OperationJournalState.TERMINAL_CONFLICT)) {
+            return
+        }
         val encCode = code?.let { runCatching { cipher.encrypt(it) }.getOrNull() }
             ?: entity.encryptedLastErrorCode
         val encAudit = auditRef?.let { runCatching { cipher.encrypt(it) }.getOrNull() }
@@ -1136,6 +1345,8 @@ class OperationRepositoryImpl(
         const val CODE_IDEMPOTENCY_KEY_REUSED = "IDEMPOTENCY_KEY_REUSED"
         const val CODE_OPERATION_NOT_FOUND = "OPERATION_NOT_FOUND"
         private const val CODE_NOT_CONFIGURED = "NOT_CONFIGURED"
+        private const val CODE_REFUSED_UNKNOWN = "REFUSED"
+        private const val CODE_CONFLICT_UNKNOWN = "CONFLICT"
 
         val IN_FLIGHT_STATES: List<OperationJournalState> = listOf(
             OperationJournalState.INTENT_RECORDED,
@@ -1148,6 +1359,19 @@ class OperationRepositoryImpl(
             OperationJournalState.SENT,
             OperationJournalState.ACKNOWLEDGED,
             OperationJournalState.UNCERTAIN,
+        )
+
+        val NON_SUCCEEDED_TERMINAL_STATES: Set<OperationJournalState> = setOf(
+            OperationJournalState.TERMINAL_REFUSED,
+            OperationJournalState.TERMINAL_CONFLICT,
+            OperationJournalState.RECOVERY_REQUIRED,
+        )
+
+        val TERMINAL_OUTCOME_STATES: Set<OperationJournalState> = setOf(
+            OperationJournalState.TERMINAL_SUCCEEDED,
+            OperationJournalState.TERMINAL_REFUSED,
+            OperationJournalState.TERMINAL_CONFLICT,
+            OperationJournalState.RECOVERY_REQUIRED,
         )
 
         /** Exact conflict set from docs/gateway-contract.md §4.3. */
@@ -1168,6 +1392,7 @@ class OperationRepositoryImpl(
             CODE_OPERATION_NOT_FOUND,
         )
 
+        private val FULL_SHA_REGEX = Regex("^[0-9a-fA-F]{40}$")
         private val SHA256_HEX_REGEX = Regex("^[0-9a-fA-F]{64}$")
         private val ALLOWED_DECISIONS = setOf("APPROVED", "REJECTED", "DEFERRED")
 
