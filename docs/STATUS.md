@@ -1,7 +1,7 @@
 # Operator Console — Status Matrix
 
 **Authoritative project status document per Guide §10.3 and `RELEASE-PLAN.md» (Stage 0.2 / T0-202).**  
-Last updated: **2026-11-14 (PR3-001 Phase 3 baseline reconciliation; HEAD SHA unverified — no `.git` in sandbox)**. **2026-11-16:** the Manual Pipeline module detail was added below ("Manual Pipeline module detail") for PR #75 — module repaired, 121 JVM tests added, CI green on `44b5022`; not merged, not operator-accepted. **2026-11-16:** the Plan Management Authoring (PMA) detail was added below ("Plan Management Authoring (PMA) detail") for PR #76 — plan authoring interface, 69 JVM tests added, CI green on `ea3a5fb`; not merged, not operator-accepted.  
+Last updated: **2026-11-14 (PR3-001 Phase 3 baseline reconciliation; HEAD SHA unverified — no `.git` in sandbox)**. **2026-11-16:** the Manual Pipeline module detail was added below ("Manual Pipeline module detail") for PR #75 — module repaired, 121 JVM tests added, CI green on `44b5022`; not merged, not operator-accepted. **2026-11-16:** the Plan Management Authoring (PMA) detail was added below ("Plan Management Authoring (PMA) detail") for PR #76 — plan authoring interface, 69 JVM tests added, CI green on `ea3a5fb`; merged into `main` as `2c450d2`, not operator-accepted.  
 Reference plan of record: [`RELEASE-PLAN.md»](../RELEASE-PLAN.md).
 
 ---
@@ -131,7 +131,7 @@ PR #75 (`feat/manual-pipeline-poc`) repairs the compile errors, adds the module'
 
 PMA is the operator-facing **plan authoring** interface for Build Engine plans, added in PR #76 (`feat/pma-authoring`). It fills a real gap: the console could read plans (`PlanListScreen`, `PlanDetailScreen`) but had no interface anywhere between "the list of plans the gateway knows about" and "a plan somebody wrote" — `GatewayApi` exposed no plan write at all, and the gateway's plan surface is a simplified catalogue record (`PlanDO`) that cannot hold a plan document.
 
-CI is green on `abfcf28a` (run `43957253917`, attempt 2: `:app:testDebugUnitTest` **747/747, 0 failed, 0 ignored** — 678 before PMA plus 69 new; `:app:assembleDebug` succeeded). Attempt 1 of the same run failed on **`SettingsViewModelTest > saveCredential and clearCredential update state`**, a pre-existing Turbine/virtual-clock timing test in a class this change does not touch (the ViewModel there is constructed with fakes, not through the Hilt graph); the identical SHA passed on the rerun. **Not merged, not operator-accepted.**
+CI is green on `abfcf28a` (run `43957253917`, attempt 2: `:app:testDebugUnitTest` **747/747, 0 failed, 0 ignored** — 678 before PMA plus 69 new; `:app:assembleDebug` succeeded). Attempt 1 of the same run failed on **`SettingsViewModelTest > saveCredential and clearCredential update state`**, a pre-existing Turbine/virtual-clock timing test in a class this change does not touch (the ViewModel there is constructed with fakes, not through the Hilt graph); the identical SHA passed on the rerun. **Merged into `main` as `2c450d2`** (PR #76, merged by the operator) — **not operator-accepted.** Readiness is tracked in `docs/release/PMA-READINESS-REGISTER.md`.
 
 A **draft** is a plan document the operator is writing on the device. It mirrors the canonical Build Engine plan directory field for field — `plan.json`, `stages.json`, `tasks/*.json`, `coverage_exempt.json` — and the identifiers are derived the way the canonical tooling derives them: a task id is `NNNNN-PHASE-TTT-SS`, the stage is the hundreds digit of the task number, and the task number is stable, so reordering the task list changes no identifier and breaks no dependency.
 
@@ -144,7 +144,7 @@ A **draft** is a plan document the operator is writing on the device. It mirrors
 | Build Engine workflow integration — MP Stage 4 | **no** — no workflow materialises a submitted plan into `plans/<plan_id>/` and opens the reviewable pull request | — | no | no | no |
 | Submission | **blocked and reported** — the Submit action states exactly which pieces are missing rather than offering a button that does nothing; the canonical server-side validator is reported as unavailable, so a local pass is never presented as the canonical verdict | `PlanDraftUseCasesTest` (15) (`abfcf28a`) | no | no | no |
 
-**OPEN (1):** PMA has **no ADR and no register item**. The doc's Stage 0 — the draft schema, the API contract, the error model, the size limits, the authorisation model, the authoritative identifier reservation, the draft retention policy, and the documented distinction between a draft record, a repository plan and the PlanDO read projection — is an operator decision that has not been recorded.
+**OPEN (1):** PMA has a readiness register (`docs/release/PMA-READINESS-REGISTER.md`) but **no ADR**. The doc's Stage 0 — the draft schema, the API contract, the error model, the size limits, the authorisation model, the authoritative identifier reservation, the draft retention policy, and the documented distinction between a draft record, a repository plan and the PlanDO read projection — is an operator decision that has not been recorded.
 
 **OPEN (2):** the plan number and task identifiers are not allocated against repository state. The canonical allocator is the Build Engine's plan tooling, which refuses a number another plan already holds; PMA cannot check repository uniqueness from the device.
 
