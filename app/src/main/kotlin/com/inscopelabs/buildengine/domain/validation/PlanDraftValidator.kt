@@ -141,7 +141,7 @@ class PlanDraftValidator {
             val key = stageSortKey(stage.id)
             if (key != null) {
                 val last = previous.lastOrNull()
-                if (last != null && key < last) {
+                if (last != null && isBefore(key, last)) {
                     errors += error("stages", "stages must be listed in ascending id order")
                 }
                 previous += key
@@ -396,6 +396,11 @@ class PlanDraftValidator {
         if (WINDOWS_DRIVE_REGEX.containsMatchIn(path)) return false
         return path.split('/').none { part -> part.isEmpty() || part == "." || part == ".." }
     }
+
+    /** Orders stage ids by phase, then by the stage's ordinal within that phase. */
+    private fun isBefore(candidate: Pair<Int, Int>, other: Pair<Int, Int>): Boolean =
+        candidate.first < other.first ||
+            (candidate.first == other.first && candidate.second < other.second)
 
     private fun stageSortKey(stageId: String): Pair<Int, Int>? {
         val parts = stageId.split('-')
