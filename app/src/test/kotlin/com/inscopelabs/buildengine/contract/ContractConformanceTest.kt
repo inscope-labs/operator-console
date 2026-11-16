@@ -478,11 +478,6 @@ class ContractConformanceTest {
                 justification = "EnrollResponseDto omits rotatedAt required by enroll-rotate.schema.json definitions.response, causing RotateDeviceKeyUseCase response.enrolledAt to read 0L",
                 reference = "PR3-003, contract §3.16, enroll-rotate.schema.json",
             ),
-            ContractSchemaSupport.RatchetEntry(
-                id = "response_missing_required:tasks-next:order",
-                justification = "Contract revision 1.2 defines the required order field on the GET /tasks/next item; TaskSummaryDto and PublishOrderResolver adopt it in the console run that follows the gateway change",
-                reference = "ADR 0014 D1, ADR 0015, contract section 3.6",
-            ),
         )
 
         val ERROR_CODE_RATCHET_BASELINE: List<ContractSchemaSupport.RatchetEntry> = listOf(
