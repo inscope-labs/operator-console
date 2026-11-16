@@ -7,6 +7,7 @@ import com.inscopelabs.buildengine.domain.usecase.authoring.LoadPlanDraftUseCase
 import com.inscopelabs.buildengine.domain.usecase.authoring.PreviewPlanDraftUseCase
 import com.inscopelabs.buildengine.domain.usecase.authoring.SavePlanDraftUseCase
 import com.inscopelabs.buildengine.domain.usecase.authoring.SubmitPlanDraftUseCase
+import com.inscopelabs.buildengine.domain.usecase.authoring.ValidatePlanDraftUseCase
 import com.inscopelabs.buildengine.domain.validation.PlanDraftValidator
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
