@@ -206,6 +206,14 @@ intermittently red and has now failed twice across `main` and PR runs.
 | 43825849231 | `cceb72f` | success — 536 tests, 0 failures |
 | 43826457955 attempt 1 | `379c17f` | **failure** — 1 failure, `SettingsViewModelTest` (pre-existing flake, above) |
 | 43826457955 attempt 2 | `379c17f` | **success** — 536 tests, 0 failures |
+| 43827966637 attempt 1 | `8113dec` | **failure** — 1 failure, `SettingsViewModelTest` (the same flake again) |
+| 43827966637 attempt 2 | `8113dec` | **success** — 536 tests, 0 failures |
+
+The flake fired on two of the last four head runs, so it is frequent rather than marginal. Both
+failures were the same assertion in the same untouched file, and both re-runs were green.
+
+The commit that follows this one changes only this table and this paragraph. The CI result for the
+branch head is recorded in the pull request.
 
 | Class | Tests | Failures | Ignored |
 |---|---:|---:|---:|
