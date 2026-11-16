@@ -2,7 +2,6 @@ package com.inscopelabs.buildengine.ui.plans
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -44,12 +43,21 @@ import com.inscopelabs.buildengine.domain.model.Plan
 import com.inscopelabs.buildengine.ui.common.UiState
 import com.inscopelabs.buildengine.ui.components.ErrorBanner
 
+/**
+ * The plans list, with the plan authoring entry point above it.
+ *
+ * The two live side by side on purpose. The list is what the gateway knows about — plans that
+ * exist in the repository. The drafts are what the operator is writing on this device. Keeping
+ * them on one screen makes the difference between the two obvious, and it puts "Create Plan"
+ * where an operator looks for it.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlanListScreen(
     modifier: Modifier = Modifier,
     viewModel: PlanViewModel = hiltViewModel(),
     onPlanClick: (String) -> Unit = {},
+    onOpenAuthoring: (String) -> Unit = {},
     onBack: () -> Unit = {},
 ) {
     val state by viewModel.planListState.collectAsState()
@@ -88,41 +96,49 @@ fun PlanListScreen(
             )
         },
     ) { innerPadding ->
-        Box(
+        LazyColumn(
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
+            item {
+                PlanDraftListSection(onOpenDraft = onOpenAuthoring)
+            }
             when (val currentState = state) {
                 is UiState.Idle -> {
-                    ErrorBanner(
-                        message = stringResource(R.string.data_not_loaded),
-                        onRetry = { viewModel.loadPlans() },
-                    )
-                }
-                is UiState.Loading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.testTag("plan_list_loading"),
+                    item {
+                        ErrorBanner(
+                            message = stringResource(R.string.data_not_loaded),
+                            onRetry = { viewModel.loadPlans() },
                         )
                     }
                 }
+                is UiState.Loading -> {
+                    item {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.testTag("plan_list_loading"),
+                            )
+                        }
+                    }
+                }
                 is UiState.Error -> {
-                    ErrorBanner(
-                        message = currentState.message,
-                        onRetry = { viewModel.loadPlans() },
-                    )
+                    item {
+                        ErrorBanner(
+                            message = currentState.message,
+                            onRetry = { viewModel.loadPlans() },
+                        )
+                    }
                 }
                 is UiState.Success -> {
                     val plans = currentState.data
                     if (plans.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center,
-                        ) {
+                        item {
                             Text(
                                 text = stringResource(R.string.no_plans),
                                 style = MaterialTheme.typography.bodyLarge,
@@ -130,17 +146,11 @@ fun PlanListScreen(
                             )
                         }
                     } else {
-                        LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.fillMaxSize(),
-                        ) {
-                            items(plans) { plan ->
-                                PlanListItem(
-                                    plan = plan,
-                                    onClick = { onPlanClick(plan.id) },
-                                )
-                            }
+                        items(plans) { plan ->
+                            PlanListItem(
+                                plan = plan,
+                                onClick = { onPlanClick(plan.id) },
+                            )
                         }
                     }
                 }

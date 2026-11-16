@@ -13,6 +13,7 @@ import com.inscopelabs.buildengine.ui.dashboard.DashboardScreen
 import com.inscopelabs.buildengine.ui.decision.DecisionScreen
 import com.inscopelabs.buildengine.ui.enrollment.EnrollmentScreen
 import com.inscopelabs.buildengine.ui.plans.PlanDetailScreen
+import com.inscopelabs.buildengine.ui.plans.PlanAuthoringScreen
 import com.inscopelabs.buildengine.ui.plans.PlanListScreen
 import com.inscopelabs.buildengine.ui.preflight.PreflightScreen
 import com.inscopelabs.buildengine.ui.publish.PublishConfirmScreen
@@ -41,6 +42,16 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
         composable(Routes.PLANS) {
             PlanListScreen(
                 onPlanClick = { planId -> navController.navigate(Routes.planDetail(planId)) },
+                onOpenAuthoring = { draftId -> navController.navigate(Routes.planAuthoringDraft(draftId)) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable(
+            route = Routes.PLAN_AUTHORING_DRAFT,
+            arguments = listOf(navArgument("draftId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            PlanAuthoringScreen(
+                draftId = backStackEntry.arguments?.getString("draftId"),
                 onBack = { navController.popBackStack() },
             )
         }
