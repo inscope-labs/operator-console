@@ -150,9 +150,7 @@ A **draft** is a plan document the operator is writing on the device. It mirrors
 
 **OPEN (3):** the repository write path does not exist on either side of the boundary — no gateway plan-authoring route, no Build Engine plan workflow. Until both exist, a plan cannot be submitted, so no acceptance criterion of §9 that depends on a pull request can be met.
 
-**OPEN (4):** Android-runtime and device evidence are absent; all evidence above is JVM-level with an in-memory draft store.
-
----
+**OPEN (4):** Android-runtime and device evidence are absent; all evidence above is JVM-level. The tests drive an in-memory draft repository, so the device store (`PlanDraftStore`, DataStore) is not exercised off-device either.
 
 ---
 
