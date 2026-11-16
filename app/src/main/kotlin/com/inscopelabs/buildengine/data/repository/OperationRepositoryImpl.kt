@@ -19,6 +19,8 @@ import com.inscopelabs.buildengine.core.time.Clock
 import com.inscopelabs.buildengine.core.time.SystemClock
 import com.inscopelabs.buildengine.data.local.DecryptedJournalRecord
 import com.inscopelabs.buildengine.data.local.IdempotencyKeyGenerator
+import com.inscopelabs.buildengine.data.local.JournalAssociatedData
+import com.inscopelabs.buildengine.data.local.JournalColumn
 import com.inscopelabs.buildengine.data.local.JournalCryptoException
 import com.inscopelabs.buildengine.data.local.JournalFieldCipher
 import com.inscopelabs.buildengine.data.local.OperationIntent
@@ -295,8 +297,10 @@ class OperationRepositoryImpl(
     ): OperationOutcome {
         val key = sentEntity.idempotencyKey
         val nowMs = nowEpochMillis()
-        val encryptedAudit = ack.auditRef.takeIf { it.isNotBlank() }?.let { cipher.encrypt(it) }
-        val encryptedHead = ack.headSha.takeIf { it.isNotBlank() }?.let { cipher.encrypt(it) }
+        val encryptedAudit = ack.auditRef.takeIf { it.isNotBlank() }
+            ?.let { cipher.encrypt(it, aad(key, JournalColumn.AUDIT_REF)) }
+        val encryptedHead = ack.headSha.takeIf { it.isNotBlank() }
+            ?.let { cipher.encrypt(it, aad(key, JournalColumn.RESULT_HEAD_SHA)) }
 
         val ackedEntity = sentEntity.copy(
             state = OperationJournalState.ACKNOWLEDGED,
@@ -832,6 +836,16 @@ class OperationRepositoryImpl(
         }
     }
 
+    /**
+     * Associated data binding a journal ciphertext to its record and column (PR3-010 `[REG+]`).
+     *
+     * Every ciphertext written to the journal is bound to the record it belongs to and to the
+     * column it occupies, so a stored ciphertext cannot be replayed into another record or
+     * another column: the GCM tag check fails closed.
+     */
+    private fun aad(recordKey: String, column: JournalColumn): ByteArray =
+        JournalAssociatedData.forColumn(recordKey, column)
+
     private suspend fun decryptOrFailClosed(entity: OperationJournalEntity): DecryptedJournalRecord? =
         try {
             OperationJournalCodec.decryptRecord(entity, cipher)
@@ -911,8 +925,10 @@ class OperationRepositoryImpl(
     ) {
         if (isAlreadyTerminal(entity.idempotencyKey)) return
         try {
-            val encHead = headSha?.let { cipher.encrypt(it) } ?: entity.encryptedResultHeadSha
-            val encAudit = auditRef?.let { cipher.encrypt(it) } ?: entity.encryptedAuditRef
+            val encHead = headSha?.let { cipher.encrypt(it, aad(entity.idempotencyKey, JournalColumn.RESULT_HEAD_SHA)) }
+                ?: entity.encryptedResultHeadSha
+            val encAudit = auditRef?.let { cipher.encrypt(it, aad(entity.idempotencyKey, JournalColumn.AUDIT_REF)) }
+                ?: entity.encryptedAuditRef
             journalDao.update(
                 entity.copy(
                     state = OperationJournalState.UNCERTAIN,
@@ -942,8 +958,11 @@ class OperationRepositoryImpl(
                 entity.copy(
                     state = OperationJournalState.TERMINAL_SUCCEEDED,
                     updatedAtEpochMs = nowEpochMillis(),
-                    encryptedAuditRef = cipher.encrypt(auditRef),
-                    encryptedResultHeadSha = cipher.encrypt(headSha),
+                    encryptedAuditRef = cipher.encrypt(auditRef, aad(entity.idempotencyKey, JournalColumn.AUDIT_REF)),
+                    encryptedResultHeadSha = cipher.encrypt(
+                        headSha,
+                        aad(entity.idempotencyKey, JournalColumn.RESULT_HEAD_SHA),
+                    ),
                 ),
             )
             true
@@ -962,8 +981,9 @@ class OperationRepositoryImpl(
     ): Boolean {
         if (isAlreadyTerminal(entity.idempotencyKey)) return false
         return try {
-            val encCode = cipher.encrypt(code)
-            val encAudit = auditRef?.let { cipher.encrypt(it) } ?: entity.encryptedAuditRef
+            val encCode = cipher.encrypt(code, aad(entity.idempotencyKey, JournalColumn.LAST_ERROR_CODE))
+            val encAudit = auditRef?.let { cipher.encrypt(it, aad(entity.idempotencyKey, JournalColumn.AUDIT_REF)) }
+                ?: entity.encryptedAuditRef
             journalDao.update(
                 entity.copy(
                     state = state,
@@ -989,10 +1009,12 @@ class OperationRepositoryImpl(
         if (current != null && (current.state == OperationJournalState.TERMINAL_REFUSED || current.state == OperationJournalState.TERMINAL_CONFLICT)) {
             return
         }
-        val encCode = code?.let { runCatching { cipher.encrypt(it) }.getOrNull() }
-            ?: entity.encryptedLastErrorCode
-        val encAudit = auditRef?.let { runCatching { cipher.encrypt(it) }.getOrNull() }
-            ?: entity.encryptedAuditRef
+        val encCode = code?.let {
+            runCatching { cipher.encrypt(it, aad(entity.idempotencyKey, JournalColumn.LAST_ERROR_CODE)) }.getOrNull()
+        } ?: entity.encryptedLastErrorCode
+        val encAudit = auditRef?.let {
+            runCatching { cipher.encrypt(it, aad(entity.idempotencyKey, JournalColumn.AUDIT_REF)) }.getOrNull()
+        } ?: entity.encryptedAuditRef
         runCatching {
             journalDao.update(
                 entity.copy(

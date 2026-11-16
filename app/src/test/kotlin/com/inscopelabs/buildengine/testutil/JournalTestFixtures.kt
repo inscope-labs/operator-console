@@ -44,21 +44,39 @@ class InMemoryOperationJournalDao : OperationJournalDao {
         entries.values.sortedBy { it.createdAtEpochMs }
 }
 
+/**
+ * Test cipher that records plaintexts and enforces the associated-data binding (PR3-010 `[REG+]`).
+ *
+ * The associated data is carried alongside the ciphertext so that a ciphertext written for one
+ * record/column cannot be decrypted under a different one, exactly as the production cipher
+ * behaves.
+ */
 class RecordingFakeJournalCipher : JournalFieldCipher {
     var failOnDecrypt: Boolean = false
     val recordedPlaintexts = mutableListOf<String>()
+    val recordedAssociatedData = mutableListOf<ByteArray>()
 
-    override fun encrypt(plaintext: String): String {
+    override fun encrypt(plaintext: String, associatedData: ByteArray): String {
         recordedPlaintexts.add(plaintext)
+        recordedAssociatedData.add(associatedData)
         val encoded = Base64.getEncoder().encodeToString(plaintext.toByteArray(Charsets.UTF_8))
-        return "fakeenc:$encoded"
+        val aad = Base64.getEncoder().encodeToString(associatedData)
+        return "fakeenc:$aad:$encoded"
     }
 
-    override fun decrypt(ciphertext: String): String {
+    override fun decrypt(ciphertext: String, associatedData: ByteArray): String {
         if (failOnDecrypt || !ciphertext.startsWith("fakeenc:")) {
             throw JournalCryptoException("Simulated decrypt failure")
         }
-        val bytes = Base64.getDecoder().decode(ciphertext.removePrefix("fakeenc:"))
+        val parts = ciphertext.removePrefix("fakeenc:").split(":")
+        if (parts.size != 2) {
+            throw JournalCryptoException("Simulated decrypt failure")
+        }
+        val expectedAad = Base64.getDecoder().decode(parts[0])
+        if (!expectedAad.contentEquals(associatedData)) {
+            throw JournalCryptoException("Journal associated data mismatch")
+        }
+        val bytes = Base64.getDecoder().decode(parts[1])
         return String(bytes, Charsets.UTF_8)
     }
 }
