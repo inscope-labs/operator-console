@@ -8,6 +8,7 @@ import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
 import com.inscopelabs.buildengine.capability.model.OperationType
 import com.inscopelabs.buildengine.util.Redactor
+import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.security.GeneralSecurityException
 import java.security.KeyStore
@@ -142,34 +143,103 @@ class JournalCryptoException(
 ) : GeneralSecurityException(message, cause)
 
 /**
- * Field-level encryption abstraction for the Room operation journal (T3-202).
+ * The encrypted columns of the Room operation journal (T3-202, PR3-010 `[REG+]`).
  *
- * Kept behind an interface so JVM tests can substitute a fake or simulated failing cipher.
+ * Each constant carries the Room column name that holds the ciphertext. The column name is
+ * part of the GCM associated data, so a ciphertext cannot be moved between columns, and the
+ * record key is part of it, so a ciphertext cannot be moved between records.
  */
-interface JournalFieldCipher {
-    fun encrypt(plaintext: String): String
-    fun decrypt(ciphertext: String): String
+enum class JournalColumn(val columnName: String) {
+    OPERATION("encryptedOperation"),
+    PLAN("encryptedPlan"),
+    TASK("encryptedTask"),
+    BRANCH("encryptedBranch"),
+    EXPECTED_HEAD("encryptedExpectedHead"),
+    EXTRA_FIELDS("encryptedExtraFields"),
+    AUDIT_REF("encryptedAuditRef"),
+    RESULT_HEAD_SHA("encryptedResultHeadSha"),
+    LAST_ERROR_CODE("encryptedLastErrorCode"),
 }
 
 /**
- * AndroidKeyStore-backed AES-256-GCM field cipher using platform `javax.crypto` (T3-202).
+ * Derives the GCM associated data that binds a journal ciphertext to its record and column
+ * (PR3-010 `[REG+]`).
  *
- * - Non-exportable AES key stored in `AndroidKeyStore`.
- * - Fresh random 12-byte IV generated per encrypted field (`setRandomizedEncryptionRequired(true)`).
- * - Fails closed by throwing [JournalCryptoException] on any key, IV, tag, or format error.
+ * The associated data is a canonical, length-prefixed encoding of a fixed domain tag, a scheme
+ * tag, the record key and the column name. Length prefixing keeps the encoding unambiguous: no
+ * record key and column name combination can be confused with another, so the GCM tag check
+ * fails closed whenever a ciphertext is replayed into a different record or a different column.
+ *
+ * The derivation is pure and deterministic: the same (record, column) pair always produces the
+ * same bytes, on encryption and on decryption, including after a process restart.
  */
-class AndroidKeystoreJournalCipher(
-    private val keyAlias: String = DEFAULT_KEY_ALIAS,
-    private val keyStoreProvider: () -> KeyStore = {
-        KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
-    },
-) : JournalFieldCipher {
+object JournalAssociatedData {
 
-    override fun encrypt(plaintext: String): String {
+    /** Domain separator; prevents the derived bytes from being reused in another context. */
+    private const val DOMAIN: String = "com.inscopelabs.buildengine.journal.field"
+
+    /** Scheme tag; bumped if the derivation itself ever changes. */
+    private const val SCHEME: String = "v1"
+
+    /**
+     * Associated data binding [recordKey] and [column].
+     *
+     * @throws IllegalArgumentException if [recordKey] is blank; a ciphertext must never be
+     *   bound to an unidentified record.
+     */
+    fun forColumn(recordKey: String, column: JournalColumn): ByteArray {
+        require(recordKey.isNotBlank()) { "Journal record key must not be blank" }
+        val out = ByteArrayOutputStream()
+        out.write(DOMAIN.toByteArray(Charsets.UTF_8))
+        out.write(SCHEME.toByteArray(Charsets.UTF_8))
+        out.writeLengthPrefixed(recordKey.toByteArray(Charsets.UTF_8))
+        out.writeLengthPrefixed(column.columnName.toByteArray(Charsets.UTF_8))
+        return out.toByteArray()
+    }
+
+    private fun ByteArrayOutputStream.writeLengthPrefixed(bytes: ByteArray) {
+        write(ByteBuffer.allocate(4).putInt(bytes.size).array())
+        write(bytes)
+    }
+}
+
+/**
+ * AES-256-GCM field-encryption mechanics for the operation journal, including the associated
+ * data binding required by PR3-010 `[REG+]`.
+ *
+ * Split out from [AndroidKeystoreJournalCipher] so the wire format, the AAD binding and the
+ * fail-closed error handling are exercised on the JVM with a JVM-generated key. The production
+ * Keystore-backed cipher calls exactly these functions, so the JVM tests prove the production
+ * behaviour rather than a parallel implementation.
+ *
+ * - A fresh random 12-byte IV is generated per encryption and prepended to the ciphertext.
+ * - The associated data is authenticated by the GCM tag: decrypting with the wrong record or
+ *   column fails closed with [JournalCryptoException].
+ * - No error message contains plaintext.
+ */
+object JournalGcm {
+
+    /**
+     * Wire format version of an encrypted journal field.
+     *
+     * `v1` encrypted the field with no associated data and is therefore not readable under this
+     * scheme; it is rejected as an unsupported format version rather than silently accepted.
+     */
+    const val FORMAT_PREFIX: String = "v2:"
+
+    private const val TRANSFORMATION: String = "AES/GCM/NoPadding"
+    private const val GCM_IV_LENGTH_BYTES: Int = 12
+    private const val GCM_TAG_BITS: Int = 128
+    private const val GCM_MIN_TAG_BYTES: Int = GCM_TAG_BITS / 8
+
+    /**
+     * Encrypts [plaintext] under [secretKey], authenticating [associatedData] with the GCM tag.
+     */
+    fun encryptToWire(secretKey: SecretKey, plaintext: String, associatedData: ByteArray): String {
         return try {
-            val secretKey = getOrCreateKey()
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.ENCRYPT_MODE, secretKey)
+            cipher.updateAAD(associatedData)
             val iv = cipher.iv
             if (iv == null || iv.size != GCM_IV_LENGTH_BYTES) {
                 throw JournalCryptoException("Keystore cipher produced invalid IV length")
@@ -186,10 +256,18 @@ class AndroidKeystoreJournalCipher(
         }
     }
 
-    override fun decrypt(ciphertext: String): String {
+    /**
+     * Decrypts [ciphertext] under [secretKey], requiring [associatedData] to match the data the
+     * ciphertext was encrypted with.
+     *
+     * Fails closed with [JournalCryptoException] for an unsupported format version, a truncated
+     * payload, a tampered ciphertext, or a record/column mismatch. The exception message never
+     * contains plaintext.
+     */
+    fun decryptFromWire(secretKey: SecretKey, ciphertext: String, associatedData: ByteArray): String {
         return try {
             if (!ciphertext.startsWith(FORMAT_PREFIX)) {
-                throw JournalCryptoException("Malformed encrypted journal field prefix")
+                throw JournalCryptoException("Unsupported journal field format version")
             }
             val payload = Base64.getDecoder().decode(ciphertext.removePrefix(FORMAT_PREFIX))
             if (payload.size < GCM_IV_LENGTH_BYTES + GCM_MIN_TAG_BYTES) {
@@ -197,10 +275,9 @@ class AndroidKeystoreJournalCipher(
             }
             val iv = payload.copyOfRange(0, GCM_IV_LENGTH_BYTES)
             val cipherBytes = payload.copyOfRange(GCM_IV_LENGTH_BYTES, payload.size)
-            val secretKey = getExistingKey()
-                ?: throw JournalCryptoException("Journal encryption key '$keyAlias' is missing")
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(GCM_TAG_BITS, iv))
+            cipher.updateAAD(associatedData)
             val decrypted = cipher.doFinal(cipherBytes)
             String(decrypted, Charsets.UTF_8)
         } catch (e: JournalCryptoException) {
@@ -208,6 +285,45 @@ class AndroidKeystoreJournalCipher(
         } catch (e: Exception) {
             throw JournalCryptoException("Failed to decrypt journal field", e)
         }
+    }
+}
+
+/**
+ * Field-level encryption abstraction for the Room operation journal (T3-202, PR3-010 `[REG+]`).
+ *
+ * Kept behind an interface so JVM tests can substitute a fake or simulated failing cipher.
+ *
+ * Every call must supply the associated data that binds the ciphertext to its record and
+ * column (see [JournalAssociatedData]). The AAD parameter is deliberately not optional: a
+ * call site that omits it must not compile.
+ */
+interface JournalFieldCipher {
+    fun encrypt(plaintext: String, associatedData: ByteArray): String
+    fun decrypt(ciphertext: String, associatedData: ByteArray): String
+}
+
+/**
+ * AndroidKeyStore-backed AES-256-GCM field cipher using platform `javax.crypto` (T3-202).
+ *
+ * - Non-exportable AES key stored in `AndroidKeyStore`.
+ * - Fresh random 12-byte IV generated per encrypted field (`setRandomizedEncryptionRequired(true)`).
+ * - Ciphertext is bound to its record and column through GCM associated data (PR3-010 `[REG+]`).
+ * - Fails closed by throwing [JournalCryptoException] on any key, IV, tag, or format error.
+ */
+class AndroidKeystoreJournalCipher(
+    private val keyAlias: String = DEFAULT_KEY_ALIAS,
+    private val keyStoreProvider: () -> KeyStore = {
+        KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+    },
+) : JournalFieldCipher {
+
+    override fun encrypt(plaintext: String, associatedData: ByteArray): String =
+        JournalGcm.encryptToWire(getOrCreateKey(), plaintext, associatedData)
+
+    override fun decrypt(ciphertext: String, associatedData: ByteArray): String {
+        val secretKey = getExistingKey()
+            ?: throw JournalCryptoException("Journal encryption key '$keyAlias' is missing")
+        return JournalGcm.decryptFromWire(secretKey, ciphertext, associatedData)
     }
 
     private fun getExistingKey(): SecretKey? {
@@ -238,12 +354,7 @@ class AndroidKeystoreJournalCipher(
     companion object {
         const val DEFAULT_KEY_ALIAS: String = "operation_journal_aes_key"
         private const val ANDROID_KEYSTORE: String = "AndroidKeyStore"
-        private const val TRANSFORMATION: String = "AES/GCM/NoPadding"
         private const val AES_KEY_BITS: Int = 256
-        private const val GCM_IV_LENGTH_BYTES: Int = 12
-        private const val GCM_TAG_BITS: Int = 128
-        private const val GCM_MIN_TAG_BYTES: Int = GCM_TAG_BITS / 8
-        private const val FORMAT_PREFIX: String = "v1:"
     }
 }
 
@@ -323,12 +434,15 @@ internal object OperationJournalCodec {
         return OperationJournalEntity(
             idempotencyKey = idempotencyKey,
             intentFingerprint = intent.fingerprint(),
-            encryptedOperation = cipher.encrypt(intent.operation.name),
-            encryptedPlan = cipher.encrypt(intent.plan),
-            encryptedTask = cipher.encrypt(intent.task),
-            encryptedBranch = cipher.encrypt(intent.branch),
-            encryptedExpectedHead = cipher.encrypt(intent.expectedHead),
-            encryptedExtraFields = cipher.encrypt(extraJson),
+            encryptedOperation = cipher.encrypt(intent.operation.name, aad(idempotencyKey, JournalColumn.OPERATION)),
+            encryptedPlan = cipher.encrypt(intent.plan, aad(idempotencyKey, JournalColumn.PLAN)),
+            encryptedTask = cipher.encrypt(intent.task, aad(idempotencyKey, JournalColumn.TASK)),
+            encryptedBranch = cipher.encrypt(intent.branch, aad(idempotencyKey, JournalColumn.BRANCH)),
+            encryptedExpectedHead = cipher.encrypt(
+                intent.expectedHead,
+                aad(idempotencyKey, JournalColumn.EXPECTED_HEAD),
+            ),
+            encryptedExtraFields = cipher.encrypt(extraJson, aad(idempotencyKey, JournalColumn.EXTRA_FIELDS)),
             state = OperationJournalState.INTENT_RECORDED,
             createdAtEpochMs = nowEpochMs,
             updatedAtEpochMs = nowEpochMs,
@@ -339,22 +453,27 @@ internal object OperationJournalCodec {
         entity: OperationJournalEntity,
         cipher: JournalFieldCipher,
     ): DecryptedJournalRecord {
-        val opWire = cipher.decrypt(entity.encryptedOperation)
+        val recordKey = entity.idempotencyKey
+        val opWire = cipher.decrypt(entity.encryptedOperation, aad(recordKey, JournalColumn.OPERATION))
         val op = OperationType.entries.firstOrNull { it.name == opWire }
             ?: throw JournalCryptoException("Unknown decrypted operation type")
-        val plan = cipher.decrypt(entity.encryptedPlan)
-        val task = cipher.decrypt(entity.encryptedTask)
-        val branch = cipher.decrypt(entity.encryptedBranch)
-        val expectedHead = cipher.decrypt(entity.encryptedExpectedHead)
-        val extraJson = cipher.decrypt(entity.encryptedExtraFields)
+        val plan = cipher.decrypt(entity.encryptedPlan, aad(recordKey, JournalColumn.PLAN))
+        val task = cipher.decrypt(entity.encryptedTask, aad(recordKey, JournalColumn.TASK))
+        val branch = cipher.decrypt(entity.encryptedBranch, aad(recordKey, JournalColumn.BRANCH))
+        val expectedHead = cipher.decrypt(entity.encryptedExpectedHead, aad(recordKey, JournalColumn.EXPECTED_HEAD))
+        val extraJson = cipher.decrypt(entity.encryptedExtraFields, aad(recordKey, JournalColumn.EXTRA_FIELDS))
         val extra = try {
             json.decodeFromString<OperationIntentExtra>(extraJson)
         } catch (e: Exception) {
             throw JournalCryptoException("Failed to decode decrypted extra fields", e)
         }
-        val auditRef = entity.encryptedAuditRef?.let { cipher.decrypt(it) }
-        val resultHeadSha = entity.encryptedResultHeadSha?.let { cipher.decrypt(it) }
-        val lastErrorCode = entity.encryptedLastErrorCode?.let { cipher.decrypt(it) }
+        val auditRef = entity.encryptedAuditRef?.let { cipher.decrypt(it, aad(recordKey, JournalColumn.AUDIT_REF)) }
+        val resultHeadSha = entity.encryptedResultHeadSha?.let {
+            cipher.decrypt(it, aad(recordKey, JournalColumn.RESULT_HEAD_SHA))
+        }
+        val lastErrorCode = entity.encryptedLastErrorCode?.let {
+            cipher.decrypt(it, aad(recordKey, JournalColumn.LAST_ERROR_CODE))
+        }
 
         return DecryptedJournalRecord(
             idempotencyKey = entity.idempotencyKey,
@@ -378,4 +497,10 @@ internal object OperationJournalCodec {
             lastErrorCode = lastErrorCode,
         )
     }
+
+    /**
+     * Associated data binding a ciphertext to its journal record and column (PR3-010 `[REG+]`).
+     */
+    private fun aad(recordKey: String, column: JournalColumn): ByteArray =
+        JournalAssociatedData.forColumn(recordKey, column)
 }
