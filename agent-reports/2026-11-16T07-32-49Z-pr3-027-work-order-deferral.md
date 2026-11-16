@@ -2,7 +2,7 @@
 
 - **Task:** `PR3-027` (`RELEASE-PLAN.md` Stage 3.4 / `T3-404`; BD-1.3; `docs/release/PHASE-3-REMEDIATION-REGISTER.md` rev 1.2)
 - **Timestamp (UTC):** `2026-11-16T07:32:49Z`
-- **Worked-from HEAD SHA:** `2904a44` (`main` at run start — the merge of PR #71 / PR3-010)
+- **Worked-from HEAD SHA:** `560882c` (`main` at run start — the merge of PR #72 / PR3-025; the branch was rebased onto it before the PR was finalised)
 - **Branch:** `pr3/pr3-027-work-order-deferral`
 - **Pull request:** #73 (draft at first push, to claim the register ID)
 - **Operator decision relied on:** ADR 0014 D5 — BD-1.3 Option B confirmed (work orders stay with engine tooling)
@@ -145,21 +145,27 @@ route to the gateway.
 (`java: command not found`), so `./gradlew :app:testDebugUnitTest` could not be run here. No local test
 result is claimed or inferred. Verification was delegated to `android-ci.yml`.
 
-`android-ci` run **43824183321** on `bc711fa` — **success**
-(<https://github.com/inscope-labs/operator-console/actions/runs/43824183321>)
+`android-ci` run **43825323550** on the branch head `34772d9` — **success**
+(<https://github.com/inscope-labs/operator-console/actions/runs/43825323550>)
 
 | Job | Result |
 |---|---|
-| `unit-tests-and-debug-build` | **success** — `:app:testDebugUnitTest` `BUILD SUCCESSFUL in 1m 6s`; `:app:assembleDebug` `BUILD SUCCESSFUL in 18s` |
+| `unit-tests-and-debug-build` | **success** — `:app:testDebugUnitTest` `BUILD SUCCESSFUL in 1m 20s`; `:app:assembleDebug` `BUILD SUCCESSFUL in 22s` |
 | `vectors-are-reproducible` | **success** |
 
 From the retained `unit-test-reports` artifact:
 
 ```
-524 tests      0 failures      0 ignored      4.014s duration      100% successful
+536 tests      0 failures      0 ignored      5.158s duration      100% successful
 ```
 
-The suite grew from 512 to 524 tests — the 12 added here.
+The suite grew from 512 to 536 tests — the 12 added here, plus the 12 from PR3-025, which merged
+into `main` while this branch was open and was rebased onto before the run above.
+
+Earlier runs of the same code, for the record: **43824183321** on `bc711fa` — success (524 tests, 0
+failures) and **43824896807** on `8ec4fa4` — success (536 tests, 0 failures; that run was the merge
+commit of the branch head with `main`, which proved the branch merges cleanly with the PR3-025 work
+before the rebase).
 
 | Class | Tests | Failures | Ignored |
 |---|---:|---:|---:|
