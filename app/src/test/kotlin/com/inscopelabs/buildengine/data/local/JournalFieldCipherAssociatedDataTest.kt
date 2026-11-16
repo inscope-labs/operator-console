@@ -299,6 +299,7 @@ class JournalFieldCipherAssociatedDataTest {
     }
 
     /** Records the associated data used for each encryption without transforming the plaintext. */
+    @Suppress("UNUSED_PARAMETER")
     private class RecordingCipher : JournalFieldCipher {
         val associatedData = mutableListOf<ByteArray>()
 
