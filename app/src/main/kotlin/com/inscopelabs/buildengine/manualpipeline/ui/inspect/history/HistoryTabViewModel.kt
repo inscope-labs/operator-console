@@ -2,9 +2,9 @@ package com.inscopelabs.buildengine.manualpipeline.ui.inspect.history
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.inscopelabs.buildengine.manualpipeline.data.repository.AuditRepositoryImpl
 import com.inscopelabs.buildengine.manualpipeline.domain.model.OperatorActionRecord
 import com.inscopelabs.buildengine.manualpipeline.domain.port.AuditEntry
+import com.inscopelabs.buildengine.manualpipeline.domain.port.AuditReadPort
 import com.inscopelabs.buildengine.manualpipeline.domain.port.OperatorActionStore
 import com.inscopelabs.buildengine.manualpipeline.ui.state.ManualPipelineSession
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class HistoryTabViewModel @Inject constructor(
     private val operatorActionStore: OperatorActionStore,
-    private val auditRepository: AuditRepositoryImpl,
+    private val auditReadPort: AuditReadPort,
     private val session: ManualPipelineSession,
 ) : ViewModel() {
 
@@ -45,7 +45,7 @@ class HistoryTabViewModel @Inject constructor(
     fun refreshAudit() {
         viewModelScope.launch {
             _uiModel.update { it.copy(isLoadingAudit = true, auditError = null) }
-            auditRepository.fetchRecent(30).fold(
+            auditReadPort.fetchRecentAudit(30).fold(
                 onSuccess = { entries ->
                     val activeTask = session.state.value.selectedTask?.id
                     val sorted = if (activeTask.isNullOrBlank()) {
@@ -71,7 +71,7 @@ class HistoryTabViewModel @Inject constructor(
         if (auditRef.isBlank()) return
         viewModelScope.launch {
             _uiModel.update { it.copy(isLoadingAudit = true, auditError = null) }
-            auditRepository.fetchByRef(auditRef).fold(
+            auditReadPort.fetchAuditByRef(auditRef).fold(
                 onSuccess = { entry ->
                     _uiModel.update { it.copy(selectedAudit = entry, isLoadingAudit = false) }
                 },

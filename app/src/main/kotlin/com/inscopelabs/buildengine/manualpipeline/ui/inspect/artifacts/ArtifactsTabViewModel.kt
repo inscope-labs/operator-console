@@ -2,8 +2,8 @@ package com.inscopelabs.buildengine.manualpipeline.ui.inspect.artifacts
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.inscopelabs.buildengine.manualpipeline.data.repository.DeliverableRepositoryImpl
 import com.inscopelabs.buildengine.manualpipeline.domain.model.SubmissionManifest
+import com.inscopelabs.buildengine.manualpipeline.domain.port.DeliverableManifestPort
 import com.inscopelabs.buildengine.manualpipeline.domain.model.WorkOrder
 import com.inscopelabs.buildengine.manualpipeline.domain.usecase.InterpretWorkOrderUseCase
 import com.inscopelabs.buildengine.manualpipeline.domain.usecase.ManageDeliverablesUseCase
@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
 class ArtifactsTabViewModel @Inject constructor(
     private val interpretWorkOrderUseCase: InterpretWorkOrderUseCase,
     private val manageDeliverablesUseCase: ManageDeliverablesUseCase,
-    private val deliverableRepository: DeliverableRepositoryImpl,
+    private val deliverableManifestPort: DeliverableManifestPort,
     private val session: ManualPipelineSession,
 ) : ViewModel() {
 
@@ -144,7 +144,7 @@ class ArtifactsTabViewModel @Inject constructor(
         val manifest = managed?.manifest
         if (manifest != null) {
             viewModelScope.launch {
-                deliverableRepository.saveManifest(manifest, managed.deliverables)
+                deliverableManifestPort.saveManifest(manifest, managed.deliverables)
             }
         }
     }
