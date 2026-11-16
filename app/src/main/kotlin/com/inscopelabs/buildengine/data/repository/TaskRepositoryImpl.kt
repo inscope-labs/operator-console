@@ -115,6 +115,7 @@ private fun TaskSummaryDto.toTask(): Task = Task(
     status = status.toTaskStatus(),
     branch = branch,
     headSha = headSha,
+    order = order,
 )
 
 /**
