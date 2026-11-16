@@ -116,7 +116,7 @@ object UseCaseModule {
     @Provides
     @Singleton
     fun providePublishOrderResolver(): com.inscopelabs.buildengine.domain.usecase.write.PublishOrderResolver =
-        com.inscopelabs.buildengine.domain.usecase.write.UnresolvedPublishOrderResolver()
+        com.inscopelabs.buildengine.domain.usecase.write.TaskFieldPublishOrderResolver()
 
     @Provides
     @Singleton
