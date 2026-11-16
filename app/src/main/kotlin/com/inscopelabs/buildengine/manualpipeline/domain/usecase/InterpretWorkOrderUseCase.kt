@@ -38,11 +38,11 @@ class InterpretWorkOrderUseCase @Inject constructor() {
             listOf(
                 AcceptanceCriterion(
                     id = "AC-HEAD",
-                    statement = "Target branch head SHA verified at 40 hex characters before minting.",
+                    description = "Target branch head SHA verified at 40 hex characters before minting.",
                 ),
                 AcceptanceCriterion(
                     id = "AC-ZIP",
-                    statement = "Single immutable submission .zip passes contract §3.10 path & size rules.",
+                    description = "Single immutable submission .zip passes contract §3.10 path & size rules.",
                 ),
             )
         }

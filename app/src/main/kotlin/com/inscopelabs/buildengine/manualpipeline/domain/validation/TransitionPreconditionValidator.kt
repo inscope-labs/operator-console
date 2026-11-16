@@ -53,6 +53,14 @@ class TransitionPreconditionValidator @Inject constructor() {
                 reason = "Task is marked blocked by the gateway.",
             )
         }
+        if (kind == TransitionKind.SET_DONE && SET_DONE_AWAITS_SEAL_ROUTE) {
+            return Result(
+                permitted = false,
+                reason = "Completion (SET_DONE) is not dispatched: a console upload has no seal route yet " +
+                    "(BE-MP-12), so the gateway would refuse it with SEAL_NOT_ATTESTED. " +
+                    "The module fails closed and never records 'completed' locally.",
+            )
+        }
 
         return when (kind) {
             TransitionKind.SET_IN_PROGRESS -> when (task.status) {
@@ -72,5 +80,21 @@ class TransitionPreconditionValidator @Inject constructor() {
                 else -> Result(false, "Completion requires active task status (currently ${task.status.wireValue}).")
             }
         }
+    }
+
+    companion object {
+        /**
+         * `SET_DONE` is held back until BE-MP-12 defines how a Gateway A upload produces a
+         * Gateway C seal.
+         *
+         * The transition contract requires `SET_DONE` to be backed by a seal attestation for
+         * the task and its work order, and the only console write path (`UPLOAD` through
+         * Gateway A) produces no seal. Dispatching `SET_DONE` could therefore only ever be
+         * refused with `SEAL_NOT_ATTESTED`, so the module refuses it locally and fails closed
+         * (I-08) instead of spending a capability on a write the gateway cannot accept.
+         *
+         * Set this to `false` once BE-MP-12 is implemented and the operator has approved it.
+         */
+        internal const val SET_DONE_AWAITS_SEAL_ROUTE = true
     }
 }
