@@ -41,6 +41,15 @@ class TransitionPreconditionValidator @Inject constructor() {
                 reason = "Plan is currently halted; writes are blocked until resumed.",
             )
         }
+        if (task.isBlockedByGateway) {
+            // The gateway lists the task in `blockedTasks` (contract §3.6 plan status). The
+            // eligibility evaluator already refuses it, so the transition gate must agree:
+            // otherwise the panel says "not eligible" while the action is still offered.
+            return Result(
+                permitted = false,
+                reason = "Task is listed in the gateway's blockedTasks; writes are blocked until it is unblocked.",
+            )
+        }
         if (task.status == TaskStatus.UNKNOWN) {
             return Result(
                 permitted = false,
