@@ -2,11 +2,11 @@
 
 **Document ID:** `OC-MP-PRR-001`
 **Repository:** `inscope-labs/operator-console`
-**Revision:** `1.0` — corrected from the unreviewed draft; every correction is listed in Appendix A
+**Revision:** `1.1` — corrected from the unreviewed draft and re-checked against Assessment v2; every correction is listed in Appendix A
 **Install path:** `docs/release/MANUAL-PIPELINE-READINESS-REGISTER.md`, via a branch and pull request that the operator merges
 **Verification head:** `2c450d2` (`main` on 2026-11-16). Observations below were made at this commit
-**Design basis:** Build Engine — Manual Pipeline Module Assessment (Revision 2). That assessment is **not in this repository**; section and question references (`§`, `Q`, `I-nn`) cannot be traced here until it is committed (see Appendix A, C-14)
-**Controlling contract:** `docs/gateway-contract.md` revision 1.2 — it wins over the assessment wherever they differ
+**Design basis:** Build Engine — Manual Pipeline Module Assessment (Revision 2), committed beside this register as `docs/release/MANUAL-PIPELINE-ASSESSMENT-V2.md`; `§`, `Q`, `I-nn` and “test n” references below point into it. The assessment was verified against `operator-console` `560882c` and `build-engine` `9309a91`
+**Controlling contract:** `docs/gateway-contract.md` revision 1.2 for what the console may call. Where it differs from the assessment or from the build-engine `TASK-STATE-TRANSITION-CONTRACT.md`, the difference is a reconciliation item (MP-0), not something this register settles
 **Release gate status:** **PENDING VERIFICATION.** The feature is gated by the blockers in section 2. No row is `PASS`
 
 ---
@@ -25,12 +25,13 @@
 
 | Blocker | Verified state at `2c450d2` | Effect |
 |---|---|---|
-| Issue 1 — no documented route from a Gateway A upload to a Gateway C seal | Assessment item; not traceable in repo | LIF-07 cannot pass; the module must not call `SET_DONE` until resolved (Decision 1) |
+| Issue 1 — no documented route from a Gateway A upload to a Gateway C seal (assessment §5) | Open per the assessment: without a route, `SET_DONE` would be refused with `SEAL_NOT_ATTESTED`. Three resolution options are listed there | LIF-07 cannot pass; the module must not call `SET_DONE` and never records `done` locally until Decision 1 lands |
 | PR3-026 / ADR 0014 D3 — `POST /plans/{id}/status` | **Still absent.** `gateway/src/routes/plans.ts` registers `GET /plans/:id/status` only; contract §3.17 states Gateway A does not implement it yet | LIF-02 to LIF-11 cannot be exercised end to end |
 | PR3-021 — Android task model lacks the work-order `order` | Open item recorded in `docs/STATUS.md`: the capability `order` has no source in the contract | LIF-01 task-identification path incomplete |
 | PR3-020 — shared journal-backed executor | `SharedExecutorAdapter` binds `ExecutorPort` to the host `OperationRepository`; closure of PR3-020 itself is not recorded | LIF-04 and KOT-04 stay unverified until PR3-020 closes |
-| Decision 5 — Gateway A transition table | Contract rev 1.2 now fixes the table: `SET_IN_PROGRESS` and `SET_DONE` only (see LIF-02); confirm Decision 5 is closed against it | LIF-02 and LIF-08 provisional until confirmed |
-| No ADR and no register item for the module | `docs/STATUS.md` records both as open, plus three undecided operator decisions (approval of the manual pipeline, the `SET_DONE` question, archive building from selected files vs a prepared ZIP) | This register is the register item; an ADR recording those decisions is still required before release |
+| Decision 5 — Gateway A transition table | The assessment (§1.2) treats `SET_IN_PROGRESS`, `SET` and `SET_DONE` as legal, with `SET` allowed to any non-terminal status except `done`. Console contract rev 1.2 (§3.17) supports only `SET_IN_PROGRESS` and `SET_DONE` and reserves `SET`. The two disagree | LIF-02 and LIF-08 provisional until Decision 5 is closed against one table |
+| Decision 3 / Q14 — server-side task lease | Undecided; no lease exists in the published contract | LIF-22: until decided, the optimistic guards are the only protection and the UI must say so |
+| No ADR and no register item for the module | `docs/STATUS.md` records both as open, plus three undecided operator decisions (approval of the manual pipeline, the `SET_DONE` question, archive building from selected files vs a prepared ZIP) | This register is the register item; an ADR recording those decisions is still required before release (assessment Decision 7). The seven assessment decisions are: 1 seal route, 2 archive building, 3 lease, 4 read-only credential for Gateway A to read the seal fact, 5 transition table, 6 handoff evidence, 7 module ADR |
 
 ## 3. Register
 
@@ -49,7 +50,7 @@ Columns: ID, check, acceptance evidence, status, owner, depends on. “Observed�
 
 | ID | Readiness check | Acceptance evidence | Status | Owner | Depends on |
 |---|---|---|---|---|---|
-| DI-01 | Every `@Singleton` binding across all six `manualpipeline/di` modules is stateless or has an explicit process-death strategy. | Reviewer sign-off per binding. Observed: `SavedStateHandle` is not used anywhere in the module; recovery relies on the Room journal and `ManualPipelineRecoveryWorker`. | UNVERIFIED | DI Reviewer | BLD-03, LIF-14 |
+| DI-01 | Every `@Singleton` binding (assessment Q12 resume semantics, §1A.3) across all six `manualpipeline/di` modules is stateless or has an explicit process-death strategy. | Reviewer sign-off per binding. Observed: `SavedStateHandle` is not used anywhere in the module; recovery relies on the Room journal and `ManualPipelineRecoveryWorker`. | UNVERIFIED | DI Reviewer | BLD-03, LIF-14 |
 | DI-02 | Provided and bound dependencies are thread-safe or guarded. | Static analysis or concurrency test; no unguarded shared mutable state. | UNVERIFIED | Feature Owner | DI-01 |
 | DI-03 | Hilt generation succeeds for the release variant. | `./gradlew :app:kspReleaseKotlin` clean. KSP only; the project does not use KAPT. | UNVERIFIED | Android Lead | BLD-01 |
 | DI-04 | Capability minting is reachable only through `ConfirmAndMintCapabilityUseCase`, never from a worker or non-confirm path (I-01, I-02). | Architecture test enumerating callers. Observed: `ExistingMintingAdapter` wraps the host use case; the existing test “never calls the capability minter directly” covers part of this. | UNVERIFIED | DI Reviewer | DI-01 |
@@ -89,19 +90,19 @@ Anchored to contract rev 1.2 (§1.7 statuses, §3.17 transitions) and the assess
 
 | ID | Readiness check | Acceptance evidence | Status | Owner | Depends on |
 |---|---|---|---|---|---|
-| LIF-01 | The module recognises the wire task statuses `draft`, `ready`, `in_progress`, `completed`, `blocked`; any other value maps to fail-closed `UNKNOWN`; only `completed` is terminal. | Parameterised test covering each status plus an unrecognised value. Observed: `TaskStatus` matches this set. | UNVERIFIED | Feature Lead | PR3-021 |
-| LIF-02 | The module emits only `SET_IN_PROGRESS` and `SET_DONE`; it holds no transition table of its own. `SET` is reserved and the gateway refuses it with `400 BAD_ENCODING`. | **Observed defect:** `TransitionKind.SET` exists and maps to `OperationType.SET_IN_PROGRESS` in `ExistingMintingAdapter` and `JournalIntentBuilder`, so a “Set Stage Status” action would mint a start-task capability. Remove `SET` or make it unreachable; `TransitionPreconditionValidator` also carries a local `SET` rule. | FINDING | Feature Lead | PR3-026, Decision 5 |
+| LIF-01 | The module recognises one documented set of task statuses and a documented mapping between the two vocabularies in play: the build-engine canonical states (`planned`, `in_progress`, `pr_open`, `done`, `dropped`, `superseded`; assessment §1.2) and the console wire statuses (`draft`, `ready`, `in_progress`, `completed`, `blocked`; contract §1.7). Any unmapped value is fail-closed; terminal states are inert. | Mapping table committed and reviewed; parameterised test per status plus an unrecognised value. Observed: `TaskStatus` implements the wire set with `UNKNOWN`, and only `completed` is terminal; no mapping to the build-engine states is documented, and the assessment's terminal set (`done`, `dropped`, `superseded`) has no wire counterpart for the last two. | FINDING | Feature Lead | PR3-021, Decision 5 |
+| LIF-02 | The module emits only operations the controlling table allows and holds no transition table of its own (§3.1, I-10). Under rev 1.2 that is `SET_IN_PROGRESS` and `SET_DONE`; `SET` is reserved and refused with `400 BAD_ENCODING`. Under the assessment's table `SET` is also legal. | **Observed defect:** `TransitionKind.SET` exists and maps to `OperationType.SET_IN_PROGRESS` in `ExistingMintingAdapter` and `JournalIntentBuilder`, so a “Set Stage Status” action would mint a start-task capability whichever table wins. Fix the mapping (or remove `SET`) and settle Decision 5; `TransitionPreconditionValidator` also carries a local `SET` rule. | FINDING | Feature Lead | PR3-026, Decision 5 |
 | LIF-03 | One permitted transition per operator action; no batch, queued, pre-approved or background minting (I-01, Q11). | UI test: one transition per confirmation; no queued-mode surface. | UNVERIFIED | Feature Lead | DI-04 |
 | LIF-04 | Every transition needs its own confirmation at the required tier; the dialog shows the full 40-character SHA, operation, plan, task and branch (ADR 0012). | Compose/Robolectric test per transition; screenshots. Observed: `TransitionConfirmationDialog`, `HeadShaDisplay` exist. | UNVERIFIED | QA Lead | PR3-020 |
 | LIF-05 | Each minted capability is fresh, single use, bound to the exact branch and head, within TTL; `NONCE_REPLAYED` is surfaced and never retried (I-07). | Contract-vector and fault tests per operation. TTL value taken from the contract, not the assessment. | UNVERIFIED | Security Champion | DI-04 |
 | LIF-06 | A halt is respected: the gateway refusal is shown with its code and never falls through to a write (I-08, Q3). | Negative test with halt active. The contract code is `HALT_ACTIVE`. | UNVERIFIED | QA Engineer | PR3-026 |
-| LIF-07 | `SET_DONE` seal refusals fail closed: local state stays unchanged, no local “done” is recorded, no skip is offered. | Fault test per refusal. **Observed:** `SEAL_NOT_ATTESTED` and `SEAL_FACT_UNAVAILABLE` appear in app code (`GatewayRefusal`, `FailureCategoryMapper`) but **not in contract rev 1.2**; add them to the contract or map to contract codes before this row can be tested. | BLOCKED (Issue 1, Decision 1) | Feature Lead | LIF-02 |
-| LIF-08 | Illegal or reserved transitions are refused by the gateway and shown with the gateway's code and message. | Parameterised (status × operation) test. **Observed:** the contract refuses reserved values with `400 BAD_ENCODING` and a wrong op with `UNKNOWN_OP`; `TRANSITION_NOT_ALLOWED` is not in the contract. | BLOCKED (PR3-026) | QA Engineer | LIF-02 |
+| LIF-07 | `SET_DONE` seal refusals fail closed: local state stays unchanged, no local “done” is recorded, no skip is offered. | Fault test per refusal. The assessment (Q3) takes `SEAL_NOT_ATTESTED` (409) and `SEAL_FACT_UNAVAILABLE` (503) from the build-engine transition contract. They appear in app code (`GatewayRefusal`, `FailureCategoryMapper`) but **not in console contract rev 1.2**; import them into the console contract (I-10) before this row can be tested. A refused nonce is spent: any later retry needs a fresh capability. | BLOCKED (Issue 1, Decision 1) | Feature Lead | LIF-02 |
+| LIF-08 | Illegal or reserved transitions are refused by the gateway and shown with the gateway's code and message. | Parameterised (status × operation) test. Assessment test 9 expects `TRANSITION_NOT_ALLOWED` (including `SET` to `done`). **Observed:** console rev 1.2 refuses reserved values with `400 BAD_ENCODING` and a wrong op with `UNKNOWN_OP`, and does not define `TRANSITION_NOT_ALLOWED`; reconcile under Decision 5. | BLOCKED (PR3-026) | QA Engineer | LIF-02 |
 | LIF-09 | Authoritative read-back after every transition before success is reported (I-06, Q12). | Integration test with a simulated out-of-band change. | UNVERIFIED | QA Lead | PR3-013 |
 | LIF-10 | An uncertain write is resolved only by `GET /operations/{id}`; never resent; `404 OPERATION_NOT_FOUND` maps to recovery-required (I-05, ADR 0013). | Fault matrix (PR3-015) per uncertainty class; the recovery worker is lookup-only. Observed: `ReconcileOperationUseCase`, `RecoveryReconciler` exist. Lookup route is not implemented on Gateway A yet. | BLOCKED (ADR 0013 gateway task) | QA Lead | PR3-015 |
 | LIF-11 | `HEAD_MOVED`, `STALE` and `IDEMPOTENCY_KEY_REUSED` fail closed; the journal is preserved; no auto-rebase or discard. | Conflict test per code. Observed: `ConflictReportView` exists. | UNVERIFIED | QA Lead | LIF-10 |
 | LIF-12 | The UI renders each state once, with the next permitted action and the blocked reason plus the gateway code. | UI test per state. | UNVERIFIED | QA Lead | LIF-01 |
-| LIF-13 | The pre-transfer handoff is verified: upload accepted with audit reference and archive digest, status read back from Gateway A, operator confirmed, references present; the module performs no Supervisor-Agent transfer (Q8). | E2E test of all four conditions plus an architecture test that no transfer call exists. Depends on Decision 6. | UNVERIFIED | Feature Lead | LIF-07 |
+| LIF-13 | `PRE_TRANSFER_HANDOFF_READY` (assessment §3.2) holds only when its three conditions are met: (1) upload accepted with audit reference and archive digest recorded; (2) Gateway A reports the task terminal (`done` in assessment terms, `completed` on the wire), read back after the transition; (3) the operator confirmed handoff and the handoff references are available. It is a module-level state, not a task status, and the module performs no Supervisor-Agent transfer (Q8). | E2E test of all three conditions plus an architecture test that no transfer call exists. Depends on Decision 6. | UNVERIFIED | Feature Lead | LIF-07 |
 | LIF-14 | Process death mid-transition leaves no phantom running state and no local “done” after a refusal. | Kill/restore test mid-execution against the journal and recovery worker (the module has no `SavedStateHandle`). | UNVERIFIED | QA Lead | DI-01 |
 | LIF-15 | Failure vocabulary is preserved: `NOT_CONFIGURED`, `UNREACHABLE`, `TLS_PINNING`, `AUTH`, `STALE`, `POLICY_REFUSED`, `CONFLICT`; nothing is collapsed to a generic failure. | Mapping test per code. Observed: `FailureCategory` has these plus `UNKNOWN`; the original draft omitted `CONFLICT` and `UNKNOWN`. | UNVERIFIED | QA Lead | — |
 | LIF-16 | Every terminal result keeps the operation ID and audit reference; attribution uses the enrolled identity, never typed text (I-12, Q16). | Audit schema review plus a test. | UNVERIFIED | Feature Lead | SEC-03 |
@@ -109,6 +110,7 @@ Anchored to contract rev 1.2 (§1.7 statuses, §3.17 transitions) and the assess
 | LIF-18 | A staging enrolment cannot mint for production (I-11). | Per-environment test. | UNVERIFIED | Security Champion | SEC-05 |
 | LIF-19 | Where the environment disallows `in_app_confirm`, the module degrades to read-only. Missing biometric hardware must fall to `in_app_confirm` and never stop the app. | UI test in a profile that rejects `in_app_confirm`, and a device-without-biometrics test. Observed: `ReadOnlyBanner`, `ReadOnlyState` exist. | UNVERIFIED | QA Lead | LIF-04 |
 | LIF-20 | The module keeps no authoritative copy of task status. | Schema review: workflow tables hold metadata only. | UNVERIFIED | Feature Lead | SEC-03 |
+| LIF-22 | No local lock or ownership claim is presented as cross-device protection; until a server-side lease exists (Decision 3), the UI states that the optimistic guards (single-use nonce, head compare-and-swap, idempotency key) are the real protection (Q14). | UI test and copy review. *New row.* | UNVERIFIED | Feature Lead | LIF-05 |
 | LIF-21 | The idempotency key is a client-generated 32-hex value, separate from the nonce, on every write (ADR 0013). | Unit test on `IdempotencyKey` and `BuildIdempotencyKeyUseCase`; journal test. *New row.* | UNVERIFIED | Feature Lead | LIF-10 |
 
 ### OBS — Observability
@@ -130,8 +132,8 @@ Anchored to contract rev 1.2 (§1.7 statuses, §3.17 transitions) and the assess
 | TST-05 | Conflicts: `HEAD_MOVED`, `IDEMPOTENCY_KEY_REUSED` (§4.4 tests 10, 14). | Report. | UNVERIFIED | QA Lead | LIF-11 |
 | TST-06 | Seal refusals leave local state unchanged (§4.4 test 4). | Report. | BLOCKED (LIF-07) | QA Lead | LIF-07 |
 | TST-07 | Environment isolation (§4.4 test 20). | Report. | UNVERIFIED | QA Lead | LIF-18 |
-| TST-08 | All 21 architecture tests required by assessment Q17 run in CI. | **Observed: 9 exist** in `ManualPipelineArchitectureTest`; the Q17 list is not in the repo, so 12 are unaccounted for. Commit the list, then close the gap. | FINDING | Android Lead | API-01 |
-| TST-09 | End-to-end handoff verification with all four conditions (§4.4 test 18). | Report. | BLOCKED (LIF-07) | QA Lead | LIF-13 |
+| TST-08 | All 21 architecture tests listed in assessment Q17 run in CI. | `ManualPipelineArchitectureTest` has 9 tests. By name they correspond to Q17 items 11 (minter), 13 (no persisted capability), 14 (token shape; the manifest assertion is missing), 15 and 16 (HTTP and execution channel, partly) and 17 (`ui` not to `data`), plus two host-import rules that are not Q17 items. **No test appears to exist for items 1–10, 12, 18–21** (module scope, journal-before-dispatch, contract vectors, environment namespacing, read-back, lab-mode import). Name-level mapping only; a reviewer must confirm each. | FINDING | Android Lead | API-01 |
+| TST-09 | End-to-end handoff verification with all three conditions of §3.2 (§4.4 test 18). | Report. | BLOCKED (LIF-07) | QA Lead | LIF-13 |
 
 ## 4. Automation and sign-off
 
@@ -144,8 +146,8 @@ Anchored to contract rev 1.2 (§1.7 statuses, §3.17 transitions) and the assess
 | # | Draft statement | Correction |
 |---|---|---|
 | C-01 | Chat preamble and a trailing offer to paste code were included | Removed; this is a repository document |
-| C-02 | Six canonical states `planned`, `in_progress`, `pr_open`, `done`, `dropped`, `superseded`; three terminal | Contract §1.7 and `TaskStatus` define `draft`, `ready`, `in_progress`, `completed`, `blocked` (plus fail-closed `UNKNOWN`); only `completed` is terminal (LIF-01) |
-| C-03 | Module emits `SET_IN_PROGRESS`, `SET`, `SET_DONE` | Rev 1.2 supports only the first and last; `SET` is reserved. Code defect recorded (LIF-02) |
+| C-02 | Six canonical states `planned`, `in_progress`, `pr_open`, `done`, `dropped`, `superseded`, stated as the module's states | Those are the build-engine states (assessment §1.2). The console wire contract §1.7 and `TaskStatus` use `draft`, `ready`, `in_progress`, `completed`, `blocked` (plus fail-closed `UNKNOWN`); only `completed` is terminal. The two vocabularies are not mapped anywhere; recorded as a finding (LIF-01). An earlier revision of this register's pull request said the six states “do not exist”; that was wrong and is corrected here |
+| C-03 | Module emits `SET_IN_PROGRESS`, `SET`, `SET_DONE` | The assessment allows all three; console rev 1.2 supports only the first and last and reserves `SET`. Decision 5 is open. Code defect recorded either way (LIF-02) |
 | C-04 | Scope is an inert marker plus a `:manualpipeline` module | It is a package in `:app`; the marker is empty and six sibling Hilt modules carry the bindings (section 1, DI-01) |
 | C-05 | `explicitApi()` confirmed in `build.gradle.kts` | Not enabled and not applicable to an app module (BLD-02) |
 | C-06 | “KSP/KAPT” | KSP only (DI-03) |
@@ -154,12 +156,12 @@ Anchored to contract rev 1.2 (§1.7 statuses, §3.17 transitions) and the assess
 | C-09 | Coverage at least 80% via JaCoCo | No coverage tool is configured (TST-02) |
 | C-10 | 21 architecture tests wired into CI | 9 exist (TST-08) |
 | C-11 | Failure vocabulary of six codes | `FailureCategory` also has `CONFLICT` and `UNKNOWN` (LIF-15) |
-| C-12 | Refusal codes `TRANSITION_NOT_ALLOWED`, `SEAL_NOT_ATTESTED`, `SEAL_FACT_UNAVAILABLE`, halt code unnamed | Not in contract rev 1.2; reserved values give `400 BAD_ENCODING`, wrong op `UNKNOWN_OP`, halt is `HALT_ACTIVE` (LIF-06 to LIF-08) |
+| C-12 | Refusal codes `TRANSITION_NOT_ALLOWED`, `SEAL_NOT_ATTESTED`, `SEAL_FACT_UNAVAILABLE`, halt code unnamed | The codes come from the build-engine transition contract and are absent from console rev 1.2, which gives `400 BAD_ENCODING`, `UNKNOWN_OP` and `HALT_ACTIVE`; import or reconcile (LIF-06 to LIF-08) |
 | C-13 | Blocker PR3-026 status unstated | Verified still absent in `gateway/src/routes/plans.ts`; `GET /operations/{id}` also pending (section 2, LIF-10) |
-| C-14 | References to Assessment v2 as if in repo | Not present; traceability gap recorded in the header and TST-08 |
+| C-14 | References to Assessment v2 with no copy in the repo | Assessment committed as `docs/release/MANUAL-PIPELINE-ASSESSMENT-V2.md`; references verified against it. DI-01 cited Q14 for process death; the correct reference is Q12 (Q14 is the lease). The handoff state has three numbered conditions in §3.2, not four (LIF-13, TST-09) |
 | C-15 | Single status “UNVERIFIED” for everything | Added `FINDING` and `BLOCKED` so observed defects are not hidden among unverified rows |
 | C-16 | Rows listed in dependency order only by category | Added a per-row `Depends on` column and the DI-01 / LIF-14 pairing note |
-| C-17 | No coverage of idempotency key or missing-biometric degrade | Added LIF-21; extended LIF-19 |
+| C-17 | No coverage of idempotency key, missing-biometric degrade or the lease question | Added LIF-21 and LIF-22; extended LIF-19 |
 | C-18 | Markdown tables lost (tab-separated text, emoji headings) | Rebuilt as valid Markdown tables |
 
 ## Appendix B — Not covered
