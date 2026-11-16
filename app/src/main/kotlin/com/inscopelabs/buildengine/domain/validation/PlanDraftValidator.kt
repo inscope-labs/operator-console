@@ -204,23 +204,26 @@ class PlanDraftValidator {
         }
         val roots = draft.deliverableRoots.filter { it.isNotBlank() }
 
-        for ((label, paths) in listOf("deliverables" to task.deliverables, "companions" to task.companions)) {
+        for ((fieldName, singular, paths) in listOf(
+            Triple("deliverables", "deliverable", task.deliverables),
+            Triple("companions", "companion", task.companions),
+        )) {
             paths.forEachIndexed { pathIndex, path ->
-                val pathField = "$field.$label[$pathIndex]"
+                val pathField = "$field.$fieldName[$pathIndex]"
                 if (path.isBlank()) {
-                    errors += error(pathField, "$label path is empty")
+                    errors += error(pathField, "$singular path is empty")
                     return@forEachIndexed
                 }
                 if (!isSafeRelativePath(path)) {
-                    errors += error(pathField, "unsafe $label path '$path'")
+                    errors += error(pathField, "unsafe $singular path '$path'")
                     return@forEachIndexed
                 }
                 if (roots.isNotEmpty() && roots.none { root -> path.startsWith(root) }) {
-                    errors += error(pathField, "$label path '$path' is outside deliverable_roots")
+                    errors += error(pathField, "$singular path '$path' is outside deliverable_roots")
                     return@forEachIndexed
                 }
                 if (patterns.isNotEmpty() && patterns.none { pattern -> pattern.containsMatchIn(path) }) {
-                    errors += error(pathField, "$label path '$path' does not match deliverable_patterns")
+                    errors += error(pathField, "$singular path '$path' does not match deliverable_patterns")
                     return@forEachIndexed
                 }
             }

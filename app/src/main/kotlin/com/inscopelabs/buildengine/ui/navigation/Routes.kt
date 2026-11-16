@@ -8,7 +8,6 @@ object Routes {
     const val DASHBOARD: String = "dashboard"
     const val PLANS: String = "plans"
     const val PLAN_DETAIL: String = "plans/{planId}"
-    const val PLAN_AUTHORING: String = "plans/authoring"
     const val PLAN_AUTHORING_DRAFT: String = "plans/authoring/{draftId}"
     const val TASK_DETAIL: String = "tasks/{taskId}"
     const val PUBLISH: String = "publish/{taskId}"
