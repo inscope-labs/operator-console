@@ -10,8 +10,11 @@ import com.inscopelabs.buildengine.domain.model.OperationOutcome
 import com.inscopelabs.buildengine.domain.model.OperationRequest
 import com.inscopelabs.buildengine.domain.repository.OperationRepository
 import java.util.Base64
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class InMemoryOperationJournalDao : OperationJournalDao {
+    private val txMutex = Mutex()
     private val entries = linkedMapOf<String, OperationJournalEntity>()
 
     override suspend fun insert(entry: OperationJournalEntity) {
@@ -19,9 +22,52 @@ class InMemoryOperationJournalDao : OperationJournalDao {
         entries[entry.idempotencyKey] = entry
     }
 
-    override suspend fun update(entry: OperationJournalEntity) {
-        require(entries.containsKey(entry.idempotencyKey)) { "Missing entry to update" }
-        entries[entry.idempotencyKey] = entry
+    override suspend fun commitIntentIfNoActive(
+        entry: OperationJournalEntity,
+        activeStates: List<OperationJournalState>,
+    ): OperationJournalEntity = txMutex.withLock {
+        super.commitIntentIfNoActive(entry, activeStates)
+    }
+
+    override suspend fun updateStateIfCurrent(
+        idempotencyKey: String,
+        expectedFromState: OperationJournalState,
+        toState: OperationJournalState,
+        updatedAtEpochMs: Long,
+        encryptedAuditRef: String?,
+        encryptedResultHeadSha: String?,
+        encryptedLastErrorCode: String?,
+    ): Int {
+        val current = entries[idempotencyKey] ?: return 0
+        if (current.state != expectedFromState) return 0
+        entries[idempotencyKey] = current.copy(
+            state = toState,
+            updatedAtEpochMs = updatedAtEpochMs,
+            encryptedAuditRef = encryptedAuditRef ?: current.encryptedAuditRef,
+            encryptedResultHeadSha = encryptedResultHeadSha ?: current.encryptedResultHeadSha,
+            encryptedLastErrorCode = encryptedLastErrorCode ?: current.encryptedLastErrorCode,
+        )
+        return 1
+    }
+
+    override suspend fun transitionState(
+        idempotencyKey: String,
+        expectedFromState: OperationJournalState,
+        toState: OperationJournalState,
+        updatedAtEpochMs: Long,
+        encryptedAuditRef: String?,
+        encryptedResultHeadSha: String?,
+        encryptedLastErrorCode: String?,
+    ): Boolean = txMutex.withLock {
+        super.transitionState(
+            idempotencyKey = idempotencyKey,
+            expectedFromState = expectedFromState,
+            toState = toState,
+            updatedAtEpochMs = updatedAtEpochMs,
+            encryptedAuditRef = encryptedAuditRef,
+            encryptedResultHeadSha = encryptedResultHeadSha,
+            encryptedLastErrorCode = encryptedLastErrorCode,
+        )
     }
 
     override suspend fun findByKey(idempotencyKey: String): OperationJournalEntity? =

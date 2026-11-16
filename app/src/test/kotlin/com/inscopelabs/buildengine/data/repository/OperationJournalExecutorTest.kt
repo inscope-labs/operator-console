@@ -32,6 +32,9 @@ import java.util.Base64
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -1364,6 +1367,364 @@ class OperationJournalExecutorTest {
         assertEquals(0, lookupCalls)
     }
 
+    // -- PR3-011: Atomic intent-before-dispatch & fault injection -------------
+
+    @Test
+    fun `PR3-011 failed SENT transition transaction results in zero network dispatches and logs fault`() = runTest {
+        var sendCalls = 0
+        dao.failOnTransitionToSent = true
+        val repo = newExecutor()
+
+        val outcome = repo.executeOperation(sampleIntent()) {
+            sendCalls++
+            GatewayAckDto(accepted = true, headSha = HEAD_SHA_1, auditRef = "audit-should-not-send")
+        }
+
+        assertEquals(0, sendCalls)
+        assertTrue(outcome is OperationOutcome.RecoveryRequired)
+        val entry = dao.getAll().single()
+        assertEquals(OperationJournalState.INTENT_RECORDED, entry.state)
+        assertTrue(dao.recordedTransitions.isEmpty())
+        val logs = capturedLogs.joinToString("\n")
+        assertTrue(logs.contains("Failed to transition key=${entry.idempotencyKey} to SENT; aborting send"))
+    }
+
+    @Test
+    fun `PR3-011 CAS returning zero rows on SENT transition results in zero network dispatches`() = runTest {
+        var sendCalls = 0
+        dao.returnFalseOnSentCas = true
+        val repo = newExecutor()
+
+        val outcome = repo.executeOperation(sampleIntent()) {
+            sendCalls++
+            GatewayAckDto(accepted = true, headSha = HEAD_SHA_1, auditRef = "audit-should-not-send")
+        }
+
+        assertEquals(0, sendCalls)
+        assertTrue(outcome is OperationOutcome.RecoveryRequired)
+        val entry = dao.getAll().single()
+        assertEquals(OperationJournalState.INTENT_RECORDED, entry.state)
+        val logs = capturedLogs.joinToString("\n")
+        assertTrue(logs.contains("Failed CAS INTENT_RECORDED -> SENT for key=${entry.idempotencyKey}; aborting send"))
+    }
+
+    @Test
+    fun `PR3-011 executor cannot dispatch without a committed journal record`() = runTest {
+        var sendCalls = 0
+        val unpersistingDao = object : OperationJournalDao {
+            override suspend fun insert(entry: OperationJournalEntity) = Unit
+
+            override suspend fun commitIntentIfNoActive(
+                entry: OperationJournalEntity,
+                activeStates: List<OperationJournalState>,
+            ): OperationJournalEntity {
+                // Intentionally simulate a broken non-durable store returning an uncommitted entity.
+                return entry
+            }
+
+            override suspend fun updateStateIfCurrent(
+                idempotencyKey: String,
+                expectedFromState: OperationJournalState,
+                toState: OperationJournalState,
+                updatedAtEpochMs: Long,
+                encryptedAuditRef: String?,
+                encryptedResultHeadSha: String?,
+                encryptedLastErrorCode: String?,
+            ): Int = 0
+
+            override suspend fun findByKey(idempotencyKey: String): OperationJournalEntity? = null
+
+            override suspend fun findByIntentFingerprintAndStates(
+                intentFingerprint: String,
+                states: List<OperationJournalState>,
+            ): OperationJournalEntity? = null
+
+            override suspend fun findByStates(states: List<OperationJournalState>): List<OperationJournalEntity> =
+                emptyList()
+
+            override suspend fun getAll(): List<OperationJournalEntity> = emptyList()
+        }
+
+        val repo = OperationRepositoryImpl(
+            gateway = fakeGateway,
+            journalDao = unpersistingDao,
+            cipher = cipher,
+            keyGenerator = keyGenerator,
+            clock = clock,
+        )
+
+        val outcome = repo.executeOperation(sampleIntent()) {
+            sendCalls++
+            GatewayAckDto(accepted = true, headSha = HEAD_SHA_1, auditRef = "audit-uncommitted")
+        }
+
+        assertEquals(0, sendCalls)
+        assertTrue(outcome is OperationOutcome.RecoveryRequired)
+        val logs = capturedLogs.joinToString("\n")
+        assertTrue(logs.contains("without a committed journal record; aborting send"))
+    }
+
+    @Test
+    fun `PR3-011 crash after SENT commit before send recovers with same identity and zero second write`() = runTest {
+        var writeCalls = 0
+        var lookupCalls = 0
+        dao.onAfterTransitionToSent = {
+            throw SimulatedProcessCrash("crashed after SENT commit before write reached wire")
+        }
+        val recoveryGateway = object : GatewayApi by fakeGateway {
+            override suspend fun lookupOperation(idempotencyKey: String): OperationLookupDto {
+                lookupCalls++
+                return OperationLookupDto(
+                    id = idempotencyKey,
+                    operation = "PUBLISH",
+                    status = "completed",
+                    branch = "task-10008-refactor-parser",
+                    headSha = HEAD_SHA_1,
+                    auditRef = "audit-sent-crash-1",
+                    timestamp = 1761840200L,
+                )
+            }
+
+            override suspend fun branchHead(branch: String): BranchHeadDto =
+                BranchHeadDto(branch = branch, headSha = HEAD_SHA_1)
+        }
+
+        val instance1 = newExecutor(recoveryGateway)
+        val thrown = runCatching {
+            instance1.executeOperation(sampleIntent()) {
+                writeCalls++
+                GatewayAckDto(accepted = true, headSha = HEAD_SHA_1, auditRef = "unexpected")
+            }
+        }.exceptionOrNull()
+
+        assertTrue(thrown is SimulatedProcessCrash)
+        assertEquals(0, writeCalls)
+        val persisted = dao.getAll().single()
+        assertEquals(OperationJournalState.SENT, persisted.state)
+
+        dao.onAfterTransitionToSent = null
+        val instance2 = newExecutor(recoveryGateway)
+        val outcome = instance2.executeOperation(sampleIntent()) {
+            writeCalls++
+            GatewayAckDto(accepted = true, headSha = HEAD_SHA_1, auditRef = "unexpected-second-send")
+        }
+
+        assertEquals(0, writeCalls)
+        assertEquals(1, lookupCalls)
+        assertEquals(1, dao.getAll().size)
+        assertEquals(persisted.idempotencyKey, dao.getAll().single().idempotencyKey)
+        assertEquals(OperationOutcome.Succeeded(auditRef = "audit-sent-crash-1", headSha = HEAD_SHA_1), outcome)
+        assertEquals(OperationJournalState.TERMINAL_SUCCEEDED, dao.getAll().single().state)
+    }
+
+    @Test
+    fun `PR3-011 successful operation records ordered forward state transitions with zero skips`() = runTest {
+        val repo = newExecutor()
+        val outcome = repo.executeOperation(sampleIntent()) {
+            val midSend = dao.getAll().single()
+            assertEquals(OperationJournalState.SENT, midSend.state)
+            GatewayAckDto(
+                accepted = true,
+                operation = "PUBLISH",
+                branch = "task-10008-refactor-parser",
+                headSha = HEAD_SHA_1,
+                auditRef = "audit-ordered-1",
+            )
+        }
+
+        assertEquals(OperationOutcome.Succeeded(auditRef = "audit-ordered-1", headSha = HEAD_SHA_1), outcome)
+        val key = dao.getAll().single().idempotencyKey
+        assertEquals(
+            listOf(
+                Triple(key, OperationJournalState.INTENT_RECORDED, OperationJournalState.SENT),
+                Triple(key, OperationJournalState.SENT, OperationJournalState.ACKNOWLEDGED),
+                Triple(key, OperationJournalState.ACKNOWLEDGED, OperationJournalState.TERMINAL_SUCCEEDED),
+            ),
+            dao.recordedTransitions,
+        )
+    }
+
+    @Test
+    fun `PR3-011 high concurrency taps for same logical intent produce single journal row and single dispatch`() =
+        runTest {
+            var writeCalls = 0
+            val sentKeys = mutableListOf<String>()
+            val firstInSend = CompletableDeferred<Unit>()
+            val sendGate = CompletableDeferred<Unit>()
+            val repo = newExecutor()
+
+            val intent = sampleIntent()
+            val first = async {
+                repo.executeOperation(intent) { key ->
+                    writeCalls++
+                    sentKeys.add(key)
+                    firstInSend.complete(Unit)
+                    sendGate.await()
+                    GatewayAckDto(
+                        accepted = true,
+                        operation = "PUBLISH",
+                        branch = intent.branch,
+                        headSha = HEAD_SHA_1,
+                        auditRef = "audit-burst-1",
+                    )
+                }
+            }
+            firstInSend.await()
+            val rest = (2..10).map {
+                async {
+                    repo.executeOperation(intent) { key ->
+                        writeCalls++
+                        sentKeys.add(key)
+                        GatewayAckDto(
+                            accepted = true,
+                            operation = "PUBLISH",
+                            branch = intent.branch,
+                            headSha = HEAD_SHA_1,
+                            auditRef = "audit-unexpected-duplicate",
+                        )
+                    }
+                }
+            }
+            kotlinx.coroutines.yield()
+            sendGate.complete(Unit)
+            val outcomes = listOf(first.await()) + rest.awaitAll()
+
+            assertEquals(1, writeCalls)
+            assertEquals(1, sentKeys.size)
+            assertEquals(1, dao.getAll().size)
+            assertEquals(OperationJournalState.TERMINAL_SUCCEEDED, dao.getAll().single().state)
+            outcomes.forEach { outcome ->
+                assertEquals(
+                    OperationOutcome.Succeeded(auditRef = "audit-burst-1", headSha = HEAD_SHA_1),
+                    outcome,
+                )
+            }
+        }
+
+    @Test
+    fun `PR3-011 concurrent dispatches across separate repository instances share atomic DAO protection`() =
+        runTest {
+            var writeCalls = 0
+            var lookupCalls = 0
+            val sentKeys = mutableListOf<String>()
+            val firstCommitReady = CompletableDeferred<Unit>()
+            val releaseFirstWrite = CompletableDeferred<Unit>()
+            var commitCount = 0
+
+            val sharedDao = FakeOperationJournalDao().apply {
+                onAfterInsert = {
+                    commitCount++
+                    if (commitCount == 1) {
+                        firstCommitReady.complete(Unit)
+                    }
+                }
+            }
+
+            val gateway = object : GatewayApi by fakeGateway {
+                override suspend fun lookupOperation(idempotencyKey: String): OperationLookupDto {
+                    lookupCalls++
+                    return OperationLookupDto(
+                        id = idempotencyKey,
+                        operation = "PUBLISH",
+                        status = "completed",
+                        branch = "task-10008-refactor-parser",
+                        headSha = HEAD_SHA_1,
+                        auditRef = "audit-cross-instance-1",
+                        timestamp = 1761840300L,
+                    )
+                }
+
+                override suspend fun branchHead(branch: String): BranchHeadDto =
+                    BranchHeadDto(branch = branch, headSha = HEAD_SHA_1)
+            }
+
+            // Two independent OperationRepositoryImpl instances without a shared in-memory Mutex.
+            val repo1 = OperationRepositoryImpl(
+                gateway = gateway,
+                journalDao = sharedDao,
+                cipher = cipher,
+                keyGenerator = keyGenerator,
+                clock = clock,
+            )
+            val repo2 = OperationRepositoryImpl(
+                gateway = gateway,
+                journalDao = sharedDao,
+                cipher = cipher,
+                keyGenerator = keyGenerator,
+                clock = clock,
+            )
+
+            val intent = sampleIntent()
+            val call1 = async {
+                repo1.executeOperation(intent) { key ->
+                    writeCalls++
+                    sentKeys.add(key)
+                    releaseFirstWrite.await()
+                    GatewayAckDto(
+                        accepted = true,
+                        operation = "PUBLISH",
+                        branch = intent.branch,
+                        headSha = HEAD_SHA_1,
+                        auditRef = "audit-cross-instance-1",
+                    )
+                }
+            }
+
+            firstCommitReady.await()
+            val call2 = async {
+                repo2.executeOperation(intent) { key ->
+                    writeCalls++
+                    sentKeys.add(key)
+                    GatewayAckDto(
+                        accepted = true,
+                        operation = "PUBLISH",
+                        branch = intent.branch,
+                        headSha = HEAD_SHA_1,
+                        auditRef = "audit-cross-instance-unexpected",
+                    )
+                }
+            }
+            val outcome2 = call2.await()
+            releaseFirstWrite.complete(Unit)
+            val outcome1 = call1.await()
+
+            assertEquals(1, writeCalls)
+            assertEquals(1, sentKeys.size)
+            assertEquals(1, sharedDao.getAll().size)
+            assertEquals(OperationJournalState.TERMINAL_SUCCEEDED, sharedDao.getAll().single().state)
+            assertEquals(
+                OperationOutcome.Succeeded(auditRef = "audit-cross-instance-1", headSha = HEAD_SHA_1),
+                outcome1,
+            )
+            assertEquals(
+                OperationOutcome.Succeeded(auditRef = "audit-cross-instance-1", headSha = HEAD_SHA_1),
+                outcome2,
+            )
+            assertTrue(lookupCalls >= 1)
+        }
+
+    @Test
+    fun `PR3-011 ACK transition DAO failure fails closed to RecoveryRequired`() = runTest {
+        dao.failOnTransitionToAcknowledged = true
+        val repo = newExecutor()
+
+        val outcome = repo.executeOperation(sampleIntent()) {
+            GatewayAckDto(
+                accepted = true,
+                operation = "PUBLISH",
+                branch = "task-10008-refactor-parser",
+                headSha = HEAD_SHA_1,
+                auditRef = "audit-ack-dao-fail",
+            )
+        }
+
+        assertTrue(outcome is OperationOutcome.RecoveryRequired)
+        assertEquals(OperationJournalState.SENT, dao.getAll().single().state)
+        assertTrue(
+            capturedLogs.joinToString("\n").contains("Failed to persist ACKNOWLEDGED transition"),
+        )
+    }
+
     // -- Helpers & Fakes --------------------------------------------------------
 
     private suspend fun seedUncertainEntry(task: String = "10008"): String {
@@ -1393,9 +1754,15 @@ class OperationJournalExecutorTest {
     private class SimulatedProcessCrash(message: String) : CancellationException(message)
 
     private class FakeOperationJournalDao : OperationJournalDao {
+        private val txMutex = Mutex()
         private val entries = linkedMapOf<String, OperationJournalEntity>()
+        val recordedTransitions = mutableListOf<Triple<String, OperationJournalState, OperationJournalState>>()
         var onAfterInsert: (() -> Unit)? = null
+        var onAfterTransitionToSent: (() -> Unit)? = null
         var failOnInsert: Boolean = false
+        var failOnTransitionToSent: Boolean = false
+        var failOnTransitionToAcknowledged: Boolean = false
+        var returnFalseOnSentCas: Boolean = false
 
         override suspend fun insert(entry: OperationJournalEntity) {
             if (failOnInsert) throw IllegalStateException("Simulated SQLite write error")
@@ -1404,9 +1771,65 @@ class OperationJournalExecutorTest {
             onAfterInsert?.invoke()
         }
 
-        override suspend fun update(entry: OperationJournalEntity) {
-            require(entries.containsKey(entry.idempotencyKey)) { "Missing entry to update" }
-            entries[entry.idempotencyKey] = entry
+        override suspend fun commitIntentIfNoActive(
+            entry: OperationJournalEntity,
+            activeStates: List<OperationJournalState>,
+        ): OperationJournalEntity = txMutex.withLock {
+            super.commitIntentIfNoActive(entry, activeStates)
+        }
+
+        override suspend fun updateStateIfCurrent(
+            idempotencyKey: String,
+            expectedFromState: OperationJournalState,
+            toState: OperationJournalState,
+            updatedAtEpochMs: Long,
+            encryptedAuditRef: String?,
+            encryptedResultHeadSha: String?,
+            encryptedLastErrorCode: String?,
+        ): Int {
+            if (toState == OperationJournalState.SENT && failOnTransitionToSent) {
+                throw IllegalStateException("Simulated SQLite transaction error moving to SENT")
+            }
+            if (toState == OperationJournalState.ACKNOWLEDGED && failOnTransitionToAcknowledged) {
+                throw IllegalStateException("Simulated SQLite transaction error moving to ACKNOWLEDGED")
+            }
+            if (toState == OperationJournalState.SENT && returnFalseOnSentCas) {
+                return 0
+            }
+            val current = entries[idempotencyKey] ?: return 0
+            if (current.state != expectedFromState) return 0
+            entries[idempotencyKey] = current.copy(
+                state = toState,
+                updatedAtEpochMs = updatedAtEpochMs,
+                encryptedAuditRef = encryptedAuditRef ?: current.encryptedAuditRef,
+                encryptedResultHeadSha = encryptedResultHeadSha ?: current.encryptedResultHeadSha,
+                encryptedLastErrorCode = encryptedLastErrorCode ?: current.encryptedLastErrorCode,
+            )
+            recordedTransitions.add(Triple(idempotencyKey, expectedFromState, toState))
+            if (toState == OperationJournalState.SENT) {
+                onAfterTransitionToSent?.invoke()
+            }
+            return 1
+        }
+
+        override suspend fun transitionState(
+            idempotencyKey: String,
+            expectedFromState: OperationJournalState,
+            toState: OperationJournalState,
+            updatedAtEpochMs: Long,
+            encryptedAuditRef: String?,
+            encryptedResultHeadSha: String?,
+            encryptedLastErrorCode: String?,
+        ): Boolean = txMutex.withLock {
+            super.transitionState(
+                idempotencyKey = idempotencyKey,
+                expectedFromState = expectedFromState,
+                toState = toState,
+                updatedAtEpochMs = updatedAtEpochMs,
+                encryptedAuditRef = encryptedAuditRef,
+                encryptedResultHeadSha = encryptedResultHeadSha,
+                encryptedLastErrorCode = encryptedLastErrorCode,
+            )
         }
 
         override suspend fun findByKey(idempotencyKey: String): OperationJournalEntity? =

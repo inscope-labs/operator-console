@@ -53,6 +53,64 @@ enum class OperationJournalState {
 
     /** Failed, `404 OPERATION_NOT_FOUND`, unknown status/code, or journal crypto error. */
     RECOVERY_REQUIRED,
+    ;
+
+    /**
+     * Explicit forward-only state machine for operation journal entries (T3-202, PR3-011).
+     *
+     * Transitions cannot move backwards (e.g. `SENT -> INTENT_RECORDED`, `ACKNOWLEDGED -> SENT`,
+     * `UNCERTAIN -> SENT/ACKNOWLEDGED`), cannot skip `SENT` from `INTENT_RECORDED` to hit
+     * acknowledgement/uncertain/terminal outcome states, and cannot leave any terminal state.
+     */
+    fun allowedNextStates(): Set<OperationJournalState> = when (this) {
+        INTENT_RECORDED -> setOf(SENT, RECOVERY_REQUIRED)
+        SENT -> setOf(
+            ACKNOWLEDGED,
+            UNCERTAIN,
+            TERMINAL_SUCCEEDED,
+            TERMINAL_REFUSED,
+            TERMINAL_CONFLICT,
+            RECOVERY_REQUIRED,
+        )
+        ACKNOWLEDGED -> setOf(
+            UNCERTAIN,
+            TERMINAL_SUCCEEDED,
+            TERMINAL_REFUSED,
+            TERMINAL_CONFLICT,
+            RECOVERY_REQUIRED,
+        )
+        UNCERTAIN -> setOf(
+            UNCERTAIN,
+            TERMINAL_SUCCEEDED,
+            TERMINAL_REFUSED,
+            TERMINAL_CONFLICT,
+            RECOVERY_REQUIRED,
+        )
+        TERMINAL_SUCCEEDED,
+        TERMINAL_REFUSED,
+        TERMINAL_CONFLICT,
+        RECOVERY_REQUIRED -> emptySet()
+    }
+
+    fun canTransitionTo(target: OperationJournalState): Boolean =
+        target in allowedNextStates()
+
+    fun isTerminal(): Boolean =
+        this == TERMINAL_SUCCEEDED ||
+            this == TERMINAL_REFUSED ||
+            this == TERMINAL_CONFLICT ||
+            this == RECOVERY_REQUIRED
+
+    companion object {
+        fun requireValidTransition(
+            from: OperationJournalState,
+            to: OperationJournalState,
+        ) {
+            require(from.canTransitionTo(to)) {
+                "Invalid journal state transition: $from -> $to"
+            }
+        }
+    }
 }
 
 /**

@@ -66,6 +66,12 @@ class OperationRepositoryImpl(
 ) : OperationRepository {
 
     private val intentLocks = ConcurrentHashMap<String, Mutex>()
+    private val concurrentBatches = ConcurrentHashMap<String, InFlightBatch>()
+
+    private class InFlightBatch(
+        var waiters: Int = 0,
+        var completedOutcome: OperationOutcome.Succeeded? = null,
+    )
 
     /**
      * Executes a consequential write operation behind the durable encrypted journal (T3-202, T3-204).
@@ -77,13 +83,43 @@ class OperationRepositoryImpl(
         send: suspend (idempotencyKey: String) -> GatewayAckDto,
     ): OperationOutcome {
         val fingerprint = intent.fingerprint()
-        val lock = intentLocks.computeIfAbsent(fingerprint) { Mutex() }
-        return lock.withLock {
-            val existing = journalDao.findByIntentFingerprintAndStates(fingerprint, IN_FLIGHT_STATES)
-            if (existing != null) {
-                return@withLock handleExistingInFlight(existing, send)
+        val batch = synchronized(concurrentBatches) {
+            concurrentBatches.getOrPut(fingerprint) { InFlightBatch() }.also {
+                it.waiters++
             }
-            recordAndExecute(intent, send)
+        }
+        try {
+            val lock = intentLocks.computeIfAbsent(fingerprint) { Mutex() }
+            return lock.withLock {
+                batch.completedOutcome?.let { alreadySucceeded ->
+                    Logger.i(TAG, "Suppressing concurrent duplicate execution; intent already succeeded")
+                    return@withLock alreadySucceeded
+                }
+                val existing = try {
+                    journalDao.findByIntentFingerprintAndStates(fingerprint, IN_FLIGHT_STATES)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Logger.e(TAG, "Journal lookup failed before execute; aborting without send", e)
+                    return@withLock OperationOutcome.RecoveryRequired(idempotencyKey = "")
+                }
+                val outcome = if (existing != null) {
+                    handleExistingInFlight(existing, send)
+                } else {
+                    recordAndExecute(intent, send)
+                }
+                if (outcome is OperationOutcome.Succeeded) {
+                    batch.completedOutcome = outcome
+                }
+                outcome
+            }
+        } finally {
+            synchronized(concurrentBatches) {
+                batch.waiters--
+                if (batch.waiters <= 0) {
+                    concurrentBatches.remove(fingerprint, batch)
+                }
+            }
         }
     }
 
@@ -98,18 +134,32 @@ class OperationRepositoryImpl(
                 code = CODE_IDEMPOTENCY_KEY_INVALID,
             )
         }
-        val existing = journalDao.findByKey(idempotencyKey)
-        val decrypted = if (existing != null) {
-            decryptOrFailClosed(existing) ?: return OperationOutcome.RecoveryRequired(idempotencyKey)
-        } else {
-            null
+        val initial = try {
+            journalDao.findByKey(idempotencyKey)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Logger.e(TAG, "Journal lookup failed for key=$idempotencyKey; failing closed", e)
+            return OperationOutcome.RecoveryRequired(idempotencyKey)
         }
-        if (existing != null && existing.state in TERMINAL_OUTCOME_STATES) {
-            return outcomeFromTerminalEntity(existing, decrypted!!)
+        if (initial == null) {
+            return when (val result = resolveViaGatewayLookup(idempotencyKey, null, null)) {
+                is LookupResolution.Resolved -> result.outcome
+                is LookupResolution.TransientRetry -> result.fallbackOutcome
+            }
         }
-        return when (val result = resolveViaGatewayLookup(idempotencyKey, existing, decrypted)) {
-            is LookupResolution.Resolved -> result.outcome
-            is LookupResolution.TransientRetry -> result.fallbackOutcome
+        val lock = intentLocks.computeIfAbsent(initial.intentFingerprint) { Mutex() }
+        return lock.withLock {
+            val existing = journalDao.findByKey(idempotencyKey) ?: initial
+            val decrypted = decryptOrFailClosed(existing)
+                ?: return@withLock OperationOutcome.RecoveryRequired(idempotencyKey)
+            if (existing.state in TERMINAL_OUTCOME_STATES) {
+                return@withLock outcomeFromTerminalEntity(existing, decrypted)
+            }
+            when (val result = resolveViaGatewayLookup(idempotencyKey, existing, decrypted)) {
+                is LookupResolution.Resolved -> result.outcome
+                is LookupResolution.TransientRetry -> result.fallbackOutcome
+            }
         }
     }
 
@@ -228,17 +278,25 @@ class OperationRepositoryImpl(
             return OperationOutcome.RecoveryRequired(idempotencyKey = key)
         }
 
-        try {
-            journalDao.insert(initialEntity)
+        val committedOrExisting = try {
+            journalDao.commitIntentIfNoActive(initialEntity, IN_FLIGHT_STATES)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Logger.e(TAG, "Journal write failed for key=$key; nothing sent", e)
+            Logger.e(TAG, "Atomic journal commit failed for key=$key; nothing sent", e)
             return OperationOutcome.RecoveryRequired(idempotencyKey = key)
         }
 
+        if (committedOrExisting.idempotencyKey != key) {
+            Logger.i(
+                TAG,
+                "Atomic journal commit found active record key=${committedOrExisting.idempotencyKey}; suppressing key=$key",
+            )
+            return handleExistingInFlight(committedOrExisting, send)
+        }
+
         Logger.i(TAG, "Journal recorded intent key=$key op=${intent.operation.name}")
-        return dispatchRecordedEntry(initialEntity, send)
+        return dispatchRecordedEntry(committedOrExisting, send)
     }
 
     private suspend fun dispatchRecordedEntry(
@@ -246,12 +304,49 @@ class OperationRepositoryImpl(
         send: suspend (idempotencyKey: String) -> GatewayAckDto,
     ): OperationOutcome {
         val key = recordedEntity.idempotencyKey
-        val sentEntity = recordedEntity.copy(
-            state = OperationJournalState.SENT,
-            updatedAtEpochMs = nowEpochMillis(),
-        )
-        try {
-            journalDao.update(sentEntity)
+        if (!IdempotencyKeyGenerator.isValid(key)) {
+            Logger.e(TAG, "Refusing dispatch for invalid idempotency key; aborting send")
+            return OperationOutcome.RecoveryRequired(
+                idempotencyKey = key,
+                code = CODE_IDEMPOTENCY_KEY_INVALID,
+            )
+        }
+        if (recordedEntity.state != OperationJournalState.INTENT_RECORDED) {
+            Logger.e(
+                TAG,
+                "Refusing dispatch for key=$key; expected INTENT_RECORDED but got ${recordedEntity.state}",
+            )
+            return OperationOutcome.RecoveryRequired(idempotencyKey = key)
+        }
+
+        val committedBeforeSend = try {
+            journalDao.findByKey(key)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Logger.e(TAG, "Failed to verify committed journal record for key=$key; aborting send", e)
+            return OperationOutcome.RecoveryRequired(idempotencyKey = key)
+        }
+        if (committedBeforeSend == null) {
+            Logger.e(TAG, "Cannot dispatch key=$key without a committed journal record; aborting send")
+            return OperationOutcome.RecoveryRequired(idempotencyKey = key)
+        }
+        if (committedBeforeSend.state != OperationJournalState.INTENT_RECORDED) {
+            Logger.w(
+                TAG,
+                "Suppressing dispatch for key=$key; journal state is already ${committedBeforeSend.state}",
+            )
+            return resolveNonRecordedBeforeDispatch(committedBeforeSend)
+        }
+
+        val nowMs = nowEpochMillis()
+        val transitioned = try {
+            journalDao.transitionState(
+                idempotencyKey = key,
+                expectedFromState = OperationJournalState.INTENT_RECORDED,
+                toState = OperationJournalState.SENT,
+                updatedAtEpochMs = nowMs,
+            )
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -259,6 +354,36 @@ class OperationRepositoryImpl(
             return OperationOutcome.RecoveryRequired(idempotencyKey = key)
         }
 
+        if (!transitioned) {
+            val racedRecord = runCatching { journalDao.findByKey(key) }.getOrNull()
+            if (racedRecord != null && racedRecord.state != OperationJournalState.INTENT_RECORDED) {
+                Logger.w(
+                    TAG,
+                    "CAS suppressed duplicate dispatch for key=$key; current state=${racedRecord.state}",
+                )
+                return resolveNonRecordedBeforeDispatch(racedRecord)
+            }
+            Logger.e(TAG, "Failed CAS INTENT_RECORDED -> SENT for key=$key; aborting send")
+            return OperationOutcome.RecoveryRequired(idempotencyKey = key)
+        }
+
+        val sentEntity = try {
+            journalDao.findByKey(key)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Logger.e(TAG, "Failed to confirm committed SENT record for key=$key; aborting send", e)
+            return OperationOutcome.RecoveryRequired(idempotencyKey = key)
+        }
+        if (sentEntity == null || sentEntity.state != OperationJournalState.SENT) {
+            Logger.e(
+                TAG,
+                "Committed journal record for key=$key is not SENT (${sentEntity?.state}); aborting send",
+            )
+            return OperationOutcome.RecoveryRequired(idempotencyKey = key)
+        }
+
+        Logger.i(TAG, "Journal committed SENT for key=$key; dispatching single write")
         return try {
             val ack = send(key)
             handleWriteAcknowledgement(sentEntity, ack)
@@ -291,24 +416,55 @@ class OperationRepositoryImpl(
         }
     }
 
+    private suspend fun resolveNonRecordedBeforeDispatch(record: OperationJournalEntity): OperationOutcome {
+        val decrypted = decryptOrFailClosed(record)
+            ?: return OperationOutcome.RecoveryRequired(record.idempotencyKey)
+        return when (record.state) {
+            OperationJournalState.SENT,
+            OperationJournalState.ACKNOWLEDGED,
+            OperationJournalState.UNCERTAIN -> {
+                when (val resolution = resolveViaGatewayLookup(record.idempotencyKey, record, decrypted)) {
+                    is LookupResolution.Resolved -> resolution.outcome
+                    is LookupResolution.TransientRetry -> resolution.fallbackOutcome
+                }
+            }
+            OperationJournalState.TERMINAL_SUCCEEDED,
+            OperationJournalState.TERMINAL_REFUSED,
+            OperationJournalState.TERMINAL_CONFLICT,
+            OperationJournalState.RECOVERY_REQUIRED -> outcomeFromTerminalEntity(record, decrypted)
+            OperationJournalState.INTENT_RECORDED -> OperationOutcome.RecoveryRequired(record.idempotencyKey)
+        }
+    }
+
     private suspend fun handleWriteAcknowledgement(
         sentEntity: OperationJournalEntity,
         ack: GatewayAckDto,
     ): OperationOutcome {
         val key = sentEntity.idempotencyKey
-        val nowMs = nowEpochMillis()
         val encryptedAudit = ack.auditRef.takeIf { it.isNotBlank() }
             ?.let { cipher.encrypt(it, aad(key, JournalColumn.AUDIT_REF)) }
         val encryptedHead = ack.headSha.takeIf { it.isNotBlank() }
             ?.let { cipher.encrypt(it, aad(key, JournalColumn.RESULT_HEAD_SHA)) }
 
-        val ackedEntity = sentEntity.copy(
-            state = OperationJournalState.ACKNOWLEDGED,
-            updatedAtEpochMs = nowMs,
-            encryptedAuditRef = encryptedAudit ?: sentEntity.encryptedAuditRef,
-            encryptedResultHeadSha = encryptedHead ?: sentEntity.encryptedResultHeadSha,
-        )
-        journalDao.update(ackedEntity)
+        val ackedEntity = transitionEntity(
+            entity = sentEntity,
+            toState = OperationJournalState.ACKNOWLEDGED,
+            encryptedAuditRef = encryptedAudit,
+            encryptedResultHeadSha = encryptedHead,
+        ) ?: run {
+            val latest = runCatching { journalDao.findByKey(key) }.getOrNull()
+            if (latest != null && latest.state in TERMINAL_OUTCOME_STATES) {
+                val latestDecrypted = decryptOrFailClosed(latest)
+                if (latestDecrypted != null) {
+                    return outcomeFromTerminalEntity(latest, latestDecrypted)
+                }
+            }
+            Logger.e(TAG, "Failed to persist ACKNOWLEDGED transition for key=$key; failing closed")
+            return OperationOutcome.RecoveryRequired(
+                idempotencyKey = key,
+                auditRef = ack.auditRef.trim().takeIf { it.isNotEmpty() },
+            )
+        }
 
         val decrypted = decryptOrFailClosed(ackedEntity)
             ?: return OperationOutcome.RecoveryRequired(
@@ -854,18 +1010,67 @@ class OperationRepositoryImpl(
         } catch (e: Exception) {
             Logger.e(TAG, "Journal decryption failed for key=${entity.idempotencyKey}; failing closed", e)
             runCatching {
-                journalDao.update(
-                    entity.copy(
-                        state = OperationJournalState.RECOVERY_REQUIRED,
-                        updatedAtEpochMs = nowEpochMillis(),
-                    ),
-                )
+                transitionEntity(entity, OperationJournalState.RECOVERY_REQUIRED)
             }
             null
         }
 
-    private suspend fun isAlreadyTerminal(key: String): Boolean =
-        journalDao.findByKey(key)?.state in TERMINAL_OUTCOME_STATES
+    private suspend fun transitionEntity(
+        entity: OperationJournalEntity,
+        toState: OperationJournalState,
+        encryptedAuditRef: String? = null,
+        encryptedResultHeadSha: String? = null,
+        encryptedLastErrorCode: String? = null,
+    ): OperationJournalEntity? {
+        val key = entity.idempotencyKey
+        val nowMs = nowEpochMillis()
+        val current = try {
+            journalDao.findByKey(key)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Logger.e(TAG, "Journal lookup failed prior to $toState transition for key=$key", e)
+            return null
+        }
+        if (current == null) {
+            Logger.e(TAG, "Cannot transition missing journal record key=$key to $toState")
+            return null
+        }
+        if (!current.state.canTransitionTo(toState)) {
+            Logger.w(
+                TAG,
+                "Blocked invalid journal state transition ${current.state} -> $toState for key=$key",
+            )
+            return null
+        }
+        val transitioned = try {
+            journalDao.transitionState(
+                idempotencyKey = key,
+                expectedFromState = current.state,
+                toState = toState,
+                updatedAtEpochMs = nowMs,
+                encryptedAuditRef = encryptedAuditRef,
+                encryptedResultHeadSha = encryptedResultHeadSha,
+                encryptedLastErrorCode = encryptedLastErrorCode,
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Logger.e(TAG, "Journal transition ${current.state} -> $toState failed for key=$key", e)
+            return null
+        }
+        if (!transitioned) {
+            Logger.w(TAG, "Journal CAS mismatch during ${current.state} -> $toState for key=$key")
+            return null
+        }
+        return current.copy(
+            state = toState,
+            updatedAtEpochMs = nowMs,
+            encryptedAuditRef = encryptedAuditRef ?: current.encryptedAuditRef,
+            encryptedResultHeadSha = encryptedResultHeadSha ?: current.encryptedResultHeadSha,
+            encryptedLastErrorCode = encryptedLastErrorCode ?: current.encryptedLastErrorCode,
+        )
+    }
 
     private fun outcomeFromTerminalEntity(
         entity: OperationJournalEntity,
@@ -907,15 +1112,7 @@ class OperationRepositoryImpl(
     }
 
     private suspend fun markUncertain(entity: OperationJournalEntity) {
-        if (isAlreadyTerminal(entity.idempotencyKey)) return
-        runCatching {
-            journalDao.update(
-                entity.copy(
-                    state = OperationJournalState.UNCERTAIN,
-                    updatedAtEpochMs = nowEpochMillis(),
-                ),
-            )
-        }
+        transitionEntity(entity, OperationJournalState.UNCERTAIN)
     }
 
     private suspend fun markUncertainWithResult(
@@ -923,20 +1120,17 @@ class OperationRepositoryImpl(
         headSha: String?,
         auditRef: String?,
     ) {
-        if (isAlreadyTerminal(entity.idempotencyKey)) return
         try {
             val encHead = headSha?.let { cipher.encrypt(it, aad(entity.idempotencyKey, JournalColumn.RESULT_HEAD_SHA)) }
-                ?: entity.encryptedResultHeadSha
             val encAudit = auditRef?.let { cipher.encrypt(it, aad(entity.idempotencyKey, JournalColumn.AUDIT_REF)) }
-                ?: entity.encryptedAuditRef
-            journalDao.update(
-                entity.copy(
-                    state = OperationJournalState.UNCERTAIN,
-                    updatedAtEpochMs = nowEpochMillis(),
-                    encryptedResultHeadSha = encHead,
-                    encryptedAuditRef = encAudit,
-                ),
+            transitionEntity(
+                entity = entity,
+                toState = OperationJournalState.UNCERTAIN,
+                encryptedAuditRef = encAudit,
+                encryptedResultHeadSha = encHead,
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Logger.e(TAG, "Encryption failed updating uncertain state for key=${entity.idempotencyKey}", e)
             markRecoveryRequired(entity, code = null, auditRef = null)
@@ -948,24 +1142,17 @@ class OperationRepositoryImpl(
         auditRef: String,
         headSha: String,
     ): Boolean {
-        val current = journalDao.findByKey(entity.idempotencyKey)
-        if (current != null && current.state in NON_SUCCEEDED_TERMINAL_STATES) {
-            Logger.w(TAG, "Monotonicity guard: blocked transition from ${current.state} to TERMINAL_SUCCEEDED for key=${entity.idempotencyKey}")
-            return false
-        }
         return try {
-            journalDao.update(
-                entity.copy(
-                    state = OperationJournalState.TERMINAL_SUCCEEDED,
-                    updatedAtEpochMs = nowEpochMillis(),
-                    encryptedAuditRef = cipher.encrypt(auditRef, aad(entity.idempotencyKey, JournalColumn.AUDIT_REF)),
-                    encryptedResultHeadSha = cipher.encrypt(
-                        headSha,
-                        aad(entity.idempotencyKey, JournalColumn.RESULT_HEAD_SHA),
-                    ),
-                ),
-            )
-            true
+            val encAudit = cipher.encrypt(auditRef, aad(entity.idempotencyKey, JournalColumn.AUDIT_REF))
+            val encHead = cipher.encrypt(headSha, aad(entity.idempotencyKey, JournalColumn.RESULT_HEAD_SHA))
+            transitionEntity(
+                entity = entity,
+                toState = OperationJournalState.TERMINAL_SUCCEEDED,
+                encryptedAuditRef = encAudit,
+                encryptedResultHeadSha = encHead,
+            ) != null
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Logger.e(TAG, "Encryption failed recording terminal success for key=${entity.idempotencyKey}", e)
             markRecoveryRequired(entity, code = null, auditRef = null)
@@ -979,20 +1166,23 @@ class OperationRepositoryImpl(
         code: String,
         auditRef: String?,
     ): Boolean {
-        if (isAlreadyTerminal(entity.idempotencyKey)) return false
+        require(
+            state == OperationJournalState.TERMINAL_REFUSED ||
+                state == OperationJournalState.TERMINAL_CONFLICT,
+        ) {
+            "Expected terminal refusal/conflict state, got $state"
+        }
         return try {
             val encCode = cipher.encrypt(code, aad(entity.idempotencyKey, JournalColumn.LAST_ERROR_CODE))
             val encAudit = auditRef?.let { cipher.encrypt(it, aad(entity.idempotencyKey, JournalColumn.AUDIT_REF)) }
-                ?: entity.encryptedAuditRef
-            journalDao.update(
-                entity.copy(
-                    state = state,
-                    updatedAtEpochMs = nowEpochMillis(),
-                    encryptedLastErrorCode = encCode,
-                    encryptedAuditRef = encAudit,
-                ),
-            )
-            true
+            transitionEntity(
+                entity = entity,
+                toState = state,
+                encryptedAuditRef = encAudit,
+                encryptedLastErrorCode = encCode,
+            ) != null
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Logger.e(TAG, "Encryption failed recording refusal for key=${entity.idempotencyKey}", e)
             markRecoveryRequired(entity, code = null, auditRef = null)
@@ -1005,26 +1195,18 @@ class OperationRepositoryImpl(
         code: String?,
         auditRef: String? = null,
     ) {
-        val current = journalDao.findByKey(entity.idempotencyKey)
-        if (current != null && (current.state == OperationJournalState.TERMINAL_REFUSED || current.state == OperationJournalState.TERMINAL_CONFLICT)) {
-            return
-        }
         val encCode = code?.let {
             runCatching { cipher.encrypt(it, aad(entity.idempotencyKey, JournalColumn.LAST_ERROR_CODE)) }.getOrNull()
-        } ?: entity.encryptedLastErrorCode
+        }
         val encAudit = auditRef?.let {
             runCatching { cipher.encrypt(it, aad(entity.idempotencyKey, JournalColumn.AUDIT_REF)) }.getOrNull()
-        } ?: entity.encryptedAuditRef
-        runCatching {
-            journalDao.update(
-                entity.copy(
-                    state = OperationJournalState.RECOVERY_REQUIRED,
-                    updatedAtEpochMs = nowEpochMillis(),
-                    encryptedLastErrorCode = encCode,
-                    encryptedAuditRef = encAudit,
-                ),
-            )
         }
+        transitionEntity(
+            entity = entity,
+            toState = OperationJournalState.RECOVERY_REQUIRED,
+            encryptedAuditRef = encAudit,
+            encryptedLastErrorCode = encCode,
+        )
     }
 
     private fun uncertainFromRecord(
