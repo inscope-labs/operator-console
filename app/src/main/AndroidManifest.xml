@@ -46,6 +46,9 @@
             android:name=".diagnostics.UserFacingErrorActivity"
             android:exported="false"
             android:theme="@style/Theme.OperatorConsole" />
+
+        <!-- ManualPipelineRecoveryWorker is registered programmatically via WorkManager
+             for lookup-only recovery (GET /operations/{id}); no new permissions required. -->
     </application>
 
 </manifest>

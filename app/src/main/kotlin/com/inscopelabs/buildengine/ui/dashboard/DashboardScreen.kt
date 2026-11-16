@@ -57,6 +57,7 @@ import com.inscopelabs.buildengine.R
 import com.inscopelabs.buildengine.domain.model.Plan
 import com.inscopelabs.buildengine.domain.model.Task
 import com.inscopelabs.buildengine.domain.model.TaskStatus
+import com.inscopelabs.buildengine.manualpipeline.`public`.ManualPipelineEntry
 import com.inscopelabs.buildengine.ui.common.UiState
 import com.inscopelabs.buildengine.ui.components.ErrorBanner
 
@@ -70,6 +71,7 @@ fun DashboardScreen(
     onNavigateToSettings: () -> Unit = {},
     onNavigateToPlans: () -> Unit = {},
     onNavigateToPreflight: () -> Unit = {},
+    onNavigateToManualPipeline: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsState()
     val diagnosticsState by viewModel.diagnosticsState.collectAsState()
@@ -132,6 +134,7 @@ fun DashboardScreen(
                             message = stringResource(R.string.data_not_loaded),
                             onRetry = { viewModel.refresh() },
                         )
+                        ManualPipelineEntry(onOpenManualPipeline = onNavigateToManualPipeline)
                         DashboardDiagnosticsCard(
                             state = diagnosticsState,
                             onSyncClick = { viewModel.syncBranch() },
@@ -160,6 +163,7 @@ fun DashboardScreen(
                             message = currentState.message,
                             onRetry = { viewModel.refresh() },
                         )
+                        ManualPipelineEntry(onOpenManualPipeline = onNavigateToManualPipeline)
                         DashboardDiagnosticsCard(
                             state = diagnosticsState,
                             onSyncClick = { viewModel.syncBranch() },
@@ -176,6 +180,7 @@ fun DashboardScreen(
                         onPlanClick = onNavigateToPlan,
                         onTaskClick = onNavigateToTask,
                         onViewAllPlans = onNavigateToPlans,
+                        onOpenManualPipeline = onNavigateToManualPipeline,
                     )
                 }
             }
@@ -192,12 +197,16 @@ private fun DashboardContent(
     onPlanClick: (String) -> Unit,
     onTaskClick: (String) -> Unit,
     onViewAllPlans: () -> Unit,
+    onOpenManualPipeline: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        item {
+            ManualPipelineEntry(onOpenManualPipeline = onOpenManualPipeline)
+        }
         // 1. Halt status banner
         item {
             if (data.isHalted) {

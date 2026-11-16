@@ -15,6 +15,8 @@ object Routes {
     const val ENROLLMENT: String = "enrollment"
     const val SETTINGS: String = "settings"
     const val PREFLIGHT: String = "preflight"
+    const val MANUAL_PIPELINE: String = "manual_pipeline"
+    const val MANUAL_PIPELINE_TASK: String = "manual_pipeline/{taskId}"
 
     fun planDetail(planId: String): String = "plans/$planId"
 
@@ -25,4 +27,6 @@ object Routes {
     fun publishProgress(taskId: String): String = "publish/$taskId/progress"
 
     fun decision(decisionId: String): String = "decision/$decisionId"
+
+    fun manualPipelineTask(taskId: String): String = "manual_pipeline/$taskId"
 }

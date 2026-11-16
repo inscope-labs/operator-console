@@ -49,6 +49,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.inscopelabs.buildengine.R
 import com.inscopelabs.buildengine.domain.model.Task
 import com.inscopelabs.buildengine.domain.model.TaskBranch
+import com.inscopelabs.buildengine.manualpipeline.`public`.ManualPipelineTaskAction
 import com.inscopelabs.buildengine.ui.common.UiState
 import com.inscopelabs.buildengine.ui.components.BranchShaRow
 import com.inscopelabs.buildengine.ui.components.ErrorBanner
@@ -65,6 +66,7 @@ fun TaskDetailScreen(
     viewModel: TaskDetailViewModel = hiltViewModel(),
     onBack: () -> Unit = {},
     onPublishClick: (String) -> Unit = {},
+    onOpenManualPipelineForTask: (String) -> Unit = {},
 ) {
     LaunchedEffect(taskId) {
         viewModel.loadTask(taskId)
@@ -132,6 +134,7 @@ fun TaskDetailScreen(
                     TaskDetailContent(
                         data = currentState.data,
                         onPublishClick = { onPublishClick(currentState.data.task.id) },
+                        onOpenManualPipelineForTask = onOpenManualPipelineForTask,
                     )
                 }
             }
@@ -143,6 +146,7 @@ fun TaskDetailScreen(
 private fun TaskDetailContent(
     data: TaskDetailData,
     onPublishClick: () -> Unit,
+    onOpenManualPipelineForTask: (String) -> Unit,
 ) {
     val task = data.task
     val branch = data.branch
@@ -280,6 +284,11 @@ private fun TaskDetailContent(
                         Spacer(modifier = Modifier.size(8.dp))
                         Text(stringResource(R.string.action_publish))
                     }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    ManualPipelineTaskAction(
+                        taskId = task.id,
+                        onOpenForTask = onOpenManualPipelineForTask,
+                    )
                 }
             }
         }

@@ -18,6 +18,8 @@ import com.inscopelabs.buildengine.ui.preflight.PreflightScreen
 import com.inscopelabs.buildengine.ui.publish.PublishConfirmScreen
 import com.inscopelabs.buildengine.ui.publish.PublishProgressScreen
 import com.inscopelabs.buildengine.ui.settings.SettingsScreen
+import com.inscopelabs.buildengine.manualpipeline.`public`.ManualPipelineNavRoutes
+import com.inscopelabs.buildengine.manualpipeline.`public`.manualPipelineNavGraph
 import com.inscopelabs.buildengine.ui.taskdetail.TaskDetailScreen
 
 /**
@@ -33,6 +35,7 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
                 onNavigateToPlans = { navController.navigate(Routes.PLANS) },
                 onNavigateToPreflight = { navController.navigate(Routes.PREFLIGHT) },
+                onNavigateToManualPipeline = { navController.navigate(ManualPipelineNavRoutes.WORKSPACE) },
             )
         }
         composable(Routes.PLANS) {
@@ -60,6 +63,9 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 taskId = taskId,
                 onBack = { navController.popBackStack() },
                 onPublishClick = { id -> navController.navigate(Routes.publish(id)) },
+                onOpenManualPipelineForTask = { id ->
+                    navController.navigate(ManualPipelineNavRoutes.workspaceForTask(id))
+                },
             )
         }
         composable(
@@ -100,5 +106,6 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 onNavigateToEnrollment = { navController.navigate(Routes.ENROLLMENT) },
             )
         }
+        manualPipelineNavGraph(navController = navController)
     }
 }

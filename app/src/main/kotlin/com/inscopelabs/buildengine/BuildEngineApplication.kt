@@ -11,6 +11,7 @@ import com.inscopelabs.buildengine.diagnostics.CrashActivity
 import com.inscopelabs.buildengine.diagnostics.GlobalExceptionHandler
 import com.inscopelabs.buildengine.diagnostics.UserFacingErrorActivity
 import com.inscopelabs.buildengine.domain.repository.SessionRepository
+import com.inscopelabs.buildengine.manualpipeline.`public`.enqueueManualPipelineLaunchRecovery
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -71,6 +72,7 @@ class BuildEngineApplication : Application() {
                 sessionRepository.start()
             }
             OperationRecoveryWorker.enqueueLaunchRecovery(this)
+            enqueueManualPipelineLaunchRecovery(this)
             BootGuard.stageSuccess("app_init")
         } catch (t: Throwable) {
             BootGuard.recordFailure(this, "app_init", t)
