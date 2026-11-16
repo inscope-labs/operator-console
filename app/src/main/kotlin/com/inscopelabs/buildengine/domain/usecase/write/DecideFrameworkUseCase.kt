@@ -18,7 +18,14 @@ enum class FrameworkDecision(val wireValue: String) {
 }
 
 /**
- * Target for a framework decision (`POST /plans/{id}/decide`, §3.18; T3-404, PR3-003, PR3-025).
+ * Target for a framework decision (`POST /plans/{id}/decide`, §3.18; T3-404, PR3-025).
+ *
+ * Per ADR 0014 D2 (documented reduction): the wire request carries only schema fields
+ * (`plan`, `task`, `branch`, `decision`, `notes`, `idempotencyKey`, `capability`).
+ * Rationale is carried in `notes`; attribution is the enrolled key identifier recorded
+ * by the gateway audit path; there is no separate evidence field on the wire.
+ * Local fields `headSha` and `order` are retained solely for capability minting and
+ * confirmation display; they are never sent as unapproved request properties.
  */
 data class DecideTarget(
     val plan: String,
@@ -27,10 +34,7 @@ data class DecideTarget(
     val headSha: String,
     val order: String,
     val decision: FrameworkDecision,
-    val attribution: String,
-    val rationale: String,
-    val scope: String,
-    val evidence: String,
+    /** Rationale / free-text notes sent as the schema `notes` field (ADR 0014 D2). */
     val notes: String? = null,
 )
 
@@ -38,9 +42,8 @@ sealed interface DecideResult {
     data class Executed(val outcome: OperationOutcome) : DecideResult
 
     /**
-     * Blocked before minting/sending because the gateway schema/route contract is unsettled
-     * (`PR3-003` / `PR3-025`): `decide.schema.json` forbids the attribution/rationale/scope/evidence
-     * fields and omits `headSha`/`branch` needed for verified completion (T3-302).
+     * Retained for regression tests that explicitly construct the use case with
+     * [contractSchemaSettled] = false. Production DI uses the settled default.
      */
     data class ContractBlocked(val reason: String) : DecideResult
     data class NotAuthorized(val reason: MintResult) : DecideResult
@@ -50,15 +53,16 @@ sealed interface DecideResult {
 /**
  * Resolves a framework decision (`POST /plans/{id}/decide`, §3.18).
  *
- * Validates all required attribution and decision fields locally, then fails closed with
- * [DecideResult.ContractBlocked] while [contractSchemaSettled] is `false` (default, per PR3-003
- * and PR3-025) so the console never fabricates unapproved wire fields or bypasses schema checks.
+ * ADR 0014 D2 settled the documented reduction: request body matches `decide.schema.json`
+ * (`decision` + optional `notes` plus schema scope fields and `idempotencyKey`).
+ * Attribution is derived server-side from the enrolled key; rationale lives in `notes`.
+ * Default [contractSchemaSettled] is now `true` so the production path is operational.
  */
 class DecideFrameworkUseCase(
     private val operationRepository: OperationRepository,
     private val confirmAndMintCapability: ConfirmAndMintCapabilityUseCase,
     private val nonceSource: NonceSource,
-    private val contractSchemaSettled: Boolean = false,
+    private val contractSchemaSettled: Boolean = true,
 ) {
 
     val isContractSettled: Boolean
@@ -73,25 +77,17 @@ class DecideFrameworkUseCase(
             target.plan.isBlank() ||
             target.task.isBlank() ||
             target.order.isBlank() ||
-            target.attribution.isBlank() ||
-            target.rationale.isBlank() ||
-            target.scope.isBlank() ||
-            target.evidence.isBlank()
+            target.branch.isBlank() ||
+            target.headSha.isBlank()
         ) {
             return DecideResult.InvalidTarget(
-                "Plan, task, order, attribution, rationale, scope and evidence are required",
+                "Plan, task, order, branch and head SHA are required for capability minting",
             )
         }
-        val textInputs = listOfNotNull(
-            target.attribution,
-            target.rationale,
-            target.scope,
-            target.evidence,
-            target.notes,
-        )
+        val textInputs = listOfNotNull(target.notes)
         if (textInputs.any { Redactor.containsForbidden(it) }) {
             return DecideResult.InvalidTarget(
-                "Decision inputs must not contain forbidden credential or signature patterns",
+                "Decision notes must not contain forbidden credential or signature patterns",
             )
         }
 
