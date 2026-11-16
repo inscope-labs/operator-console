@@ -8,6 +8,10 @@ package com.inscopelabs.buildengine.domain.model
  * head SHA travel with the task: the console has to be able to show both before
  * anything is signed, and asking for them separately would mean a second round
  * trip for every row of the task list.
+ *
+ * `order` is the work-order identifier from the gateway task read (contract
+ * revision 1.2 / ADR 0014 D1). It is required for capability minting on publish
+ * and is never invented by the console.
  */
 data class Task(
     val id: String,
@@ -18,6 +22,8 @@ data class Task(
     val branch: String = "",
     /** The head SHA the gateway reported for that branch. */
     val headSha: String = "",
+    /** Work-order identifier under which the task was issued (contract §3.6). */
+    val order: String = "",
 )
 
 /**
