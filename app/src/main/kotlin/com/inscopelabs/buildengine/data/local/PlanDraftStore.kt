@@ -41,7 +41,7 @@ class PlanDraftStore(
             return emptyList()
         }
         return preferences.asMap()
-            .filterKeys { name -> name.startsWith(DRAFT_KEY_PREFIX) }
+            .filterKeys { key -> key.name.startsWith(DRAFT_KEY_PREFIX) }
             .mapNotNull { (_, value) -> decode(value as? String) }
     }
 
