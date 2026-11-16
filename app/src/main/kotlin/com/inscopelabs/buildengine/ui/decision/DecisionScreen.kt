@@ -46,8 +46,9 @@ import com.inscopelabs.buildengine.ui.publish.publishBannerMessage
 /**
  * Owner framework decision screen (`POST /plans/{id}/decide`, T3-404 / PR3-025).
  *
- * Captures required attribution, rationale, scope, and evidence, and displays the active
- * PR3-003 contract-reconciliation blocker so submission stays disabled until schema/route settle.
+ * ADR 0014 D2: collects and displays only the fields that will be sent
+ * (plan, task, branch, decision, notes). Rationale is entered as notes.
+ * Attribution is not collected; the gateway records it from the enrolled key.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -166,31 +167,6 @@ fun DecisionScreen(
                 label = { Text(stringResource(R.string.decision_head_label)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth().testTag("decision_head_input"),
-            )
-            OutlinedTextField(
-                value = state.attribution,
-                onValueChange = viewModel::updateAttribution,
-                label = { Text(stringResource(R.string.decision_attribution_label)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().testTag("decision_attribution_input"),
-            )
-            OutlinedTextField(
-                value = state.rationale,
-                onValueChange = viewModel::updateRationale,
-                label = { Text(stringResource(R.string.decision_rationale_label)) },
-                modifier = Modifier.fillMaxWidth().testTag("decision_rationale_input"),
-            )
-            OutlinedTextField(
-                value = state.scope,
-                onValueChange = viewModel::updateScope,
-                label = { Text(stringResource(R.string.decision_scope_label)) },
-                modifier = Modifier.fillMaxWidth().testTag("decision_scope_input"),
-            )
-            OutlinedTextField(
-                value = state.evidence,
-                onValueChange = viewModel::updateEvidence,
-                label = { Text(stringResource(R.string.decision_evidence_label)) },
-                modifier = Modifier.fillMaxWidth().testTag("decision_evidence_input"),
             )
             OutlinedTextField(
                 value = state.notes,
