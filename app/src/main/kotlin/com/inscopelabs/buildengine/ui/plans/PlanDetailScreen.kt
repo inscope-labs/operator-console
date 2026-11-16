@@ -224,6 +224,12 @@ private fun PlanDetailContent(
             }
         }
 
+        // Work order: the documented alternative to a work-order creation action.
+        // Work-order creation is deferred to engine tooling (BD-1.3 Option B, PR3-027).
+        item {
+            WorkOrderDeferralCard()
+        }
+
         // Actions: Validate & Render Check
         item {
             Card(
@@ -290,6 +296,39 @@ private fun PlanDetailContent(
             item {
                 RenderCheckResultCard(renderCheck = data.renderCheck)
             }
+        }
+    }
+}
+
+/**
+ * The documented alternative to a work-order creation action (BD-1.3 Option B, PR3-027).
+ *
+ * Work orders are created by engine tooling. The gateway contract defines no work-order
+ * creation request, response or schema, so the console has no such action to offer and must
+ * not pretend otherwise (I-10). This card states where work orders come from instead of
+ * presenting a control that cannot work.
+ *
+ * It is informational only: there is no button, and nothing here can reach the gateway.
+ */
+@Composable
+private fun WorkOrderDeferralCard() {
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("work_order_deferral_card"),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = stringResource(R.string.work_order_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.work_order_deferral_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

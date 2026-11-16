@@ -22,7 +22,6 @@ import com.inscopelabs.buildengine.domain.usecase.read.GetPlansUseCase
 import com.inscopelabs.buildengine.domain.usecase.read.GetStatusUseCase
 import com.inscopelabs.buildengine.domain.usecase.read.RenderCheckUseCase
 import com.inscopelabs.buildengine.domain.usecase.read.ValidatePlanUseCase
-import com.inscopelabs.buildengine.domain.usecase.write.CreateWorkOrderUseCase
 import com.inscopelabs.buildengine.domain.usecase.write.DecideFrameworkUseCase
 import com.inscopelabs.buildengine.domain.usecase.write.HaltUseCase
 import com.inscopelabs.buildengine.domain.usecase.write.PublishTaskUseCase
@@ -144,10 +143,6 @@ object UseCaseModule {
         nonceSource = nonceSource,
         planRepository = planRepository,
     )
-
-    @Provides
-    @Singleton
-    fun provideCreateWorkOrderUseCase(): CreateWorkOrderUseCase = CreateWorkOrderUseCase()
 
     @Provides
     @Singleton

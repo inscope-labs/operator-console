@@ -9,6 +9,11 @@
     <string name="plan_list_placeholder">Plan list. Scaffold placeholder.</string>
     <string name="plan_detail_title">Plan</string>
     <string name="plan_detail_placeholder">Plan detail. Scaffold placeholder.</string>
+
+    <!-- Work-order creation is deferred to engine tooling (BD-1.3 Option B, PR3-027, ADR 0014 D5).
+         This is the documented alternative that replaces a work-order creation action. -->
+    <string name="work_order_title">Work Order</string>
+    <string name="work_order_deferral_body">Work orders are created in engine tooling. This console does not create work orders: the gateway contract defines no work-order creation request, response or schema, so there is no console action for it. The gateway reports the work-order identifier it holds for each task, and the console copies that value unchanged — it never derives or invents one.</string>
     <string name="task_detail_title">Task</string>
     <string name="task_detail_placeholder">Task detail. Scaffold placeholder.</string>
     <string name="publish_confirm_title">Publish</string>
