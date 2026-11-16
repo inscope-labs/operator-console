@@ -163,9 +163,12 @@ The suite grew from 512 to 536 tests — the 12 added here, plus the 12 from PR3
 into `main` while this branch was open and was rebased onto before the run above.
 
 Earlier runs of the same code, for the record: **43824183321** on `bc711fa` — success (524 tests, 0
-failures) and **43824896807** on `8ec4fa4` — success (536 tests, 0 failures; that run was the merge
+failures), **43824896807** on `8ec4fa4` — success (536 tests, 0 failures; that run was the merge
 commit of the branch head with `main`, which proved the branch merges cleanly with the PR3-025 work
-before the rebase).
+before the rebase), and **43825323550** on `34772d9` — success (536 tests, 0 failures).
+
+The commit that follows this one changes only the CI wording in the `docs/STATUS.md` `T3-404` row and
+this paragraph. The CI result for the branch head is recorded in the pull request.
 
 | Class | Tests | Failures | Ignored |
 |---|---:|---:|---:|
