@@ -114,7 +114,7 @@ The gateway directly replaces the legacy CLI `cbridge` while eliminating reposit
 | `decide` | `POST /plans/{id}/decide` | Task/Plan scope | Yes | Decision execution per BD-1.3 |
 | `status` | `GET /plans/{id}/status` | Read-only | No | Returns plan status |
 | `status` (transition) | `POST /plans/{id}/status` | Plan scope | Yes (`set` / `set_in_progress` / `set_done`) | Guarded status mutation with compare-and-swap per BD-1.3/BD-1.4 |
-| `order` | `POST /plans/{id}/order` | Task scope | Yes (`ORDER`) | Work order minting |
+| `order` | `POST /plans/{id}/order` | Task scope | Yes (`ORDER`) | **Reserved / not supported.** No §3 request, response or schema exists; work orders are created by engine tooling (§3.6, ADR 0014 D5). Clients must not call it. |
 | `operations` | `GET /operations/{id}` | Read-only | No (Bearer auth) | Operation lookup keyed by idempotency key per BD-1.7 |
 | `audit` | `GET /audit` / `GET /audit/{ref}` | Read-only | No (Bearer auth) | Audit journal inspection |
 | `halt` | `POST /halt` | Engine branch (`engine`) | Yes (Engine scoped) | Global emergency stop |
