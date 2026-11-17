@@ -1,8 +1,8 @@
 # Operator Console — v0.6.0 RELEASE PLAN
 
 **Repository:** `inscope-labs/operator-console` — this plan covers the **Android app (`app/`) only**. Operator Gateway "Gateway A" (`gateway/`) has its own plan and agent: `gateway/GATEWAY-A-COMPLETION-PLAN.md`.
-**Plan revision:** 1.2 — Android-only scope (gateway work moved to its own plan); pre-scaffolded files named per stage (G-14)
-**Review baseline:** 5 November 2026 (`main` as cloned on that date; I did not run any build or test)
+**Plan revision:** 1.3 — revision 1.2's Android-only scope and per-stage file naming (G-14) are unchanged; this revision replaces the A.4 baseline table with one derived from the repository, restates T3-303 and T3-404 against ADR 0014 D4, ADR 0014 D2/D5 and ADR 0016 D-1, and records the gateway plan's Phase 1 result
+**Review baseline:** 17 November 2026 (`main` at `1f949ef`; the A.4 table is derived from the repository, its CI runs and its merged pull requests — not from agent reports. No build or test was run locally: CI is the only compiler in this repository)
 **Supersedes:** `docs/V0.6.0-BUILD-PLAN.md` (OC-0…OC-9), the unfinished parts of `IMPLEMENTATION-PLAN.md` (Phases 4.3–6, kept in `public/assets/aistudio/IMPLEMENTATION-PLAN_c11dc242.md`), `docs/console-connectivity-remediation.md` stages 2–8, and the open stop-and-ask items in the `gateway-repair-ga` agent reports.
 **Gateway plan (separate owner):** `gateway/GATEWAY-A-COMPLETION-PLAN.md`. No stage in this plan changes `gateway/**`; this plan only consumes the gateway's published contract and its verified gates.
 **Companion:** `inscope-labs/build-engine` → `docs/release/V0.6.0-BUILD-PLAN.md` (Gateways B/C, conformance, compatibility record).
@@ -51,37 +51,37 @@ Release claims use the status vocabulary of the guide §1.3: **implemented, refe
 - **G-13** Scope split: AI Studio edits only `app/**`, `docs/**` Android documents and `agent-reports/**` allowed for the stage. It never creates, edits or deletes anything under `gateway/**`. Before each run it starts from the current `main` (pull first) so that gateway PRs merged meanwhile are not overwritten; if its working tree contains `gateway/**` changes, it discards them and reports.
 - **G-14** Pre-execution scaffolds (`docs/PRE-EXECUTION-FILE-MAP.md`, rules in `docs/PRE-EXECUTION-ONBOARDING.md`). A stage whose **Files** line names a scaffold completes that file **in place**: it does not recreate, rename, move or delete it, treats the scaffold as an untrusted proposal, and removes both markers (G-09). A stage may touch only the paths in its own **Files** line plus the existing files its tasks name (G-02). Paths are under `app/src/main/kotlin/com/inscopelabs/buildengine/` unless stated.
 
-### A.4 Evidence-based baseline (5 Nov 2026)
+### A.4 Evidence-based baseline (17 Nov 2026)
 
-Status words per the guide. "Per report" = taken from AI Studio agent reports; I did not execute tests. Gateway A rows are baseline evidence only; the work to change them is tracked in `gateway/GATEWAY-A-COMPLETION-PLAN.md`.
+Status words per the guide. This table replaces the 5 Nov 2026 baseline. It is **derived from the repository** — source, CI runs and merged pull requests — not from agent reports, and it states the gap that is still open in each area. Gateway A rows are the console's view of the gateway's state; the work that changes them is tracked in `gateway/GATEWAY-A-COMPLETION-PLAN.md`.
 
 | Area | Status | Evidence / gap |
 |---|---|---|
-| Contract, ADRs 0001–0010, conformance vectors | **implemented** | `docs/gateway-contract.md`, vectors reproducibility job in CI. Contract and code have drifted (see B.3) |
-| Core utilities, codec, signers, minter | **implemented** (per report) | Stages 2.1–2.3 reports; no report exists for Stage 2.4 (transport) or Stage 3.1 (settings/session) although code is present: re-verify |
-| Read layer and screens | **implemented** (per report) | Stages 3.2, 3.3 |
-| Device key, enrolment, attestation (app side) | **implemented** (per report) | Stage 4.1 + 4.2 remediation; 216 JVM tests reported passing in the agent environment |
-| Confirmation + mint single path | **implemented** (per report) | `ConfirmAndMintCapabilityUseCase`, `ArchitectureTest` guards `.mint(` |
-| Connectivity remediation | **partial** | Only Stage 1 of 8 reported; its report lists the full Gradle run as unverified |
-| Write use cases (publish, upload, reconcile, halt, resume, decide, work order, set status), `OperationRepositoryImpl`, publish/decision screens | **scaffold** | ~42 `TODO`/`SCAFFOLD` markers in 25 app files |
-| Certificate pinning | **scaffold** | `CertificatePinning` throws `TODO`; pin set is commented out; `gateway.invalid` still in network config |
-| Durable operation journal, background executor | **not started** | ADR 0009 chose encrypted Room + WorkManager; neither is in the build file |
-| Lab (Phase 5) | **not started** | Only `LabEnvironmentGuard` exists |
-| Phase 6 close-out (DEFERRED.md, device checklist, README) | **not started** | README still says "scaffold" |
-| Gateway A | **partial, not deployed (unverified)** | ~2,560 lines. Implemented: config gate, `/health`, `/enroll*`, `/branches/:name/head`, status/plans reads, capability verify + nonce DO, device-key resolution, attestation verifier, enrolment registry DO, guards G1/G3/G4/G13, GitHub App auth, read handles. **Stubs:** guards G5–G8, G11, G14, G15; publish transaction; upload; reconcile; halt/resume; decide; sync; doctor; admin; audit record/emit/stream; PlanDO; ETag cache; rate coordinator; transaction; nonce cleanup alarm |
-| Gateway CI | **permissive** | `cbridge-ci.yml`: `npm ci \|\| npm install`, `lint \|\| true`, `test:unit \|\| true`, `verify-log-hygiene \|\| true`; **no `gateway/package-lock.json`**; every gateway report says tsc/vitest "unverified in-agent" |
-| Gateway deploy workflow | **scaffold** | `cbridge-deploy.yml`: `TODO: run V1–V12 against staging before production promote`; no approval gate |
-| Android CI | **implemented, narrow** | JVM tests + debug build + vector reproducibility only; no release, signing or instrumented jobs |
+| Contract, ADRs, conformance vectors | **implemented** | `docs/gateway-contract.md` revision 1.3 (ADR 0016). ADRs 0001–0010 and 0012–0016 exist; **ADR 0011 is still unwritten** (PoC task 49, blocked on the operator's closed decisions). The vectors reproducibility job runs in CI. `POST /plans/{id}/order` is marked *reserved*: the contract defines no §3 request/response and no schema, so the console may not implement it (I-10, ADR 0015 R3) |
+| Core utilities, codec, signers, minter | **implemented** | Stages 2.1–2.3 and 3.1, verified against the repository rather than an agent report |
+| Read layer and screens | **implemented** | Stages 3.2 and 3.3; the plan-authoring screens were added in PR #76 |
+| Device key, enrolment, attestation (app side) | **implemented in code; no device evidence** | Stage 4.1 + 4.2 remediation; per-environment keys and credential slots (Stage 2.2); `RevokeDeviceKeyUseCase` and `DeviceKeyManager.NeedsReenrollment` are in the repository. **Open:** no instrumented evidence — PoC tasks 30–32, and the `NeedsReenrollment` UI is deferred to Stage 4.4 (PoC task 24) |
+| Confirmation + mint single path | **implemented** | `ConfirmAndMintCapabilityUseCase`; `ArchitectureTest` confines `.mint(` and adds Rules A, B, D, E, F1 and F2, backed by `ArchitectureScanner` and 12 fixture tests. **Open:** the Rule E ratchet baseline is **unapproved** — four files still reference the Lab package or the HMAC signer (PoC task 37) |
+| Connectivity remediation | **implemented** | Stage 2.1 in full: idle init, `BaseUrlStore` injection and URL validation, health-snapshot persistence, staging banner, redacted activity log, redirect refusal and a response size cap. **Open:** the base URL still defaults to the `gateway.invalid` placeholder (PoC tasks 17, 18) |
+| Write use cases (publish, upload, reconcile, halt, resume, decide, work order, set status), `OperationRepositoryImpl`, publish/decision screens | **implemented** | The scaffolded files are real: `OperationRepositoryImpl` implements publish, upload, reconcile, halt and resume through the journal; `DecideFrameworkUseCase` (PR #72) and `SetTaskStatusUseCase` (`4ba2c90`, `SET_IN_PROGRESS` only). Work-order creation is a **documented deferral**, not a scaffold (PR #73). **Open:** **10** scaffold markers remain in `app/src/main` — 8 Phase 4 screens and 2 Phase 5 Lab (PoC tasks 19–29) |
+| Certificate pinning | **implemented in code; not configured** | `CertificatePinning` with a primary and a backup pin, BD-2.2 180-day expiry enforcement, release empty-pin refusal, a dynamic rotation path without an app update, an OkHttp pinner and interceptor, and `docs/PIN-ROTATION.md`. **Not safe to use:** the shipped `network_security_config.xml` still names `gateway.invalid` and its `<pin-set>` is commented out, so no deployed host and no pin exist in a build (PoC task 39, needs EXT-6) |
+| Durable operation journal, background executor | **implemented** | Room `2.8.5` (KSP schema committed) and WorkManager `2.11.2` are in the build file; the GCM associated-data binding merged in PR #71. **Open:** the journal has no column for a gateway operation id distinct from the client idempotency key, and there is no on-device evidence (PoC tasks 33, 34) |
+| Lab (Phase 5) | **partially implemented** | No longer only a guard: `lab/` holds the scenario runner, catalogue, mutators, contract check and report, with `ui/lab/` screens. **Open:** Stage 5.5 release packaging isolation — the Lab and the HMAC signer are still in the release source set, and the release posture gate allowlists them until then (PoC task 44) |
+| Phase 6 close-out (`DEFERRED.md`, device checklist, README) | **partially implemented** | `docs/DEFERRED.md` and the README status pointer landed in PR #81. **Open:** the device test checklist and the environments document (PoC task 60) |
+| Gateway A | **implemented in code; not deployed** | ~9,300 lines of TypeScript with **32** registered routes, including the publish, upload, reconcile, halt, resume and decide transactions, `GET /operations/:id`, the admin surfaces and the audit routes. **Not deployed** to any Worker (EXT-5). **Open:** `POST /plans/{id}/status` is still absent (PoC task 62) and `GET /tasks/next` still emits no `order` (PoC task 64) |
+| Gateway CI | **fail-closed** | `gateway-ci.yml` runs `npm ci`, typecheck, lint, unit tests, log-hygiene and repo-privacy with **no `|| true`**, and `gateway/package-lock.json` is committed. Green on `201d0607` (run `43710236552`) |
+| Gateway deploy workflow | **partially implemented** | Renamed `gateway-deploy.yml`; it runs `npm ci`, typecheck and the two hygiene checks before `wrangler deploy`. **Open:** the V1–V12 pre-production gate is still a comment rather than a gate, and the environment has no required reviewer (PoC task 47) |
+| Android CI | **implemented, narrow** | JVM tests, a debug build, vector reproducibility, and — since PR #82 — a **release posture gate** that fails on a scaffold marker in a shipped file, a placeholder host, a missing or near-expiry pin set, cleartext in the release config, the Lab or HMAC signer in the release source set, or a debug keystore or emulator host in the release build type. **Still no release build, signing or instrumented job** (PoC tasks 42, 43) |
 
-**Two defects found during review that need action before anything else:**
+**The two defects found during review on 5 Nov 2026 are both resolved.**
 
-1. `POST /tasks/:id/publish` on Gateway A returns **HTTP 200 `{ok:true}`** after the guards pass, with the message "publish transaction not yet implemented". A client reading the status code would report a publication that never happened. It must return 501 until the transaction exists (T1-103).
-2. Gateway environment names are `test | production` only (`config/constants.ts`), but ADR 0010 and the build-engine plan require `test`, `staging`, `production`. Staging cannot currently be configured (BD-1.1).
+1. ~~`POST /tasks/:id/publish` on Gateway A returned **HTTP 200 `{ok:true}`** after the guards passed.~~ **Fixed.** While it was a stub the route returned 501 `NOT_IMPLEMENTED` (T1-103, PR #30); it now runs the publish transaction with an idempotency write-ahead, capability gating and branch, head and task agreement checks.
+2. ~~Gateway environment names were `test | production` only, so staging could not be configured.~~ **Fixed.** ADR 0010 and BD-1.1 are in force: the environment model accepts `test`, `staging` and `production` (Stage 1.2, PR #32).
 
 ### A.5 What I could not verify
 
 - Whether Gateway A is deployed anywhere, and whether the `staging` GitHub environment holds Gateway A secrets (only build-engine's Gateways B/C staging deployment is evidenced).
-- Any CI run result for `operator-console`; unit-test counts above are agent-reported.
+- ~~Any CI run result for `operator-console`; unit-test counts above are agent-reported.~~ **Now verifiable.** CI runs are readable through the GitHub API and the real test counts come from the `unit-test-reports` artifact of each run, not from an agent report. `main` was green at `95a3465` (run `44195246660`) with **746/746 tests, 0 failures, 0 ignored**; `android-ci` runs `:app:testDebugUnitTest` and `:app:assembleDebug` on every push and pull request, and since PR #82 also runs the release posture gate.
 - Cloudflare account state, the account `workers.dev` subdomain, GitHub App configuration.
 - Whether the repository is intended to be public: both repositories were readable without credentials (BD-0.1).
 - The Galaxy A03 Core's real biometric and attestation capabilities. Treat as unknown until Stage 7.2 reads the posture screen.
@@ -294,9 +294,11 @@ Path shorthand: `M/` = `app/src/main/kotlin/com/inscopelabs/buildengine/`, `T/` 
 - T0-301 Delete `public/assets/aistudio/*` per BD-0.4 after listing each file's replacement in the report.
 - T0-302 `[BE]` X-1: build-engine reconciles its `RELEASE-PLAN.md` header.
 
-### Phase 1 — Gateway A (not part of this plan)
+### Phase 1 — Gateway A (owned by the gateway plan)
 
 Gateway A is planned, built and verified under `gateway/GATEWAY-A-COMPLETION-PLAN.md` by its own agent. This plan schedules **no** gateway task, stage or gate. The former Phase 1 stages (T1-101 … T1-605) were removed from this plan in revision 1.1; their text is in git history before that revision.
+
+**Recorded result.** The gateway plan's Phase 1 is closed. `docs/release/PHASE-1-COMPLETION-REPORT.md` (2026-11-07) records all five stages closed with their closing SHAs and CI runs: 1.1 publish and stubs answer 501 `NOT_IMPLEMENTED` (`5e09ca8` / `e3d5683`, PR #30), 1.2 the environment model accepts `test`, `staging` and `production` (`3ab8487` / `cf0899a`, PR #32), 1.3 the contract schemas and frozen error catalogue (`6d0e7f1` / `e6ead04`, PR #33), 1.4 fail-closed CI and the committed lockfile (`2080fb9` / `817e462`, PR #34), and 1.5 the report itself. **The gate is still unsigned** — the report's §6 reads “Decision: pending operator review” — so Phase 1 is *closed but not accepted*. Two things have changed since that report and are tracked here rather than in the gateway plan: `POST /plans/{id}/status` is still absent (PoC task 62) and `GET /tasks/next` still emits no `order` (PoC task 64).
 
 **What Android stages need from the gateway plan** (operator confirms each before authorizing the dependent Android stage):
 - Published contract, JSON schemas and frozen error catalogue (`docs/gateway-contract.md`, `gateway/docs/**`): needed by Stages 2.x–3.x for DTOs and error mapping.
@@ -354,13 +356,13 @@ Android phases begin at Phase 2. Stage and task IDs keep their numbers (no renum
 **Stage 3.3 — Publish (old T4-301/T4-302) `[AIS]`**
 - T3-301 `PublishTaskUseCase`, `PublishViewModel`, `PublishConfirmScreen` (operation, plan, task/order, branch, **full 40-character head**, TTL countdown from approval, posture and tier badge, guard summary), `PublishProgressScreen`, `OperationResultBanner` (shows `auditRef`).
 - T3-302 Success is reported only after gateway confirmation **and** a live-head check; otherwise `UncertainCompletion`.
-- T3-303 Real tests for each distinct refusal (scope refused, replayed, head drifted, halt active), declined confirmation, TTL expiry while the prompt is open.
+- T3-303 Real tests for each distinct refusal (scope refused, replayed, head drifted, halt active) and a declined confirmation. **Per ADR 0014 D4, “TTL expiry while the prompt is open” is removed from this task** and replaced by: *a minted capability expires exactly the configured lifetime after approval*. The replacement is a property of the capability's `exp` timestamp relative to the approval instant, which is testable without a clock the test does not control.
 
 **Stage 3.4 — Remaining operations (old Stage 4.4) `[AIS]`**
 - T3-401 `HaltUseCase` / `ResumeUseCase` (own scope; resume requires the recorded cause).
 - T3-402 `ReconcileUseCase` (shows `MERGED:`/`CLOSED:` outcome; no merge by the app).
 - T3-403 `UploadSubmissionUseCase`: system document picker (no storage permission), size cap, on-device SHA-256, client pre-checks mirroring `cbridge`, original preserved.
-- T3-404 `DecideFrameworkUseCase` + `ui/decision` with attribution, rationale, scope, evidence fields; `SetTaskStatusUseCase` per BD-1.3/1.4; `CreateWorkOrderUseCase` only if BD-1.3 says so, otherwise a documented alternative screen.
+- T3-404 `DecideFrameworkUseCase` + `ui/decision`. **Per ADR 0014 D2 the decide request is a documented reduction:** the request carries `decision` and `notes` only (plus the schema's scope fields and `idempotencyKey`), the rationale goes in `notes`, attribution comes from the enrolled key identifier in the gateway audit record, and there is **no separate evidence field** — this task's earlier “attribution, rationale, scope, evidence fields” wording is superseded. `SetTaskStatusUseCase` per BD-1.3/1.4 and **ADR 0016 D-1**: only `SET_IN_PROGRESS` (`PENDING → IN_PROGRESS`) is supported; `completed` and op `SET_DONE` are reserved and refused with `400 BAD_ENCODING`, and the console rejects `DONE` with `UnsupportedByContract` before any biometric prompt or gateway request. `CreateWorkOrderUseCase` **is not built**: BD-1.3 option B is confirmed (ADR 0014 D5), so the documented alternative screen is the deliverable — the contract defines no `POST /plans/{id}/order` request, response or schema, so I-10 forbids implementing it.
 - T3-405 `sync` / `doctor` on the dashboard.
 
 **Stage 3.5 — Confirmation tier hardening `[AIS]`**
