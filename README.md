@@ -129,21 +129,9 @@ Transport: pinning and rotation policy in `docs/adr/0007-production-transport-po
 
 ## Status
 
-Status words, used identically across the Build Engine: **implemented**, **reference only**, **scaffold**, **not started**, **not deployed**, **unsupported**. Snapshot of **5 November 2026**; the authoritative, current table is `docs/STATUS.md`, and the path to release is [`RELEASE-PLAN.md`](RELEASE-PLAN.md).
+Status words, used identically across the Build Engine: **implemented**, **reference only**, **scaffold**, **not started**, **not deployed**, **unsupported**. This README carries no status table, so it cannot go stale. The authoritative, current table is [`docs/STATUS.md`](docs/STATUS.md); deliberately deferred items are in [`docs/DEFERRED.md`](docs/DEFERRED.md); the path to release is [`RELEASE-PLAN.md`](RELEASE-PLAN.md).
 
-| Area | Status |
-|---|---|
-| Contract, ADRs, conformance vectors | implemented |
-| Capability model, codec, signers, minter | implemented (per agent report) |
-| Device key, enrolment, confirmation tiers (app side) | implemented (per agent report) |
-| Read layer and read screens | implemented (per agent report) |
-| Connectivity and settings | partial |
-| Write operations (publish, upload, reconcile, halt, resume, decide), operation journal, recovery | scaffold / not started |
-| Certificate pinning | scaffold |
-| Lab (test harness) | not started |
-| Gateway A | partial; **not deployed** |
-| Gateway CI and deploy gates | being hardened (currently permissive) |
-| Termux `cbridge` replacement overall | **in progress**; `cbridge` is discontinued, replacement not complete |
+Gateway A is **not deployed**, and the Termux `cbridge` replacement is **in progress**: `cbridge` is discontinued and its replacement is not complete.
 
 Nothing here may be described as "production ready, deployed and supported" until the release plan's Phase 7 evidence exists.
 
