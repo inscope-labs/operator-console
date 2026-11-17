@@ -285,7 +285,7 @@ Path shorthand: `M/` = `app/src/main/kotlin/com/inscopelabs/buildengine/`, `T/` 
 - T0-201 Rewrite `README.md`: real status in the guide's vocabulary, correct toolchain table (Compose BOM: `libs.versions.toml` says `2026.06.01`, README says `2026.09.00`; one agent report says `compileSdk 34`, the build says 36), remove "scaffold" claim only for items that are implemented.
 - T0-202 Create `docs/STATUS.md`: one table of every phase/stage with implemented / tested / merged to `main` / released / safe to use (guide §10.3).
 - T0-203 Mark `docs/V0.6.0-BUILD-PLAN.md` and `docs/console-connectivity-remediation.md` "superseded by RELEASE-PLAN.md".
-- T0-204 Fix the duplicate ADR number: two files are numbered 0007. Keep `0007-production-transport-posture.md`; rename `0007-confirmation-tiers-and-attestation-challenge.md` to ADR 0012 and fix every reference (ADR 0006, `device-enrollment.md`, `threat-model.md`, `gateway-contract.md`, reports are left unchanged).
+- T0-204 Fix the duplicate ADR number: two files are numbered 0007. Keep `0007-production-transport-posture.md`; rename `0007-confirmation-tiers-and-attestation-challenge.md` to ADR 0012 and fix every reference (ADR 0006, `device-enrollment.md`, `threat-model.md`, `gateway-contract.md`, reports are left unchanged). **Closed 2026-11-17 (PoC task 48):** ADR 0012 landed on 2026-11-06; the leftover `0007-confirmation-tiers-and-attestation-challenge.md` (a byte-identical copy apart from its title and status line) is deleted, and the one remaining stale pointer — ADR 0013's "ADR 0007 (capability single use)" — is repointed at `docs/gateway-contract.md` §1.4, where the rule actually lives. `device-enrollment.md`, `threat-model.md`, `gateway-contract.md` and ADR 0006 already pointed at ADR 0012 and are unchanged.
 - T0-205 Amend ADR 0004: environments are `test`, `staging`, `production`; Lab only on `test` (BD-1.1/1.6).
 - T0-206 Commit the corrected guide as `docs/operator-guide.md` (v2.1) implementing B.2–B.4.
 - T0-207 Decide version fields per BD-0.3 (docs only; the build change goes in Stage 7.1).
@@ -493,7 +493,7 @@ Android phases begin at Phase 2. Stage and task IDs keep their numbers (no renum
 | gateway-repair-ga reports | GW-6 conformance suites, halt/sync/doctor, transaction layer, GW-7 | Gateway plan |
 | gateway-repair-ga reports | All "tsc/vitest unverified in-agent" | Gateway plan |
 | ADR 0007 (transport) | Pins and rotation procedure; release refused without them | 2.3, 7.1 |
-| ADR 0007 (tiers) / ADR 0012 after rename | Gateway tier policy per environment | BD-3.1, 3.5 |
+| ADR 0012 (tiers) | Gateway tier policy per environment | BD-3.1, 3.5 |
 | ADR 0009 | Encrypted Room + WorkManager | 3.1–3.2 |
 | ADR 0010 | Runtime hostname validation; production host only after build-engine gate change | 2.2, X-5 |
 | ADR 0008 | Task-state transition operation; coverage matrix; Termux retirement | Gateway plan, 6.4, 8.4 |

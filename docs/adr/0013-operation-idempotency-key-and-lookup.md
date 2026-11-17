@@ -5,7 +5,7 @@
 | **Status** | Accepted (pending merge of this PR) |
 | **Date** | 2026-11-13 |
 | **Decision IDs** | BD-1.7 (and the key-origin question found while preparing Stage 3.2) |
-| **Related** | ADR 0009 (journal), ADR 0007 (capability single use), `docs/gateway-contract.md` §1.6, §3.19, §4.3 |
+| **Related** | ADR 0009 (journal), `docs/gateway-contract.md` §1.4 (capability single use), §1.6, §3.19, §4.3 |
 
 ---
 

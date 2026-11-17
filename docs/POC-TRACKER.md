@@ -9,15 +9,17 @@ a docs follow-up the operator merges. The AI Studio agent does not edit this fil
 States: `todo`, `in-progress`, `blocked`, `done`, `deferred` (deferred rows also appear in `docs/DEFERRED.md`).
 `(verify)` in a title means the task cannot close until that check has been run.
 
+**2026-11-17 (PR #82).** Rows 1–7 and 15 were marked *in flight — AI Studio*, but the work had already landed in `4ba2c90` (CI green, run 44194377929); they are ticked `done` here against that SHA. Rows 52, 54 and 56 were marked *in flight — PR #81*; PR #81 is merged as `95a3465` (CI green, run 44195246660). Row 8 stays `todo`: `TaskSummaryDto.order` exists but still defaults to `""` and is not enforced non-blank, and `TaskSummaryDtoOrderTest` (row 9) does not exist.
+
 | ID | Lane | Task | State | Evidence / note | Closed on |
 |---|---|---|---|---|---|
-| 1 | APP | SetTaskStatusUseCase: SET_IN_PROGRESS only | in-progress | AI Studio, in flight | |
-| 2 | APP | SetTaskStatusUseCaseTest: rejects DONE | in-progress | AI Studio, in flight | |
-| 3 | APP | Remove TransitionKind.SET | in-progress | AI Studio; `4ba2c90` on main, close-out not yet confirmed | |
-| 4 | APP | JournalIntentBuilder: drop SET branch | in-progress | AI Studio, in flight | |
-| 5 | APP | ExistingMintingAdapter: drop SET branch | in-progress | AI Studio, in flight | |
-| 6 | APP | ActConfirmingViewModel: drop SET branch | in-progress | AI Studio, in flight | |
-| 7 | APP | TransitionPreconditionValidator: drop local SET rule | in-progress | AI Studio, in flight | |
+| 1 | APP | SetTaskStatusUseCase: SET_IN_PROGRESS only | done | `4ba2c90` — `DONE` rejected with `UnsupportedByContract` (ADR 0016 D-1) before any prompt or gateway call; CI green run 44194377929 | 2026-11-17 |
+| 2 | APP | SetTaskStatusUseCaseTest: rejects DONE | done | `4ba2c90` — `use case rejects DONE with UnsupportedByContract before prompt or send` covers PENDING, IN_PROGRESS, DONE and UNKNOWN sources; CI green run 44194377929 | 2026-11-17 |
+| 3 | APP | Remove TransitionKind.SET | done | `4ba2c90` — `SET` deleted from `TransitionKind`; CI green run 44194377929 | 2026-11-17 |
+| 4 | APP | JournalIntentBuilder: drop SET branch | done | `4ba2c90`; CI green run 44194377929 | 2026-11-17 |
+| 5 | APP | ExistingMintingAdapter: drop SET branch | done | `4ba2c90`; CI green run 44194377929 | 2026-11-17 |
+| 6 | APP | ActConfirmingViewModel: drop SET branch | done | `4ba2c90`; CI green run 44194377929 | 2026-11-17 |
+| 7 | APP | TransitionPreconditionValidator: drop local SET rule | done | `4ba2c90`; CI green run 44194377929 | 2026-11-17 |
 | 8 | APP | TaskSummaryDto: `order` required (verify mapper) | todo |  | |
 | 9 | APP | TaskSummaryDtoOrderTest (new) | todo |  | |
 | 10 | APP | OperationIntent fingerprint includes decide notes (F1; locate) | todo |  | |
@@ -25,7 +27,7 @@ States: `todo`, `in-progress`, `blocked`, `done`, `deferred` (deferred rows also
 | 12 | APP | Verify stored fingerprint before dispatch/recovery (F4) | todo |  | |
 | 13 | APP | ErrorMapper: one source of gateway error codes (F3) | todo |  | |
 | 14 | APP | GatewayErrorCatalogueParityTest (new) | todo |  | |
-| 15 | APP | RevokeDeviceKeyUseCaseTest: replace TODO() fakes | in-progress | AI Studio, in flight | |
+| 15 | APP | RevokeDeviceKeyUseCaseTest: replace TODO() fakes | done | `4ba2c90` — 0 `TODO(` remain in the file; CI green run 44194377929 | 2026-11-17 |
 | 16 | APP | SettingsViewModelTest deterministic (locate) | todo |  | |
 | 17 | APP | GatewayBaseUrlStore: no gateway.invalid default | todo |  | |
 | 18 | APP | GatewayEndpoints: remove gateway.invalid; update 2 tests | todo |  | |
@@ -54,19 +56,19 @@ States: `todo`, `in-progress`, `blocked`, `done`, `deferred` (deferred rows also
 | 41 | PROT | version.properties (new) | todo |  | |
 | 42 | PROT | android-ci: assembleRelease + kspReleaseKotlin | todo |  | |
 | 43 | PROT | android-ci: emulator instrumented job | todo |  | |
-| 44 | PROT | scripts/release-check.py + CI step | todo |  | |
+| 44 | PROT | scripts/release-check.py + CI step | done | `5dcbc2a` — the gate runs in `android-ci`; green on `b0e2b92c` (run 44196957274); 33 tracked outstanding findings, 0 failures; verified to fail on a new scaffold marker, a new placeholder host and a stale allowlist entry | 2026-11-17 (PR #82) |
 | 45 | PROT | build-apk-debug.yml consolidate | todo |  | |
 | 46 | PROT | proguard-rules.pro: review 7fdd304 | blocked | needs operator acceptance | |
 | 47 | PROT | gateway-deploy.yml: real V1-V12 gate | todo |  | |
-| 48 | DOC | Delete/point ADR 0007 duplicate; fix references | todo |  | |
+| 48 | DOC | Delete/point ADR 0007 duplicate; fix references | done | `6006359` — the duplicate is deleted and ADR 0013 is repointed at contract §1.4; green on `b0e2b92c` (run 44196957274) | 2026-11-17 (PR #82) |
 | 49 | DOC | ADR 0011 closed decisions (new) | blocked | needs operator answers | |
 | 50 | DOC | ADR 0017 manual-pipeline approval (new) | blocked | needs EXT-10 | |
 | 51 | DOC | ADR 0018 PMA decisions (new) | blocked | needs EXT-10 | |
-| 52 | DOC | docs/DEFERRED.md (new) | in-progress | PR #81 | |
-| 53 | DOC | docs/STATUS.md corrections + PoC rows | todo |  | |
-| 54 | DOC | README status snapshot replaced | in-progress | PR #81 | |
+| 52 | DOC | docs/DEFERRED.md (new) | done | PR #81 merged as `95a3465`; CI green run 44195246660 | 2026-11-17 |
+| 53 | DOC | docs/STATUS.md corrections + PoC rows | done | `b0e2b92` — Stages 1.4, 1.5, 2.3, 3.4 and 7.1 corrected, the verified SHA recorded, the PoC row set added; green on `b0e2b92c` (run 44196957274) | 2026-11-17 (PR #82) |
+| 54 | DOC | README status snapshot replaced | done | PR #81 merged as `95a3465`; CI green run 44195246660 | 2026-11-17 |
 | 55 | DOC | RELEASE-PLAN.md rev 1.3 (4 edits) | todo |  | |
-| 56 | DOC | Contract: order route reserved (PR3-003) | in-progress | PR #81 | |
+| 56 | DOC | Contract: order route reserved (PR3-003) | done | PR #81 merged as `95a3465`; CI green run 44195246660 | 2026-11-17 |
 | 57 | DOC | PHASE-3-REMEDIATION-REGISTER rev 1.3 | todo |  | |
 | 58 | DOC | MANUAL-PIPELINE-READINESS-REGISTER update | todo |  | |
 | 59 | DOC | PMA-READINESS-REGISTER: GOV-02, link ADR 0018 | todo |  | |
