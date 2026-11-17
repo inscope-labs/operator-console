@@ -21,6 +21,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Release posture check
+        # T7-102 / PoC task 44. Fails the build when the release variant has
+        # regressed: scaffold markers in shipped sources, a placeholder host, a
+        # missing or near-expiry pin set, cleartext in the release config, the
+        # Lab engine or HMAC signer in the release source set, or a debug
+        # keystore / emulator host in the release build type.
+        run: python3 scripts/release-check.py
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
