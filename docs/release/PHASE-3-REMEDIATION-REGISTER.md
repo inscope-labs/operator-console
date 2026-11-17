@@ -734,10 +734,21 @@ Source: ADR 0014, approved by the operator on 2026-11-14.
 | D5 | BD-1.3 option B and BD-3.1 option (a) are confirmed | PR3-027, PR3-030 |
 
 **Still open (operator action needed):** whether the `[REG+]` items of §1.3 become Gate 3 requirements; acceptance
-of the `proguard-rules.pro` edit from commit `7fdd304`; the controlled gateway environment for PR3-042.
+of the `proguard-rules.pro` edit from commit `7fdd304`; the controlled gateway environment for PR3-042 as a whole (ADR 0016 D-2 fixes it for PR3-026 evidence only).
 
 **Follow-ups, not done by this revision:** contract revision 1.2 for the order identifier; the gateway agent task
 for the order field and the status route; a `RELEASE-PLAN.md` revision for T3-303 and a pointer to this register.
+
+## Appendix D — Operator decisions recorded after revision 1.2
+
+Source: ADR 0016, 2026-11-17.
+
+| ID | Decision | Tasks affected |
+|---|---|---|
+| D-1 | Option A: the console supports only `SET_IN_PROGRESS` (contract revision 1.3). `completed` and op `SET_DONE` are reserved and refused until the seal route and completion-evidence rule are decided (assessment Decisions 1 and 4). Completion is a recorded deferral, not an implementation | PR3-026 |
+| D-2 | The integration evidence for PR3-026 runs against a local harness (gateway conformance tests plus console contract vectors), not the deployed test Worker. The environment for PR3-042 as a whole is still open | PR3-026 |
+
+PR3-026 can close only for `SET_IN_PROGRESS`; its acceptance line “Done requires the contract-defined evidence” is deferred with `SET_DONE`.
 
 *End of register.*
 

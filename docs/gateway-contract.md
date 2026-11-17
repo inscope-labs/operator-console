@@ -3,6 +3,11 @@
 This document defines the HTTP API surface of the Cloudflare Operator Gateway (`cbridge` replacement)
 and the contract between the Operator Console Android application and the gateway.
 
+> **Revision 1.3 (ADR 0016):** narrows `POST /plans/{id}/status` (§3.17) to the transition that needs no completion seal:
+> `in_progress` with capability op `SET_IN_PROGRESS`. `completed` and op `SET_DONE` become reserved, like `SET`, until the seal
+> route and the evidence rule are decided. No other section changes. Pending operator merge; Gateway A and the console do not
+> implement it yet.
+>
 > **Revision 1.2 (ADR 0014, ADR 0015):** adds the required `order` field to the `GET /tasks/next` item (§3.6), states the
 > wire status vocabulary (§1.7), pins the transition rules of `POST /plans/{id}/status` (§3.17) and records how `decide`
 > derives attribution (§3.18). Pending operator merge; Gateway A and the console do not implement it yet.
@@ -502,7 +507,7 @@ Rotates an enrolled device key. Retires old `kid`.
 ### 3.17 `POST /plans/{id}/status`
 Guarded plan status mutation with compare-and-swap (BD-1.3, BD-1.4).
 
-- **Auth**: Operator Bearer + Capability (`SET`, `SET_IN_PROGRESS`, `SET_DONE`).
+- **Auth**: Operator Bearer + Capability (`SET_IN_PROGRESS`; `SET` and `SET_DONE` are reserved, see below).
 - **Request Body**:
 ```json
 {
@@ -528,16 +533,16 @@ Guarded plan status mutation with compare-and-swap (BD-1.3, BD-1.4).
 }
 ```
 
-**Transition rules (revision 1.2).** The operation changes the status of one task recorded by the gateway. It does not
-commit to the consumer repository. Supported transitions:
+**Transition rules (revision 1.3).** The operation changes the status of one task recorded by the gateway. It does not
+commit to the consumer repository. The only supported transition:
 
 | `targetStatus` | Capability `op` | Task status afterwards | `operation` in the response |
 |---|---|---|---|
 | `in_progress` | `SET_IN_PROGRESS` | `in_progress` | `SET_IN_PROGRESS` |
-| `completed` | `SET_DONE` | `completed` | `SET_DONE` |
 
-The other `targetStatus` values in the schema (`draft`, `ready`, `halted`, `archived`) and capability op `SET` are reserved
-and not supported in revision 1.2; the gateway refuses them with `400 BAD_ENCODING` and changes nothing. `newStatus` in the
+The other `targetStatus` values in the schema (`draft`, `ready`, `completed`, `halted`, `archived`) and capability ops `SET`
+and `SET_DONE` are reserved and not supported in revision 1.3; the gateway refuses them with `400 BAD_ENCODING` and changes
+nothing. `completed` stays in the wire vocabulary of §1.7 for reads; completing a task is deferred (ADR 0016). `newStatus` in the
 response uses the wire vocabulary of §1.7.
 
 Checks, in this order after the idempotency record is created (§1.6): the capability `op` must match the table
