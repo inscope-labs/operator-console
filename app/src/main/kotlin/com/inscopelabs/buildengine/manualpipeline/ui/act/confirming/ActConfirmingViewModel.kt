@@ -78,7 +78,7 @@ class ActConfirmingViewModel @Inject constructor(
                 ActActionKind.TRANSITION -> {
                     val kind = current.transitionKind ?: TransitionKind.SET_IN_PROGRESS
                     val target = when (kind) {
-                        TransitionKind.SET_IN_PROGRESS, TransitionKind.SET -> TaskStatus.IN_PROGRESS
+                        TransitionKind.SET_IN_PROGRESS -> TaskStatus.IN_PROGRESS
                         TransitionKind.SET_DONE -> TaskStatus.COMPLETED
                     }
                     val req = TransitionRequest(

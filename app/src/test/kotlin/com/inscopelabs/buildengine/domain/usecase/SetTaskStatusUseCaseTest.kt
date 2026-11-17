@@ -116,12 +116,10 @@ class SetTaskStatusUseCaseTest {
             TaskStatus.IN_PROGRESS to TaskStatus.UNKNOWN,
             TaskStatus.DONE to TaskStatus.PENDING,
             TaskStatus.DONE to TaskStatus.IN_PROGRESS,
-            TaskStatus.DONE to TaskStatus.DONE,
             TaskStatus.UNKNOWN to TaskStatus.IN_PROGRESS,
-            TaskStatus.UNKNOWN to TaskStatus.DONE,
         )
         for ((from, to) in invalidPairs) {
-            val res = useCase()(baseTarget(current = from, target = to, evidence = "CI run #88 passed"))
+            val res = useCase()(baseTarget(current = from, target = to))
             assertTrue("Expected InvalidTransition for $from -> $to, got $res", res is SetTaskStatusResult.InvalidTransition)
         }
         assertEquals(0, prompts)
@@ -129,18 +127,26 @@ class SetTaskStatusUseCaseTest {
     }
 
     @Test
-    fun `transitioning to DONE requires non-blank completion evidence before prompt or send`() = runTest {
-        val missing = useCase()(baseTarget(current = TaskStatus.IN_PROGRESS, target = TaskStatus.DONE, evidence = null))
-        val blank = useCase()(baseTarget(current = TaskStatus.PENDING, target = TaskStatus.DONE, evidence = "   "))
-
-        assertTrue(missing is SetTaskStatusResult.MissingEvidence)
-        assertTrue(blank is SetTaskStatusResult.MissingEvidence)
+    fun `use case rejects DONE with UnsupportedByContract before prompt or send`() = runTest {
+        val doneTargets = listOf(
+            TaskStatus.PENDING to TaskStatus.DONE,
+            TaskStatus.IN_PROGRESS to TaskStatus.DONE,
+            TaskStatus.DONE to TaskStatus.DONE,
+            TaskStatus.UNKNOWN to TaskStatus.DONE,
+        )
+        for ((from, to) in doneTargets) {
+            val res = useCase()(baseTarget(current = from, target = to, evidence = "CI run #412 green"))
+            assertTrue(
+                "Expected UnsupportedByContract for $from -> $to, got $res",
+                res is SetTaskStatusResult.UnsupportedByContract,
+            )
+        }
         assertEquals(0, prompts)
         assertTrue(operationRepository.statusTransitions.isEmpty())
     }
 
     @Test
-    fun `valid PENDING to IN_PROGRESS and IN_PROGRESS to DONE mint scoped capability and refresh authoritative state`() = runTest {
+    fun `valid PENDING to IN_PROGRESS mints scoped capability and refreshes authoritative state`() = runTest {
         refreshedTaskStatus = TaskStatus.IN_PROGRESS
         val inProgress = useCase()(baseTarget(current = TaskStatus.PENDING, target = TaskStatus.IN_PROGRESS))
             as SetTaskStatusResult.Executed
@@ -148,20 +154,7 @@ class SetTaskStatusUseCaseTest {
         assertEquals(TaskStatus.IN_PROGRESS, inProgress.authoritativeTask?.status)
         assertEquals("in_progress", operationRepository.statusTransitions[0].second)
         assertEquals(OperationType.SET_IN_PROGRESS, operationRepository.statusTransitions[0].first.op)
-
-        refreshedTaskStatus = TaskStatus.DONE
-        operationRepository.defaultOutcome = OperationOutcome.Succeeded(
-            auditRef = "audit-status-2",
-            headSha = head,
-            outcome = "completed",
-        )
-        val done = useCase()(
-            baseTarget(current = TaskStatus.IN_PROGRESS, target = TaskStatus.DONE, evidence = "CI run #412 green"),
-        ) as SetTaskStatusResult.Executed
-        assertEquals(TaskStatus.DONE, done.authoritativeTask?.status)
-        assertEquals("completed", operationRepository.statusTransitions[1].second)
-        assertEquals(OperationType.SET_DONE, operationRepository.statusTransitions[1].first.op)
-        assertEquals(2, planRepository.getStatusCallCount)
+        assertEquals(1, planRepository.getStatusCallCount)
     }
 
     @Test
@@ -181,7 +174,7 @@ class SetTaskStatusUseCaseTest {
             task = "10008",
             branch = branch,
             expectedHead = head,
-            targetStatus = "completed",
+            targetStatus = "in_progress",
             idempotencyKey = "a".repeat(32),
             capability = "cap-wire",
         )

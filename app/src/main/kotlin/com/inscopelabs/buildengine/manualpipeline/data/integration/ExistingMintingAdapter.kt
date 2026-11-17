@@ -40,7 +40,7 @@ class ExistingMintingAdapter @Inject constructor(
 
     override suspend fun mintForTransition(request: TransitionRequest): MintOutcome {
         val opType = when (request.kind) {
-            TransitionKind.SET_IN_PROGRESS, TransitionKind.SET -> OperationType.SET_IN_PROGRESS
+            TransitionKind.SET_IN_PROGRESS -> OperationType.SET_IN_PROGRESS
             TransitionKind.SET_DONE -> OperationType.SET_DONE
         }
         val hostRequest = OperationRequest(

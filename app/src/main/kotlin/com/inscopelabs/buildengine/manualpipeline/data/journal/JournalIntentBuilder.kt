@@ -12,7 +12,7 @@ object JournalIntentBuilder {
 
     fun forTransition(request: TransitionRequest): OperationIntent {
         val op = when (request.kind) {
-            TransitionKind.SET_IN_PROGRESS, TransitionKind.SET -> OperationType.SET_IN_PROGRESS
+            TransitionKind.SET_IN_PROGRESS -> OperationType.SET_IN_PROGRESS
             TransitionKind.SET_DONE -> OperationType.SET_DONE
         }
         return OperationIntent(

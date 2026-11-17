@@ -78,10 +78,6 @@ class TransitionPreconditionValidator @Inject constructor() {
                 TaskStatus.COMPLETED -> Result(false, "Completed tasks cannot move back to in_progress.")
                 else -> Result(false, "Transition to in_progress requires status ready (currently ${task.status.wireValue}).")
             }
-            TransitionKind.SET -> when (task.status) {
-                TaskStatus.READY, TaskStatus.IN_PROGRESS -> Result(true, "Eligible for stage status update.")
-                else -> Result(false, "Stage status update requires ready or in_progress (currently ${task.status.wireValue}).")
-            }
             TransitionKind.SET_DONE -> when (task.status) {
                 TaskStatus.IN_PROGRESS -> Result(true, "Ready to complete from in_progress -> completed.")
                 TaskStatus.READY -> Result(true, "Task is ready; Gateway A guards verify completion readiness.")

@@ -93,19 +93,6 @@ class TransitionPreconditionValidatorTest {
         assertFalse(result.permitted)
     }
 
-    @Test
-    fun `a stage status update is permitted from ready and in progress only`() {
-        assertTrue(
-            validator.validate(Fixtures.task(status = TaskStatus.READY), TransitionKind.SET).permitted,
-        )
-        assertTrue(
-            validator.validate(Fixtures.task(status = TaskStatus.IN_PROGRESS), TransitionKind.SET).permitted,
-        )
-        assertFalse(
-            validator.validate(Fixtures.task(status = TaskStatus.COMPLETED), TransitionKind.SET).permitted,
-        )
-    }
-
     // -- the SET_DONE hold (BE-MP-12) --
 
     @Test
