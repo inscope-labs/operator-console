@@ -2,10 +2,10 @@
 
 **Document ID:** `OC-PR3-RR-001`  
 **Repository:** `inscope-labs/operator-console`  
-**Revision:** `1.2` — records the operator decisions of ADR 0014 (see Appendix C); revision 1.1 was verified against the repository and corrected before installation (Appendix A)  
+**Revision:** `1.3` — records the operator decisions of ADR 0014 (Appendix C) and ADR 0016 (Appendix D), and adds §2.4, the verified state of every remediation task at the verification head (Appendix E); revision 1.1 was verified against the repository and corrected before installation (Appendix A)  
 **Install path:** `docs/release/PHASE-3-REMEDIATION-REGISTER.md`, via a Claude branch and pull request that the operator merges (ADR 0010)  
 **Assessment baseline:** `732b7fbc41e3a139ead15db0d09f1c0e498ff347`  
-**Verification head:** `7fdd304` (`main` on 2026-11-13). Findings below were re-checked at this commit  
+**Verification head:** `1f949ef` (`main` on 2026-11-17, the merge of PR #82). §2.1 remains the historical baseline at `7fdd304`; §2.4 records the state at this head  
 **Controlling plan:** `RELEASE-PLAN.md`, Phase 3, Stages 3.1–3.6  
 **Register status:** Corrected draft — takes effect only when the operator merges the installing PR; it authorizes no implementation by itself (see §8)  
 **Purpose:** Establish an independently auditable set of completion requirements that must be satisfied before Stage 4 begins.
@@ -92,6 +92,43 @@ The assessment baseline `732b7fb` is the merge of the Gateway A idempotency PR (
 The baseline showed meaningful progress in the Stage 3.2 foundation: an encrypted Room journal with Keystore AES-GCM field encryption, the sealed outcome model, idempotency keys, operation lookup and a recovery worker. These are inputs to the tasks below, not closed tasks.
 
 ---
+
+### 2.4 Verified state of the remediation tasks at `1f949ef`
+
+This subsection records **what is in the repository**, re-derived at the verification head above. It is not an acceptance record: §4 states that only the operator or a designated reviewer closes a task, and nothing here assigns `ACCEPTED`.
+
+**Vocabulary.** `IMPLEMENTED` — the work is in the repository with the named evidence, but the task's own acceptance still names an integration or operator step that has not run. `PARTIAL` — part of the work is in the repository and the remainder is named. `OPEN` — not implemented at this head. `BLOCKED` — cannot proceed until a named dependency exists. `DEFERRED` — a recorded operator disposition that is plan-consistent and is not itself a defect.
+
+| ID | Task | State at `1f949ef` | Evidence at this head |
+|---|---|---|---|
+| PR3-001 | Reconcile Phase 3 implementation baseline | IMPLEMENTED | `docs/STATUS.md` reconciled against a verified `main`; Stages 1.4, 1.5, 2.3, 3.4 and 7.1 corrected and the PoC row set added (`b0e2b92`, PR #82) |
+| PR3-002 | Verify dependency and build configuration | PARTIAL | Room `2.8.5` (KSP schema committed) and WorkManager `2.11.2` are in `gradle/libs.versions.toml` and `app/build.gradle.kts`. **Open:** commit `7fdd304` edited the protected `app/proguard-rules.pro` outside a `[CLAUDE]` pull request and operator acceptance is still outstanding; the journal comment in `gradle/libs.versions.toml` describes Keystore AES-GCM but omits the GCM associated-data binding that PR3-010 added (protected path) |
+| PR3-003 | Freeze and verify the Android-consumed gateway contract | IMPLEMENTED | `docs/gateway-contract.md` at revision 1.3 (ADR 0016), revision 1.2 (ADR 0015) and the reserved `POST /plans/{id}/order` row (PR3-003, PR #81). The gateway-side routes remain gateway-agent work |
+| PR3-010 | Journal schema and encrypted-field policy | IMPLEMENTED | GCM associated-data binding merged in PR #71; `JournalFieldCipherAssociatedDataTest` 17/17. **Open:** the journal has no column for a gateway operation identifier distinct from the client idempotency key (a Room schema bump and migration in `OperationJournalDatabase.kt`), and the `libs.versions.toml` journal comment omits the binding |
+| PR3-011 | Atomic intent-before-dispatch | IMPLEMENTED | `commitIntentIfNoActive` atomic transaction, CAS `transitionState`, pre-dispatch database verification, forward-only state machine and concurrent batch coalescing; `OperationJournalExecutorTest` 45/45, `OperationJournalStateTransitionTest` 3/3 |
+| PR3-012 | Idempotency and duplicate-intent protection | PARTIAL | Audit plus nine gap tests in `IdempotencyAndFingerprintTest` (9/9) and `IdempotencyKeyGeneratorTest` (4/4). **Findings F1–F4 remain unpatched on `main`:** F1 `decide` omits `notes` from `OperationIntent`; F2 a local idempotency-key collision returns `RecoveryRequired` instead of `Conflict`; F3 two sources of gateway error codes (`ErrorMapper.GATEWAY_CODES` and `KNOWN_GATEWAY_CODES` in `OperationRepositoryImpl`); F4 the stored fingerprint is not verified against the decrypted fields before dispatch and before recovery. See `agent-reports/2026-11-16T17-15-00Z-pr3-012-idempotency-audit.md` |
+| PR3-013 | Acknowledgement and live-head verification consistent | PARTIAL | `OperationRepositoryImpl.verifyLiveHead` is applied on the lookup path. The synchronous acknowledgement path remains to be reconciled with it |
+| PR3-014 | Restart recovery and WorkManager policy | IMPLEMENTED | `OperationRecoveryWorker` enqueues unique work with `ExistingWorkPolicy.KEEP` and resolves by lookup only, never by resend. Android-runtime evidence is owed under PR3-041 |
+| PR3-015 | Crash and network fault matrix | IMPLEMENTED | `docs/release/PHASE-3-FAULT-MATRIX.md` (14 scenarios) with gap coverage in `FaultMatrixTest` (9/9) for scenarios 1, 4, 5, 7, 11 and 13 |
+| PR3-020 | Shared journal-backed write executor | IMPLEMENTED | `manualpipeline/data/integration/SharedExecutorAdapter` binds the module's `ExecutorPort` to the host `OperationRepository`; the module's adapters pass the journal-bypass rule (Rule D) |
+| PR3-021 | Complete publish | PARTIAL | `TaskSummaryDto.order` and `PublishOrderResolver` merged in PR #74; the resolver returns `task.order.takeIf { it.isNotBlank() }` and fails closed rather than minting an empty order. **Open:** `gateway/src/routes/tasks.ts` emits no `order` at all, so the identifier has no source end to end; the client field still defaults to `""` and is not enforced non-blank (PoC tasks 8 and 9) |
+| PR3-022 | Complete upload | IMPLEMENTED | `UploadSubmissionUseCase`, the module's `UploadRepositoryImpl` and `GatewayAUploadAdapter` are in the repository, and Gateway A registers `POST /tasks/:id/upload`. The controlled-gateway integration result named in this row's evidence is still owed |
+| PR3-023 | Complete reconcile | IMPLEMENTED | `ReconcileUseCase` and `OperationRepositoryImpl.reconcile` are in the repository. The controlled-gateway integration result is still owed |
+| PR3-024 | Complete halt and resume | PARTIAL | `HaltUseCase`, `ResumeUseCase` and the repository's `halt`/`resume` are in the repository. **Open:** the halt/resume screen is still a scaffold (`ui/operations/HaltResumeScreen.kt`, `TODO(Stage 4.4 / T4-401)`; PoC task 19), so "resume requires the recorded halt cause" and the authoritative-state display have no surface |
+| PR3-025 | Complete decide | IMPLEMENTED | Merged in PR #72 under the ADR 0014 D2 documented reduction; `DecideFrameworkUseCase` defaults `contractSchemaSettled = true` and production DI uses the settled default. The controlled-gateway integration result is still owed |
+| PR3-026 | Complete task-status transition | **CLOSED FOR `SET_IN_PROGRESS` ONLY** | See §4, PR3-026, and Appendix D. The client accepts only `SET_IN_PROGRESS` and rejects `DONE` with `UnsupportedByContract` before any biometric prompt or gateway request (`4ba2c90`, CI green run 44194377929); `TransitionKind.SET` and the module's `SET` branches are deleted. The completion-evidence acceptance line is deferred with `SET_DONE`, and the gateway route `POST /plans/{id}/status` does not exist yet |
+| PR3-027 | Work-order creation | DEFERRED | Merged in PR #73 under BD-1.3 option B: `CreateWorkOrderUseCase` is out of the Hilt graph, no production source references it, the gateway exposes no work-order creation route, and the plan detail screen shows the documented alternative. `docs/DEFERRED.md` records the deferral |
+| PR3-030 | Per-operation authentication tier | IMPLEMENTED | `ConfirmationTierPolicy` requires `hardware_confirm` for `DECIDE` and `RESUME` when the device can provide it, downgrades to `in_app_confirm` only explicitly and visibly with a reason, and never silently; `ConfirmationTierPolicyTest` and `AuthTierResolverTest` cover it |
+| PR3-031 | Verify the no-biometric operator path | PARTIAL | The degraded path exists and is JVM-tested (`ConfirmationTierPolicy`, `BiometricGate`, `AuthTier`, `ConfirmAndMintCapabilityUseCaseTest`). This row asks for the path to be **exercised**, so it needs device evidence that does not exist yet |
+| PR3-032 | Key invalidation and re-enrolment | PARTIAL | `RevokeDeviceKeyUseCase`, `DeviceKeyManager.NeedsReenrollment` and `DeviceEnrollmentStore.retire` are in the repository. **Open:** the `NeedsReenrollment` UI is deferred to Stage 4.4 (PoC task 24), and there is no instrumented evidence of key invalidation |
+| PR3-033 | Architecture and secret-hygiene tests | PARTIAL | `ArchitectureTest` enforces the single mint path plus Rules A, B, D, E, F1 and F2, backed by `ArchitectureScanner` and 12 fixture tests. **Open:** the Rule E ratchet baseline is **unapproved** — four files still reference the Lab package or the HMAC signer (`CapabilitySigner.kt`, `CryptoModule.kt`, `ui/lab/LabScreen.kt`, `ui/lab/LabViewModel.kt`); the operator decision is outstanding (PoC task 37) and a baseline must not be widened silently |
+| PR3-040 | Android instrumentation for persistence and crypto | OPEN | No `androidTest` source exercises Room, the Keystore cipher or the journal; `docs/STATUS.md` defers on-device runtime to Stage 7.2 |
+| PR3-041 | WorkManager instrumentation | OPEN | As PR3-040; `OperationRecoveryWorker` is JVM-tested only |
+| PR3-042 | Operation-level integration suite | OPEN | No controlled-gateway run exists. ADR 0016 D-2 fixes the environment for PR3-026 evidence only; the environment for this item as a whole is still open |
+| PR3-043 | Make Phase 3 verification mandatory in CI | PARTIAL | `android-ci` runs `:app:testDebugUnitTest` and `:app:assembleDebug` on every push and pull request, and PR #82 added a release posture gate. **Open:** `:app:assembleRelease` and `:app:kspReleaseKotlin` steps (PoC task 42) and an emulator instrumented-test job (PoC task 43) |
+| PR3-044 | Produce and accept the Phase 3 evidence dossier | PARTIAL | `docs/release/PHASE-3-EVIDENCE.md` has sections for Stage 3.3 and Stage 3.4; there is no Stage 3.2 (journal) or Stage 3.5 (tiers) section, and the operator acceptance is outstanding (PoC task 61) |
+
+**Reading the table.** `IMPLEMENTED` means the code is present with the named evidence — it is not acceptance. Every item in this register names a controlled-gateway integration result in its evidence line, and **no such run exists at this head**, so no item can be closed on evidence alone. The Android-runtime items (PR3-040, PR3-041) and the controlled-gateway item (PR3-042) are the three that Gate 3 cannot pass without.
 
 ## 3. Non-negotiable invariants
 
@@ -367,17 +404,19 @@ Task status is initially **OPEN** for every item. Implementation agents must not
 
 #### PR3-026 — Complete task-status transition
 
-- **Traceability:** Gate 3; T3-404; BD-1.3; BD-1.4; ADR 0008. The contract defines `POST /plans/{id}/status` (§3.17); the Android client has no method or DTO for it yet.
+- **Traceability:** Gate 3; T3-404; BD-1.3; BD-1.4; ADR 0008; ADR 0016 D-1. The contract defines `POST /plans/{id}/status` (§3.17); the Android client implements it (`GatewayApi.transitionPlanStatus`, `SetTaskStatusUseCase`, `SetTaskStatusTarget`).
 - **Priority:** Critical.
 - **Work:** Implement status changes supported by the authoritative contract, including any required completion evidence and task-scoped capability.
 - **Acceptance:**
   - Only contract-supported transitions are offered.
   - Invalid transitions are rejected before dispatch where locally knowable and always fail closed if refused remotely.
-  - “Done” or equivalent completion status requires the contract-defined evidence.
+  - “Done” or equivalent completion status requires the contract-defined evidence. **Deferred with `SET_DONE` at revision 1.3** (ADR 0016 D-1, Appendix D): the console supports only `SET_IN_PROGRESS`, and contract revision 1.3 reserves `completed` and op `SET_DONE`, refusing them with `400 BAD_ENCODING`. The completion-evidence rule returns when the seal route and the completion-evidence question are decided (assessment Decisions 1 and 4)
   - Status changes use the shared journal-backed executor.
   - The displayed status is refreshed from authoritative state after the operation.
-- **Gateway dependency (ADR 0014 D3):** The gateway agent adds `POST /plans/{id}/status`. Client work and unit tests can proceed; integration evidence waits for the route.
+- **Gateway dependency (ADR 0014 D3):** The gateway agent adds `POST /plans/{id}/status`. Client work and unit tests can proceed; integration evidence waits for the route. **Still outstanding at `1f949ef`:** `gateway/src/routes/plans.ts` registers `GET /plans/:id/status` only.
 - **Evidence:** Transition-table tests, evidence-validation tests and controlled-gateway integration results.
+- **Status (revision 1.3):** **Closed for `SET_IN_PROGRESS` only** (ADR 0016 D-1 and D-2; Appendix D). The client accepts only `SET_IN_PROGRESS` and rejects `DONE` with `UnsupportedByContract` before any biometric prompt or gateway request (`4ba2c90`, CI green run 44194377929; `SetTaskStatusUseCaseTest` covers `PENDING`, `IN_PROGRESS`, `DONE` and `UNKNOWN` sources). `TransitionKind.SET` is deleted and the `SET` branches are gone from `ExistingMintingAdapter`, `JournalIntentBuilder`, `ActConfirmingViewModel` and `TransitionPreconditionValidator` (PoC tasks 3–7). The completion-evidence acceptance line above is deferred with `SET_DONE`, not satisfied. Integration evidence is still owed under ADR 0016 D-2, which fixes a **local harness** for this item — gateway conformance tests plus the console contract vectors — and leaves the environment for PR3-042 as a whole open.
+- **Follow-on (not part of this task):** the `manualpipeline` module still maps `TransitionKind.SET_DONE` to `OperationType.SET_DONE` and holds it back only with a local constant. Contract revision 1.3 reserves that operation, so the module's guard should refuse it as reserved rather than as “awaiting a seal route”. Recorded in `docs/release/MANUAL-PIPELINE-READINESS-REGISTER.md` LIF-02.
 
 #### PR3-027 — Work-order creation: documented alternative, not implementation
 
@@ -749,6 +788,21 @@ Source: ADR 0016, 2026-11-17.
 | D-2 | The integration evidence for PR3-026 runs against a local harness (gateway conformance tests plus console contract vectors), not the deployed test Worker. The environment for PR3-042 as a whole is still open | PR3-026 |
 
 PR3-026 can close only for `SET_IN_PROGRESS`; its acceptance line “Done requires the contract-defined evidence” is deferred with `SET_DONE`.
+
+## Appendix E — Revision 1.3 log (2026-11-17)
+
+Source: re-verification of the repository at `1f949ef` (the merge of PR #82), the contract at revision 1.3 (ADR 0016), and the merged pull requests `#71`–`#76` and `#81`–`#82`. Appendices A–D are left as history.
+
+| # | Change | Why |
+|---|---|---|
+| E-01 | Added §2.4, the verified state of every remediation task at `1f949ef` | §2.1 was a baseline at `7fdd304` (13 Nov). Four days and a dozen merged pull requests later, the register's own tasks had moved, and the register said nothing about it |
+| E-02 | Recorded the PR3-026 closure for `SET_IN_PROGRESS` only | ADR 0016 D-1 (Appendix D) settled the disposition; the register's §4 still described the Android client as having no method or DTO for the transition |
+| E-03 | Marked the completion-evidence acceptance line deferred, not satisfied | Under revision 1.3 `SET_DONE` is reserved. “Deferred” and “satisfied” are different dispositions and the register must not read as though completion were implemented |
+| E-04 | Recorded the `manualpipeline` `SET_DONE` follow-on | Contract revision 1.3 reserves an operation the module still maps. It is not part of PR3-026's scope, so it is named rather than silently absorbed |
+| E-05 | §2.1 retained unchanged | It is the baseline the register was written against. Rewriting it would destroy the record of what the register was correcting |
+| E-06 | Vocabulary of §2.4 made explicit | §4 reserves closure to the operator or a designated reviewer. A table reading `IMPLEMENTED` could be mistaken for `ACCEPTED`, so §2.4 states in its own words that it records the repository and not acceptance |
+
+**Not changed.** The invariants in §3, the scoring model in §6, the Stage 4 entry criteria in §7, the exclusions in §9 and the acceptance record in §10 are unchanged; no operator decision recorded in Appendix C or D is restated or reinterpreted here.
 
 *End of register.*
 
