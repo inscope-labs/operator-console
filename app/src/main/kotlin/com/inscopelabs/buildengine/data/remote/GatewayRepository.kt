@@ -200,6 +200,10 @@ class GatewayRepository(
         throw GatewayProtocolException(
             "the gateway's answer could not be read: ${error.message}"
         )
+    } catch (error: IllegalArgumentException) {
+        throw GatewayProtocolException(
+            "the gateway's answer could not be read: ${error.message}"
+        )
     }
 
     private companion object {

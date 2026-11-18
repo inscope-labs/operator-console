@@ -151,7 +151,8 @@ class GatewayRepositoryTest {
                     "title": "Refactor parser",
                     "branch": "task-10008-refactor-parser",
                     "status": "ready",
-                    "headSha": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d"
+                    "headSha": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+                    "order": "order-7731"
                   }
                 ]
                 """.trimIndent()
@@ -165,6 +166,7 @@ class GatewayRepositoryTest {
         assertEquals("atlas", tasks[0].planId)
         assertEquals("task-10008-refactor-parser", tasks[0].branch)
         assertEquals("ready", tasks[0].status)
+        assertEquals("order-7731", tasks[0].order)
         assertEquals("/tasks/next", server.takeRequest().path)
     }
 
@@ -450,7 +452,7 @@ class GatewayRepositoryTest {
         )
         assertEquals(
             "",
-            TaskSummaryDto(id = "10008", planId = "atlas").status,
+            TaskSummaryDto(id = "10008", planId = "atlas", order = "order-7731").status,
         )
         assertNull(PublishRequestDto().capability.ifEmpty { null })
     }

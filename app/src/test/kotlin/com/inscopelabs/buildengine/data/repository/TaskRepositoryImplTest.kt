@@ -62,6 +62,7 @@ class TaskRepositoryImplTest {
         assertEquals("Refactor parser", tasks[0].title)
         assertEquals("task-10008-refactor-parser", tasks[0].branch)
         assertEquals("9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d", tasks[0].headSha)
+        assertEquals("order-7731", tasks[0].order)
     }
 
     @Test
@@ -185,7 +186,8 @@ class TaskRepositoryImplTest {
                     "title": "Refactor parser",
                     "branch": "",
                     "status": "ready",
-                    "headSha": ""
+                    "headSha": "",
+                    "order": "order-7731"
                   }
                 ]
                 """.trimIndent()
@@ -228,7 +230,8 @@ class TaskRepositoryImplTest {
             "title": "Refactor parser",
             "branch": "task-10008-refactor-parser",
             "status": "$status",
-            "headSha": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d"
+            "headSha": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+            "order": "order-7731"
           }
         ]
     """.trimIndent()
@@ -242,7 +245,8 @@ class TaskRepositoryImplTest {
                 "title": "Refactor parser",
                 "branch": "task-10008-refactor-parser",
                 "status": "ready",
-                "headSha": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d"
+                "headSha": "9f2c1b7e4a5d6038c1b2a9e7d4f6081c3b5a7e9d",
+                "order": "order-7731"
               }
             ]
         """.trimIndent()

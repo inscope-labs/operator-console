@@ -12,9 +12,9 @@ import kotlinx.serialization.Serializable
  * SHA (design review §5), and the console has to be able to show both before
  * anything is signed.
  *
- * `order` is the work-order identifier under which the task was issued (ADR 0014 D1,
- * ADR 0015). The console copies it unchanged into the capability `order` field and
- * never invents one.
+ * `order` is the required non-blank work-order identifier under which the task was issued
+ * (ADR 0014 D1, ADR 0015). The console copies it unchanged into the capability `order`
+ * field and never invents one; a task without a non-blank `order` fails closed.
  *
  * `status` is the gateway's vocabulary — `"ready"`, not `"READY"` — and it is
  * carried as it arrives. A status the console does not recognise is a task it
@@ -28,5 +28,11 @@ data class TaskSummaryDto(
     val branch: String = "",
     val status: String = "",
     val headSha: String = "",
-    val order: String = "",
-)
+    val order: String,
+) {
+    init {
+        require(order.isNotBlank()) {
+            "TaskSummaryDto.order must be non-blank (docs/gateway-contract.md §3.6)"
+        }
+    }
+}
