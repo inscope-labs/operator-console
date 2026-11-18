@@ -263,6 +263,20 @@ class JournalFieldCipherAssociatedDataTest {
         assertFalse("the failure must not leak plaintext", failure.message.orEmpty().contains(OperationType.PUBLISH.name))
     }
 
+    @Test
+    fun `codec fails closed when stored intent fingerprint mismatches decrypted fields`() {
+        val cipher = AadBindingCipher(testKey())
+        val intent = sampleIntent()
+        val entity = OperationJournalCodec.encryptNewEntity(RECORD_KEY, intent, cipher, NOW)
+
+        val mismatched = entity.copy(intentFingerprint = intent.copy(task = "other-task").fingerprint())
+
+        val failure = assertThrows(JournalCryptoException::class.java) {
+            OperationJournalCodec.decryptRecord(mismatched, cipher)
+        }
+        assertFalse("the failure must not leak plaintext", failure.message.orEmpty().contains(intent.plan))
+    }
+
     /** Corrupts the GCM tag of a wire-format ciphertext. */
     private fun flipLastByte(ciphertext: String): String {
         val payload = Base64.getDecoder().decode(ciphertext.removePrefix(JournalGcm.FORMAT_PREFIX))

@@ -50,18 +50,18 @@ import org.junit.Test
  * Audit and gap-closing JVM test suite for PR3-012 (`T3-204`; `I-05`):
  * - Bullet 1: Same user intent reuses its existing key across every unresolved state (including
  *   `ACKNOWLEDGED`), while terminal states issue a new key on a fresh operator attempt.
- * - Bullet 2: Materially different operation/scope/fields (including length-prefix boundary cases
- *   and upload `zipSha256` normalization) produce distinct fingerprints and keys even while the
- *   prior intent is active; pins Finding F1 (`decide` omits `notes` from [OperationIntent]).
+ * - Bullet 2: Materially different operation/scope/fields (including length-prefix boundary cases,
+ *   upload `zipSha256` normalization, and `decide` `notes` / F1) produce distinct fingerprints and
+ *   keys even while the prior intent is active.
  * - Bullet 3: Reusing a key with a different fingerprint (`409 IDEMPOTENCY_KEY_REUSED` on write and
- *   refused lookup, plus local `@PrimaryKey` collision before send) is never dispatched as a new
- *   write; pins Finding F2 (local key collision currently fails closed as [OperationOutcome.RecoveryRequired]
- *   rather than [OperationOutcome.Conflict]).
+ *   refused lookup, plus local `@PrimaryKey` collision before send / F2) returns `Conflict` and is
+ *   never dispatched as a new write.
  * - Bullet 4: Process restart across `INTENT_RECORDED`, `SENT`, `ACKNOWLEDGED`, and `UNCERTAIN`
  *   (including repeated restarts with differently seeded [IdempotencyKeyGenerator]s) keeps the
  *   existing key and never generates a new one.
  * - Bullet 5: Idempotency keys and capability nonces remain strictly distinct on a shared CSPRNG, on
  *   the HTTP wire, across re-minted capabilities, in `GET /operations/{id}`, and in the journal.
+ * - F4: Stored `intentFingerprint` is verified against decrypted fields before dispatch and recovery.
  */
 class IdempotencyAndFingerprintTest {
 
@@ -120,6 +120,7 @@ class IdempotencyAndFingerprintTest {
             reason = "none",
             targetStatus = "completed",
             decision = "APPROVED",
+            notes = "rationale-1",
         )
         val equalCopy = base.copy()
 
@@ -138,11 +139,12 @@ class IdempotencyAndFingerprintTest {
             base.copy(reason = "changed-reason"),
             base.copy(targetStatus = "in_progress"),
             base.copy(decision = "REJECTED"),
+            base.copy(notes = "rationale-2"),
         )
         val allFingerprints = listOf(base.fingerprint()) + singleFieldMutations.map { it.fingerprint() }
         assertEquals(
-            "Mutating any of the 10 fingerprint fields must produce a distinct digest",
-            11,
+            "Mutating any of the 11 fingerprint fields must produce a distinct digest",
+            12,
             allFingerprints.toSet().size,
         )
 
@@ -154,6 +156,10 @@ class IdempotencyAndFingerprintTest {
         val pairB1 = base.copy(submissionId = "sub", zipSha256 = "12")
         val pairB2 = base.copy(submissionId = "su", zipSha256 = "b12")
         assertNotEquals(pairB1.fingerprint(), pairB2.fingerprint())
+
+        val pairC1 = base.copy(decision = "AB", notes = "C")
+        val pairC2 = base.copy(decision = "A", notes = "BC")
+        assertNotEquals(pairC1.fingerprint(), pairC2.fingerprint())
     }
 
     @Test
@@ -266,15 +272,14 @@ class IdempotencyAndFingerprintTest {
         }
 
     /**
-     * Documents Production Finding F1 (not patched on `main`):
-     * Contract §1.6 requires the request fingerprint to include every request field except
-     * `capability` and `zipBase64`. `DecideRequestDto` includes `notes`, yet
-     * [OperationRepositoryImpl.decide] omits `notes` when constructing [OperationIntent].
-     * While a `DECIDE` intent is unresolved, a second `DECIDE` with the same target/decision
-     * and different `notes` collides on `intentFingerprint` and reuses the first key.
+     * Verifies Finding F1 fix:
+     * `OperationRepositoryImpl.decide` includes normalized `notes` in [OperationIntent] so two
+     * `DECIDE` intents with identical target/decision and differing `notes` get distinct
+     * `intentFingerprint`s and distinct keys even while the first intent is unresolved, whereas
+     * whitespace-trimmed equivalents reuse the unresolved key.
      */
     @Test
-    fun `bullet 2 finding DECIDE omits notes from OperationIntent so differing notes collide while unresolved`() =
+    fun `bullet 2 DECIDE includes notes in OperationIntent so differing notes get distinct keys`() =
         runTest {
             val dao = InMemoryOperationJournalDao()
             val repo = newRepository(dao = dao, keyGenerator = incrementingKeyGenerator(start = 20))
@@ -285,18 +290,33 @@ class IdempotencyAndFingerprintTest {
             assertTrue(first is OperationOutcome.Timeout)
             val key1 = (first as OperationOutcome.Timeout).idempotencyKey
 
-            // Different notes on an otherwise identical DECIDE while key1 is UNCERTAIN hits lookup on key1.
+            // Equivalent trimmed notes reuse key1 via lookup without sending a second POST.
             server.enqueue(
                 MockResponse().setResponseCode(200).setBody(
                     """{"id":"$key1","operation":"DECIDE","status":"pending","timestamp":1761840050}""",
                 ),
             )
-            val (req2, cap2) = signedOp(OperationType.DECIDE, head = HEAD_SHA_1)
-            val second = repo.decide(req2, decision = "APPROVED", notes = "Completely different rationale B", capability = cap2)
-            assertEquals(OperationOutcome.UncertainCompletion(idempotencyKey = key1), second)
+            val (req1Repeat, cap1Repeat) = signedOp(OperationType.DECIDE, head = HEAD_SHA_1)
+            val repeated = repo.decide(req1Repeat, decision = "APPROVED", notes = "  Rationale A  ", capability = cap1Repeat)
+            assertEquals(OperationOutcome.UncertainCompletion(idempotencyKey = key1), repeated)
             assertEquals(1, dao.getAll().size)
+
+            // Different notes on an otherwise identical DECIDE while key1 is UNCERTAIN dispatches with a distinct key2.
+            server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+            val (req2, cap2) = signedOp(OperationType.DECIDE, head = HEAD_SHA_1)
+            val second = repo.decide(
+                req2,
+                decision = "APPROVED",
+                notes = "Completely different rationale B",
+                capability = cap2,
+            )
+            assertTrue(second is OperationOutcome.Timeout)
+            val key2 = (second as OperationOutcome.Timeout).idempotencyKey
+            assertNotEquals(key1, key2)
+            assertEquals(2, dao.getAll().size)
+            assertNotEquals(dao.findByKey(key1)?.intentFingerprint, dao.findByKey(key2)?.intentFingerprint)
             assertEquals(
-                listOf("POST /plans/atlas/decide", "GET /operations/$key1"),
+                listOf("POST /plans/atlas/decide", "GET /operations/$key1", "POST /plans/atlas/decide"),
                 takeAllRequests().methodPaths(),
             )
         }
@@ -389,15 +409,14 @@ class IdempotencyAndFingerprintTest {
     }
 
     /**
-     * Pins Production Finding F2 (not patched on `main`):
+     * Verifies Finding F2 fix:
      * When [IdempotencyKeyGenerator] produces a key that already exists in `operation_journal`
      * under a different [OperationIntent.fingerprint], the `@PrimaryKey` `ABORT` constraint prevents
-     * any write dispatch (`0` network sends) and leaves the original record intact, but
-     * [OperationRepositoryImpl] surfaces [OperationOutcome.RecoveryRequired] rather than
-     * [OperationOutcome.Conflict] (`IDEMPOTENCY_KEY_REUSED`).
+     * any write dispatch (`0` network sends), leaves the original record intact, and
+     * [OperationRepositoryImpl] returns [OperationOutcome.Conflict] (`IDEMPOTENCY_KEY_REUSED`).
      */
     @Test
-    fun `bullet 3 finding local key reuse with different fingerprint sends nothing and preserves existing row`() =
+    fun `bullet 3 local key reuse with different fingerprint returns Conflict, sends nothing, and preserves existing row`() =
         runTest {
             val dao = InMemoryOperationJournalDao()
             // Repeating byte 0x5A yields key = "5a".repeat(16) on every generate() call.
@@ -414,17 +433,102 @@ class IdempotencyAndFingerprintTest {
             assertEquals(expectedKey, originalEntry.idempotencyKey)
             assertEquals(2, takeAllRequests().size)
 
-            // Second, materially different intent tries to reuse expectedKey -> blocked before wire dispatch.
+            // Second, materially different intent tries to reuse expectedKey -> blocked as Conflict before wire dispatch.
             val (req2, cap2) = signedOp(OperationType.PUBLISH, task = "10099", head = HEAD_SHA_1)
             val secondOutcome = repo.publish(req2, cap2)
 
-            assertTrue(
-                "Finding F2: local key collision aborts before send (currently RecoveryRequired instead of Conflict), got $secondOutcome",
-                secondOutcome == OperationOutcome.RecoveryRequired(idempotencyKey = expectedKey),
+            assertEquals(
+                OperationOutcome.Conflict(code = OperationRepositoryImpl.CODE_IDEMPOTENCY_KEY_REUSED),
+                secondOutcome,
             )
             assertTrue("No network request may be dispatched on key/fingerprint collision", takeAllRequests().isEmpty())
             assertEquals(1, dao.getAll().size)
             assertEquals(originalEntry, dao.findByKey(expectedKey))
+        }
+
+    /**
+     * Verifies Finding F4 fix:
+     * Before dispatching a recorded entry or recovering/looking up an existing journal row,
+     * [OperationRepositoryImpl] verifies that `decrypted.intent.fingerprint()` matches the stored
+     * `intentFingerprint`. Any mismatch fails closed to [OperationOutcome.RecoveryRequired] and
+     * performs zero network calls.
+     */
+    @Test
+    fun `stored intentFingerprint mismatch fails closed to RecoveryRequired before dispatch and recovery`() =
+        runTest {
+            // 1. Pre-dispatch mismatch on INTENT_RECORDED row.
+            run {
+                val dao = InMemoryOperationJournalDao()
+                val cipher = RecordingFakeJournalCipher()
+                val intent = samplePublishIntent(task = "10008")
+                val key = "cc".repeat(16)
+                val valid = OperationJournalCodec.encryptNewEntity(
+                    idempotencyKey = key,
+                    intent = intent,
+                    cipher = cipher,
+                    nowEpochMs = clock.now().toEpochMilli(),
+                )
+                val tamperedFingerprint = samplePublishIntent(task = "99999").fingerprint()
+                val tamperedEntity = valid.copy(intentFingerprint = tamperedFingerprint)
+                dao.commitIntentIfNoActive(tamperedEntity, OperationRepositoryImpl.IN_FLIGHT_STATES)
+
+                val repo = newRepository(dao = dao, cipher = cipher)
+                var sendCount = 0
+                val outcome = repo.executeOperation(samplePublishIntent(task = "99999")) {
+                    sendCount++
+                    GatewayAckDto(accepted = true, headSha = HEAD_SHA_1, auditRef = "should-not-send")
+                }
+
+                assertEquals(OperationOutcome.RecoveryRequired(idempotencyKey = key), outcome)
+                assertEquals(0, sendCount)
+                assertTrue(takeAllRequests().isEmpty())
+                assertEquals(OperationJournalState.RECOVERY_REQUIRED, dao.findByKey(key)?.state)
+            }
+
+            // 2. Pre-recovery mismatch on UNCERTAIN row blocks both recoverUncertainOperations() and lookupOperation().
+            run {
+                val dao = InMemoryOperationJournalDao()
+                val cipher = RecordingFakeJournalCipher()
+                val intent = samplePublishIntent(task = "10008")
+                val key = "dd".repeat(16)
+                val valid = OperationJournalCodec.encryptNewEntity(
+                    idempotencyKey = key,
+                    intent = intent,
+                    cipher = cipher,
+                    nowEpochMs = clock.now().toEpochMilli(),
+                )
+                val tamperedEntity = valid.copy(intentFingerprint = samplePublishIntent(task = "88888").fingerprint())
+                dao.commitIntentIfNoActive(tamperedEntity, OperationRepositoryImpl.IN_FLIGHT_STATES)
+                assertTrue(dao.transitionState(key, OperationJournalState.INTENT_RECORDED, OperationJournalState.SENT, 1L))
+                assertTrue(dao.transitionState(key, OperationJournalState.SENT, OperationJournalState.UNCERTAIN, 2L))
+
+                val repo = newRepository(dao = dao, cipher = cipher)
+                val lookupOutcome = repo.lookupOperation(key)
+                assertEquals(OperationOutcome.RecoveryRequired(idempotencyKey = key), lookupOutcome)
+                assertTrue(takeAllRequests().isEmpty())
+                assertEquals(OperationJournalState.RECOVERY_REQUIRED, dao.findByKey(key)?.state)
+
+                // Now check recoverUncertainOperations() when row is directly in SENT/UNCERTAIN.
+                val dao2 = InMemoryOperationJournalDao()
+                val key2 = "ee".repeat(16)
+                val valid2 = OperationJournalCodec.encryptNewEntity(
+                    idempotencyKey = key2,
+                    intent = intent,
+                    cipher = cipher,
+                    nowEpochMs = clock.now().toEpochMilli(),
+                )
+                val tampered2 = valid2.copy(intentFingerprint = "0".repeat(64))
+                dao2.commitIntentIfNoActive(tampered2, OperationRepositoryImpl.IN_FLIGHT_STATES)
+                assertTrue(dao2.transitionState(key2, OperationJournalState.INTENT_RECORDED, OperationJournalState.SENT, 1L))
+
+                val repo2 = newRepository(dao = dao2, cipher = cipher)
+                val summary = repo2.recoverUncertainOperations()
+                assertEquals(1, summary.resolvedCount)
+                assertEquals(0, summary.retryCount)
+                assertEquals(OperationOutcome.RecoveryRequired(idempotencyKey = key2), summary.outcomes[key2])
+                assertTrue(takeAllRequests().isEmpty())
+                assertEquals(OperationJournalState.RECOVERY_REQUIRED, dao2.findByKey(key2)?.state)
+            }
         }
 
     // -- Bullet 4: Process restart never generates a new key for unresolved intent --

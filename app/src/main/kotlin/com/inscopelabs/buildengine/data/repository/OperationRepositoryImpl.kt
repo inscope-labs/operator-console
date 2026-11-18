@@ -283,11 +283,26 @@ class OperationRepositoryImpl(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            val colliding = runCatching { journalDao.findByKey(key) }.getOrNull()
+            if (colliding != null && colliding.intentFingerprint != initialEntity.intentFingerprint) {
+                Logger.w(
+                    TAG,
+                    "Local idempotency key collision for key=$key with different intentFingerprint; returning Conflict",
+                )
+                return OperationOutcome.Conflict(code = CODE_IDEMPOTENCY_KEY_REUSED)
+            }
             Logger.e(TAG, "Atomic journal commit failed for key=$key; nothing sent", e)
             return OperationOutcome.RecoveryRequired(idempotencyKey = key)
         }
 
         if (committedOrExisting.idempotencyKey != key) {
+            if (committedOrExisting.intentFingerprint != initialEntity.intentFingerprint) {
+                Logger.w(
+                    TAG,
+                    "Active journal record key=${committedOrExisting.idempotencyKey} fingerprint mismatch; failing closed",
+                )
+                return OperationOutcome.Conflict(code = CODE_IDEMPOTENCY_KEY_REUSED)
+            }
             Logger.i(
                 TAG,
                 "Atomic journal commit found active record key=${committedOrExisting.idempotencyKey}; suppressing key=$key",
@@ -338,6 +353,13 @@ class OperationRepositoryImpl(
             )
             return resolveNonRecordedBeforeDispatch(committedBeforeSend)
         }
+        if (committedBeforeSend.intentFingerprint != recordedEntity.intentFingerprint) {
+            Logger.e(TAG, "Committed journal record fingerprint mismatch for key=$key; aborting send")
+            markRecoveryRequired(committedBeforeSend, code = null)
+            return OperationOutcome.RecoveryRequired(idempotencyKey = key)
+        }
+        decryptOrFailClosed(committedBeforeSend)
+            ?: return OperationOutcome.RecoveryRequired(idempotencyKey = key)
 
         val nowMs = nowEpochMillis()
         val transitioned = try {
@@ -1500,6 +1522,7 @@ class OperationRepositoryImpl(
         requireCapabilityMatchesRequest(OperationType.DECIDE, request, capability)
         require(decision in ALLOWED_DECISIONS) { "Unsupported framework decision '$decision'" }
 
+        val normalizedNotes = notes?.trim()?.takeIf { it.isNotEmpty() }
         val intent = OperationIntent(
             operation = OperationType.DECIDE,
             plan = request.plan,
@@ -1507,6 +1530,7 @@ class OperationRepositoryImpl(
             branch = request.scope.branch,
             expectedHead = request.scope.head,
             decision = decision,
+            notes = normalizedNotes.orEmpty(),
         )
         return executeOperation(intent) { idempotencyKey ->
             val ack = gateway.decide(
@@ -1515,7 +1539,7 @@ class OperationRepositoryImpl(
                     task = request.task,
                     branch = request.scope.branch,
                     decision = decision,
-                    notes = notes?.trim()?.takeIf { it.isNotEmpty() },
+                    notes = normalizedNotes,
                     idempotencyKey = idempotencyKey,
                     capability = capability.toWire(),
                 ),

@@ -130,6 +130,7 @@ data class OperationIntent(
     val reason: String = "",
     val targetStatus: String = "",
     val decision: String = "",
+    val notes: String = "",
 ) {
     init {
         val checkedFields = listOf(
@@ -142,6 +143,7 @@ data class OperationIntent(
             reason,
             targetStatus,
             decision,
+            notes,
         )
         require(checkedFields.none { Redactor.containsForbidden(it) }) {
             "OperationIntent must never contain capability strings, signatures, nonces, or secrets"
@@ -164,6 +166,7 @@ data class OperationIntent(
             reason,
             targetStatus,
             decision,
+            notes,
         )
         for (field in fields) {
             val utf8 = field.toByteArray(Charsets.UTF_8)
@@ -179,6 +182,7 @@ data class OperationIntent(
         reason = reason,
         targetStatus = targetStatus,
         decision = decision,
+        notes = notes,
     )
 }
 
@@ -189,6 +193,7 @@ data class OperationIntentExtra(
     val reason: String = "",
     val targetStatus: String = "",
     val decision: String = "",
+    val notes: String = "",
 )
 
 /**
@@ -533,20 +538,26 @@ internal object OperationJournalCodec {
             cipher.decrypt(it, aad(recordKey, JournalColumn.LAST_ERROR_CODE))
         }
 
+        val intent = OperationIntent(
+            operation = op,
+            plan = plan,
+            task = task,
+            branch = branch,
+            expectedHead = expectedHead,
+            submissionId = extra.submissionId,
+            zipSha256 = extra.zipSha256,
+            reason = extra.reason,
+            targetStatus = extra.targetStatus,
+            decision = extra.decision,
+            notes = extra.notes,
+        )
+        if (intent.fingerprint() != entity.intentFingerprint) {
+            throw JournalCryptoException("Decrypted journal intent does not match stored intent fingerprint")
+        }
+
         return DecryptedJournalRecord(
             idempotencyKey = entity.idempotencyKey,
-            intent = OperationIntent(
-                operation = op,
-                plan = plan,
-                task = task,
-                branch = branch,
-                expectedHead = expectedHead,
-                submissionId = extra.submissionId,
-                zipSha256 = extra.zipSha256,
-                reason = extra.reason,
-                targetStatus = extra.targetStatus,
-                decision = extra.decision,
-            ),
+            intent = intent,
             state = entity.state,
             createdAtEpochMs = entity.createdAtEpochMs,
             updatedAtEpochMs = entity.updatedAtEpochMs,
