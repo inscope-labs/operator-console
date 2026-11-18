@@ -70,7 +70,12 @@ class ArchitectureManifestTest {
     fun `merged manifest requests no permission beyond the two plus the recorded library baseline`() {
         val xml = locateMergedManifest().readText()
         val allowed = setOf("android.permission.INTERNET", "android.permission.USE_BIOMETRIC")
-        val extra = permissionsIn(xml) - allowed
+        // androidx.core declares `<applicationId>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`; the debug
+        // build adds an applicationId suffix, so the package part is normalised to keep the baseline
+        // identical for debug and release.
+        val extra = (permissionsIn(xml) - allowed)
+            .map { if (it.endsWith(".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION")) DYNAMIC_RECEIVER_KEY else it }
+            .toSet()
 
         ContractSchemaSupport.verifyRatchet(
             checkName = "Merged manifest permissions (BLD-04)",
@@ -89,7 +94,44 @@ class ArchitectureManifestTest {
     }
 
     private companion object {
+        const val DYNAMIC_RECEIVER_KEY = "<applicationId>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+        const val REFERENCE = "PoC task 36 / MP BLD-04; first seen in the android-ci merged debug manifest"
+        const val OPERATOR_QUESTION =
+            "Whether to strip it with tools:node=\"remove\" is an operator decision: the manifest comment says " +
+                "two permissions, and the merged manifest has more."
+
         /** Permissions a library adds on merge, each with the reason it is tolerated. */
-        val MERGED_PERMISSION_BASELINE: List<ContractSchemaSupport.RatchetEntry> = emptyList()
+        val MERGED_PERMISSION_BASELINE: List<ContractSchemaSupport.RatchetEntry> = listOf(
+            ContractSchemaSupport.RatchetEntry(
+                id = "android.permission.ACCESS_NETWORK_STATE",
+                justification = "Added on merge, most likely by WorkManager (network constraints); source library not verified here. $OPERATOR_QUESTION",
+                reference = REFERENCE,
+            ),
+            ContractSchemaSupport.RatchetEntry(
+                id = "android.permission.FOREGROUND_SERVICE",
+                justification = "Added on merge, most likely by WorkManager (expedited work); source library not verified here. $OPERATOR_QUESTION",
+                reference = REFERENCE,
+            ),
+            ContractSchemaSupport.RatchetEntry(
+                id = "android.permission.RECEIVE_BOOT_COMPLETED",
+                justification = "Added on merge, most likely by WorkManager (rescheduling work after reboot, which the operation recovery worker relies on); source library not verified here. $OPERATOR_QUESTION",
+                reference = REFERENCE,
+            ),
+            ContractSchemaSupport.RatchetEntry(
+                id = "android.permission.WAKE_LOCK",
+                justification = "Added on merge, most likely by WorkManager; source library not verified here. $OPERATOR_QUESTION",
+                reference = REFERENCE,
+            ),
+            ContractSchemaSupport.RatchetEntry(
+                id = "android.permission.USE_FINGERPRINT",
+                justification = "Added on merge, most likely by androidx.biometric for pre-API-28 devices; minSdk is 28. Source library and any maxSdkVersion not verified here. $OPERATOR_QUESTION",
+                reference = REFERENCE,
+            ),
+            ContractSchemaSupport.RatchetEntry(
+                id = DYNAMIC_RECEIVER_KEY,
+                justification = "A custom permission declared by androidx.core so unexported dynamic receivers cannot be spoofed; it is namespaced to the app id (with the debug suffix in debug builds).",
+                reference = REFERENCE,
+            ),
+        )
     }
 }
