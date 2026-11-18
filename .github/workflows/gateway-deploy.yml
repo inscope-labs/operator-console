@@ -30,7 +30,13 @@ jobs:
       - run: npm run generate-wrangler
       - run: npm run check-repo-privacy
       - run: npm run verify-log-hygiene
-      # Stage 6.1: run V1–V12 against staging before production promote
+      # PoC task 47. The deploy is gated on the unit tests and the conformance suite
+      # (gateway/tests/conformance: capability vectors, V1, V5, V9, V10). V2-V4, V6-V8, V11 and V12
+      # have no conformance test yet, so this gate does not claim V1-V12; add each as it is written.
+      # Promotion to `production` additionally needs the required-reviewer rule on the `production`
+      # GitHub environment (repository settings; an operator decision, not set by this file).
+      - run: npm run test:unit
+      - run: npm run test:conformance
       - name: Deploy
         run: npx wrangler deploy --env ${{ inputs.environment }}
         env:
