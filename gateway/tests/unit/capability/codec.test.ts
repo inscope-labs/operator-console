@@ -21,7 +21,7 @@ const valid: OperatorCapability = {
   op: 'publish',
   branch: 'task-42',
   head: 'a'.repeat(40),
-  nonce: 'nonce-abc',
+  nonce: '7f3c9b1e5d2a7046',
 };
 
 describe('encodeCapability', () => {
@@ -34,7 +34,7 @@ describe('encodeCapability', () => {
     expect(lines[6]).toBe('PUBLISH');
     expect(lines[7]).toBe('task-42');
     expect(lines[8]).toBe('a'.repeat(40));
-    expect(lines[9]).toBe('nonce-abc');
+    expect(lines[9]).toBe('7f3c9b1e5d2a7046');
   });
 
   it('round-trips with decodeCapability', () => {
@@ -73,10 +73,29 @@ describe('decodeCapability', () => {
     expect(() => decodeCapability(lines.join('\n'))).toThrow(/UNKNOWN_OP/);
   });
 
-  it('rejects BRANCH_INVALID (main)', () => {
+  it('rejects BRANCH_NOT_TASK (main on a task-scoped op)', () => {
     const lines = encodeCapability(valid).split('\n');
     lines[7] = 'main';
-    expect(() => decodeCapability(lines.join('\n'))).toThrow(/BRANCH_INVALID/);
+    expect(() => decodeCapability(lines.join('\n'))).toThrow(/BRANCH_NOT_TASK/);
+  });
+
+  it('rejects BRANCH_NOT_TASK (engine branch on a task-scoped op)', () => {
+    const lines = encodeCapability(valid).split('\n');
+    lines[7] = 'engine';
+    expect(() => decodeCapability(lines.join('\n'))).toThrow(/BRANCH_NOT_TASK/);
+  });
+
+  it('rejects BRANCH_MISMATCH (task branch on an engine-scoped op)', () => {
+    const lines = encodeCapability({ ...valid, op: 'halt' }).split('\n');
+    lines[6] = 'HALT';
+    expect(() => decodeCapability(lines.join('\n'))).toThrow(/BRANCH_MISMATCH/);
+  });
+
+  it('rejects an unsafe engine branch', () => {
+    const lines = encodeCapability({ ...valid, op: 'halt', branch: 'engine' }).split('\n');
+    lines[6] = 'HALT';
+    lines[7] = 'a..b';
+    expect(() => decodeCapability(lines.join('\n'))).toThrow(/BAD_ENCODING/);
   });
 
   it('rejects short head SHA', () => {
@@ -88,7 +107,52 @@ describe('decodeCapability', () => {
   it('rejects missing nonce', () => {
     const lines = encodeCapability(valid).split('\n');
     lines[9] = '';
-    expect(() => decodeCapability(lines.join('\n'))).toThrow(/nonce/);
+    // An empty tenth field is wire-identical to a trailing line feed, so the
+    // refusal is the encoding fault rather than the nonce rule.
+    expect(() => decodeCapability(lines.join('\n'))).toThrow(/BAD_ENCODING/);
+  });
+
+  it('rejects a nonce that is not 16-64 lower-case hex', () => {
+    const lines = encodeCapability(valid).split('\n');
+    lines[9] = '7f3c9b1e5d2a704'; // 15 characters
+    expect(() => decodeCapability(lines.join('\n'))).toThrow(/BAD_ENCODING/);
+    lines[9] = '7F3C9B1E5D2A7046'; // upper case
+    expect(() => decodeCapability(lines.join('\n'))).toThrow(/BAD_ENCODING/);
+    lines[9] = '7f3c9b1e5d2a7046'.repeat(3); // 48 characters is fine
+    expect(() => decodeCapability(lines.join('\n'))).not.toThrow();
+  });
+
+  it('rejects an upper-case head SHA', () => {
+    const lines = encodeCapability(valid).split('\n');
+    lines[8] = 'A'.repeat(40);
+    expect(() => decodeCapability(lines.join('\n'))).toThrow(/BAD_ENCODING/);
+  });
+
+  it('rejects a non-canonical exp', () => {
+    for (const exp of ['+1800000000', '01800000000', '99999999999999999999']) {
+      const lines = encodeCapability(valid).split('\n');
+      lines[2] = exp;
+      expect(() => decodeCapability(lines.join('\n'))).toThrow(/BAD_ENCODING/);
+    }
+  });
+
+  it('decodes the largest canonical exp', () => {
+    const lines = encodeCapability(valid).split('\n');
+    lines[2] = '9223372036854775807';
+    const decoded = decodeCapability(lines.join('\n'));
+    expect(decoded.exp).toBeGreaterThanOrEqual(Number.MAX_SAFE_INTEGER);
+  });
+
+  it('rejects an empty order', () => {
+    const lines = encodeCapability(valid).split('\n');
+    lines[3] = '';
+    expect(() => decodeCapability(lines.join('\n'))).toThrow(/BAD_ENCODING/);
+  });
+
+  it('rejects a leading or trailing line feed', () => {
+    const msg = encodeCapability(valid);
+    expect(() => decodeCapability(`\n${msg}`)).toThrow(/BAD_ENCODING/);
+    expect(() => decodeCapability(`${msg}\n`)).toThrow(/BAD_ENCODING/);
   });
 });
 

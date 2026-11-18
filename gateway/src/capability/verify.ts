@@ -26,6 +26,7 @@ export type VerifyFailure =
   | 'UNKNOWN_OP'
   | 'BRANCH_MISMATCH'
   | 'BRANCH_INVALID'
+  | 'BRANCH_NOT_TASK'
   | 'BAD_FIELD_COUNT'
   | 'BAD_ENCODING';
 
@@ -101,6 +102,12 @@ export async function verifyCapability(
     }
     if (msg.startsWith('BRANCH_INVALID')) {
       return { ok: false, code: 'BRANCH_INVALID', message: msg };
+    }
+    if (msg.startsWith('BRANCH_NOT_TASK')) {
+      return { ok: false, code: 'BRANCH_NOT_TASK', message: msg };
+    }
+    if (msg.startsWith('BRANCH_MISMATCH')) {
+      return { ok: false, code: 'BRANCH_MISMATCH', message: msg };
     }
     if (msg.startsWith('BAD_FIELD_COUNT')) {
       return { ok: false, code: 'BAD_FIELD_COUNT', message: msg };

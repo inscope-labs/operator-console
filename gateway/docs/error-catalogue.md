@@ -48,6 +48,7 @@ Stable public error codes returned by Gateway A as JSON:
 |------|------|---------|
 | `REPO_NOT_PRIVATE` | 403 | Target repository is not private |
 | `BRANCH_INVALID` | 400 | Branch name does not match the required pattern |
+| `BRANCH_NOT_TASK` | 400 | Task-scoped operation carries a branch that is not a `task-*` branch (e.g. `main` or `engine`) |
 | `BRANCH_MISSING` | 404 | Branch does not exist on the remote |
 | `ANCESTRY_FAIL` | 409 | Branch ancestry check failed |
 | `DELTA_EMPTY` | 400 | Branch delta is empty |

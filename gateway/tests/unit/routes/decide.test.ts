@@ -29,6 +29,10 @@ function b64url(bytes: Uint8Array): string {
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+/** The nonce of the last capability minted by signedCap — used to assert
+ *  that the nonce never reaches the persisted record. */
+let lastNonce = '';
+
 async function signedCap(
   over: Partial<OperatorCapability> = {}
 ): Promise<string> {
@@ -42,9 +46,10 @@ async function signedCap(
     op: 'decide',
     branch: BRANCH,
     head: HEAD,
-    nonce: 'nonce-' + crypto.randomUUID().slice(0, 8),
+    nonce: crypto.randomUUID().replace(/-/g, '').slice(0, 16),
     ...over,
   };
+  lastNonce = cap.nonce;
   const message = encodeCapability(cap);
   const key = await crypto.subtle.importKey(
     'raw',
@@ -311,7 +316,7 @@ describe('POST /plans/:id/decide', () => {
     expect(record.scope).toBe(`atlas/7/${BRANCH}`);
     // The signed capability, its signature and nonce never reach the persisted record.
     expect(written[0]).not.toContain('ctxop-v1');
-    expect(written[0]).not.toContain('nonce-');
+    expect(written[0]).not.toContain(lastNonce);
   });
 
   it('happy path returns DECIDE + auditRef', async () => {

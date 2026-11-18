@@ -23,6 +23,7 @@ describe('error catalogue freeze (Stage 1.3)', () => {
       'TTL_TOO_LONG',
       'UNKNOWN_OP',
       'BRANCH_MISMATCH',
+      'BRANCH_NOT_TASK',
       'HEAD_MOVED',
       'NONCE_REPLAYED',
       'CAPABILITY_EXPIRED',

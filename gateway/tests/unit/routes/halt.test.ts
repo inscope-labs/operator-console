@@ -42,7 +42,7 @@ async function signedCap(
     op: 'halt',
     branch: 'engine',
     head: HEAD,
-    nonce: 'nonce-' + crypto.randomUUID().slice(0, 8),
+    nonce: crypto.randomUUID().replace(/-/g, '').slice(0, 16),
     ...over,
   };
   const message = encodeCapability(cap);
@@ -276,7 +276,9 @@ describe('POST /halt and /resume', () => {
     expect(listAuditRecords().some((r) => r.op === 'resume')).toBe(true);
   });
 
-  it('rejects non-engine branch on halt', async () => {
+  it('rejects a task branch on halt at decode time (BRANCH_MISMATCH)', async () => {
+    // An engine-scoped op must not carry a task-* branch; the codec refuses it
+    // before the route runs (docs/capability-format.md §2, `branch` row).
     const cap = await signedCap({ op: 'halt', branch: 'task-x' });
     const res = await dispatch(
       new Request('https://gw.test/halt', {
@@ -289,6 +291,30 @@ describe('POST /halt and /resume', () => {
           idempotencyKey: idemKey(),
           capability: cap,
           branch: 'task-x',
+          head: HEAD,
+        }),
+      }),
+      baseEnv(),
+      ctx
+    );
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe('BRANCH_MISMATCH');
+  });
+
+  it('rejects non-engine branch on halt', async () => {
+    const cap = await signedCap({ op: 'halt', branch: 'main' });
+    const res = await dispatch(
+      new Request('https://gw.test/halt', {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer tok',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          idempotencyKey: idemKey(),
+          capability: cap,
+          branch: 'main',
           head: HEAD,
         }),
       }),
