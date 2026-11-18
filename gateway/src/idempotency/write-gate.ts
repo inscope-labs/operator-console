@@ -240,6 +240,7 @@ export function outcomeFromErrorCode(
     'HALT_ACTIVE',
     'BRANCH_MISMATCH',
     'BRANCH_INVALID',
+    'BRANCH_NOT_TASK',
     'BRANCH_MISSING',
     'DELTA_EMPTY',
     'MERGE_COMMITS',

@@ -41,7 +41,7 @@ function baseCap(over: Partial<OperatorCapability> = {}): OperatorCapability {
     op: 'publish',
     branch: BRANCH,
     head: HEAD,
-    nonce: 'nonce-' + crypto.randomUUID().slice(0, 8),
+    nonce: crypto.randomUUID().replace(/-/g, '').slice(0, 16),
     ...over,
   };
 }

@@ -41,7 +41,7 @@ function baseCap(over: Partial<OperatorCapability> = {}): OperatorCapability {
     op: 'publish',
     branch: 'task-7-work',
     head: 'a'.repeat(40),
-    nonce: 'nonce-' + Math.random().toString(16).slice(2),
+    nonce: crypto.randomUUID().replace(/-/g, '').slice(0, 16),
     ...over,
   };
 }
@@ -118,7 +118,7 @@ describe('Stage 2.4 capability catalogue coverage', () => {
     if (!r.ok) expect(r.code).toBe('BRANCH_MISMATCH');
   });
 
-  it('BRANCH_INVALID (wrong branch pattern)', async () => {
+  it('BRANCH_NOT_TASK (task-scoped op carries a non-task branch)', async () => {
     const lines = [
       CAPABILITY_VERSION,
       'k1',
@@ -129,13 +129,13 @@ describe('Stage 2.4 capability catalogue coverage', () => {
       'PUBLISH',
       'main',
       'a'.repeat(40),
-      'n1',
+      '7f3c9b1e5d2a7046',
     ];
     const message = lines.join('\n');
     const raw = message + '\n' + (await sign(message));
     const r = await verifyCapability(raw, ctx());
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.code).toBe('BRANCH_INVALID');
+    if (!r.ok) expect(r.code).toBe('BRANCH_NOT_TASK');
   });
 
   it('BAD_FIELD_COUNT', async () => {

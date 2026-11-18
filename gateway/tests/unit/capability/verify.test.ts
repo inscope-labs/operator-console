@@ -29,7 +29,7 @@ function baseCap(overrides: Partial<OperatorCapability> = {}): OperatorCapabilit
     op: 'publish',
     branch: 'task-7',
     head: 'b'.repeat(40),
-    nonce: 'nonce-1',
+    nonce: '7f3c9b1e5d2a7046',
     ...overrides,
   };
 }
@@ -159,7 +159,7 @@ describe('verifyCapability — branch scope', () => {
     if (!result.ok) expect(result.code).toBe('BRANCH_MISMATCH');
   });
 
-  it('rejects BRANCH_INVALID for main at decode time', async () => {
+  it('rejects BRANCH_NOT_TASK for main at decode time', async () => {
     const cap = baseCap({ branch: 'main' });
     // encode will still produce the message; decode inside verify rejects
     const message = [
@@ -177,7 +177,7 @@ describe('verifyCapability — branch scope', () => {
     const signature = await sign(message);
     const result = await verifyCapability(message + '\n' + signature, ctx());
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.code).toBe('BRANCH_INVALID');
+    if (!result.ok) expect(result.code).toBe('BRANCH_NOT_TASK');
   });
 });
 

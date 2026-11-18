@@ -30,6 +30,72 @@ import {
 
 const FIELD_COUNT = 10;
 
+/**
+ * Canonical decimal expiry — no sign, no leading zero (except "0" itself).
+ * `Number()` alone accepts "+1761840000", "01761840000" and values that do
+ * not fit a signed 64-bit integer, so the raw field is checked as text first.
+ */
+const EXP_CANONICAL_RE = /^(0|[1-9][0-9]*)$/;
+
+/** Upper bound of a signed 64-bit integer (Long.MAX_VALUE). */
+const EXP_MAX_I64 = 9223372036854775807n;
+
+/** 40 lower-case hex characters — the expected branch head SHA. */
+const HEAD_RE = /^[0-9a-f]{40}$/;
+
+/** 16–64 lower-case hex characters — the single-use nonce. */
+const NONCE_RE = /^[0-9a-f]{16,64}$/;
+
+/** Task branch shape (docs/capability-format.md §2, `branch` row). */
+const TASK_BRANCH_RE = /^task-[A-Za-z0-9._-]+$/;
+
+/**
+ * Task-scoped operations: the branch must be a `task-*` branch.
+ * Source: docs/capability-format.md §2 `branch` row. `SET` is not listed
+ * there — it is a task status operation, so it is scoped like its siblings
+ * `SET_IN_PROGRESS` / `SET_DONE` (recorded as an open question in the
+ * agent report).
+ */
+const TASK_SCOPED_OPS: readonly OperationType[] = [
+  'publish',
+  'upload',
+  'reconcile',
+  'decide',
+  'order',
+  'set',
+  'set_in_progress',
+  'set_done',
+] as const;
+
+/** Engine-scoped operations: the branch must be the configured engine branch. */
+const ENGINE_SCOPED_OPS: readonly OperationType[] = [
+  'halt',
+  'resume',
+  'sync',
+  'doctor',
+  'new',
+] as const;
+
+/**
+ * Engine branch shape — the `unsafe-engine-branch` mutation class.
+ * A branch that contains ".." or starts with "-" is refused (a ref that the
+ * platform would treat as a range or an option). The configured engine branch
+ * itself is not known to the codec; equality with it is checked where the
+ * configuration is available (src/routes/halt.ts).
+ */
+function isSafeEngineBranch(branch: string): boolean {
+  if (branch.length === 0) return false;
+  if (branch.startsWith('-') || branch.startsWith('/')) return false;
+  if (branch.endsWith('/') || branch.endsWith('.')) return false;
+  if (branch.endsWith('.lock')) return false;
+  if (branch.includes('..')) return false;
+  if (branch.includes('//')) return false;
+  if (branch.includes('@{')) return false;
+  // Space, control characters and the characters git refuses in a ref name.
+  if (/[\s~^:?*\[\\\x00-\x1f\x7f]/.test(branch)) return false;
+  return true;
+}
+
 /** Wire-form (UPPER) → internal OperationType (lower). Closed set from docs/capability-format.md. */
 const WIRE_TO_INTERNAL: Readonly<Record<string, OperationType>> = {
   PUBLISH: 'publish',
@@ -102,12 +168,27 @@ export function encodeCapability(cap: OperatorCapability): string {
 /**
  * Decode an LF-separated message into an OperatorCapability.
  * Does not verify the signature — that is the responsibility of verify.ts.
- * Throws on malformed input with a catalogue-aligned prefix when possible:
- *   BAD_FIELD_COUNT | BAD_ENCODING | UNKNOWN_OP | BRANCH_INVALID
+ *
+ * The decoder is fail-closed: every field is checked against
+ * docs/capability-format.md before the capability is handed on, and a
+ * malformed field is refused with the catalogue code that names it:
+ *
+ *   BAD_FIELD_COUNT | BAD_ENCODING | UNKNOWN_OP | BRANCH_NOT_TASK | BRANCH_MISMATCH
+ *
+ * Field checks follow the order of docs/gateway-contract.md §7 (kid, exp,
+ * nonce, op, branch, head) so that the code a caller sees matches the
+ * contract's own ordering.
  */
 export function decodeCapability(message: string): OperatorCapability {
   if (message.includes('\r')) {
     throw new Error('BAD_ENCODING: CR characters are not permitted');
+  }
+  // A leading or trailing LF is an encoding fault, not a field-count fault
+  // (docs/capability-format.md §5: "no trailing LF").
+  if (message.startsWith('\n') || message.endsWith('\n')) {
+    throw new Error(
+      'BAD_ENCODING: message must not begin or end with a line feed'
+    );
   }
 
   const lines = message.split('\n');
@@ -126,20 +207,56 @@ export function decodeCapability(message: string): OperatorCapability {
   if (!kid || !/^[A-Za-z0-9_]{1,16}$/.test(kid)) {
     throw new Error(`BAD_ENCODING: invalid kid`);
   }
-  const exp = Number(expRaw);
-  if (!Number.isInteger(exp) || exp <= 0) {
-    throw new Error(`BAD_ENCODING: invalid exp`);
+
+  // exp — canonical decimal only, and it must fit a signed 64-bit integer.
+  if (!EXP_CANONICAL_RE.test(expRaw)) {
+    throw new Error(`BAD_ENCODING: invalid exp: ${expRaw}`);
   }
+  const expBig = BigInt(expRaw);
+  if (expBig <= 0n || expBig > EXP_MAX_I64) {
+    throw new Error(`BAD_ENCODING: invalid exp: ${expRaw}`);
+  }
+  // Above 2^53-1 the exact integer is not representable as a JS number; the
+  // capability keeps the nearest representable value (docs/fixtures/vectors/
+  // valid_capabilities.json — valid-exp-max-long).
+  const exp = Number(expBig);
+
+  // order / plan / task are required fields (docs/fixtures/vectors/README.md
+  // — mutation class `empty-field`).
+  if (!order) {
+    throw new Error('BAD_ENCODING: missing order');
+  }
+  if (!plan) {
+    throw new Error('BAD_ENCODING: missing plan');
+  }
+  if (!task) {
+    throw new Error('BAD_ENCODING: missing task');
+  }
+
+  if (!NONCE_RE.test(nonce)) {
+    throw new Error(`BAD_ENCODING: invalid nonce`);
+  }
+
   const op = fromWireOp(opRaw);
-  // Task branches for write ops; engine branch for halt/resume (contract §3.11–3.12).
-  if (branch !== 'engine' && !/^task-[A-Za-z0-9._-]+$/.test(branch)) {
-    throw new Error(`BRANCH_INVALID: ${branch}`);
+
+  // Branch scope — docs/capability-format.md §2, `branch` row.
+  if (isTaskScopedOp(op)) {
+    if (!TASK_BRANCH_RE.test(branch)) {
+      throw new Error(`BRANCH_NOT_TASK: ${branch}`);
+    }
+  } else {
+    if (!isSafeEngineBranch(branch)) {
+      throw new Error(`BAD_ENCODING: invalid engine branch: ${branch}`);
+    }
+    if (TASK_BRANCH_RE.test(branch)) {
+      throw new Error(
+        `BRANCH_MISMATCH: engine-scoped op ${op} must not carry a task branch: ${branch}`
+      );
+    }
   }
-  if (!/^[0-9a-f]{40}$/i.test(head)) {
+
+  if (!HEAD_RE.test(head)) {
     throw new Error(`BAD_ENCODING: invalid head SHA`);
-  }
-  if (!nonce) {
-    throw new Error('BAD_ENCODING: missing nonce');
   }
 
   return {
@@ -154,6 +271,16 @@ export function decodeCapability(message: string): OperatorCapability {
     head,
     nonce,
   };
+}
+
+/** True when the operation is authorised by a task-scoped `task-*` branch. */
+export function isTaskScopedOp(op: OperationType): boolean {
+  return (TASK_SCOPED_OPS as readonly string[]).includes(op);
+}
+
+/** True when the operation is authorised by the configured engine branch. */
+export function isEngineScopedOp(op: OperationType): boolean {
+  return (ENGINE_SCOPED_OPS as readonly string[]).includes(op);
 }
 
 /**

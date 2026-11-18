@@ -27,6 +27,7 @@ export type ErrorCode =
   // Guard layer
   | 'REPO_NOT_PRIVATE'
   | 'BRANCH_INVALID'
+  | 'BRANCH_NOT_TASK'
   | 'BRANCH_MISSING'
   | 'ANCESTRY_FAIL'
   | 'DELTA_EMPTY'
@@ -78,6 +79,7 @@ export const HTTP_STATUS: Record<ErrorCode, number> = {
   BAD_ENCODING: 400,
   REPO_NOT_PRIVATE: 403,
   BRANCH_INVALID: 400,
+  BRANCH_NOT_TASK: 400,
   BRANCH_MISSING: 404,
   ANCESTRY_FAIL: 409,
   DELTA_EMPTY: 400,
@@ -120,6 +122,8 @@ export const ERROR_MESSAGE: Record<ErrorCode, string> = {
   BAD_ENCODING: 'Capability wire message has invalid encoding or framing',
   REPO_NOT_PRIVATE: 'Target repository is not private',
   BRANCH_INVALID: 'Branch name does not match the required pattern',
+  BRANCH_NOT_TASK:
+    'Task-scoped operation must carry a task-* branch, not main or the engine branch',
   BRANCH_MISSING: 'Branch does not exist on the remote',
   ANCESTRY_FAIL: 'Branch ancestry check failed',
   DELTA_EMPTY: 'Branch delta is empty',

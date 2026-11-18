@@ -162,7 +162,7 @@ describe('registry kid end-to-end capability verify', () => {
       op: 'publish',
       branch: 'task-7',
       head: 'a'.repeat(40),
-      nonce: 'n-reg-1',
+      nonce: '7f3c9b1e5d2a7046',
     };
     const message = encodeCapability(cap);
     const sigBuf = await crypto.subtle.sign(
