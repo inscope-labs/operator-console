@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
@@ -33,6 +34,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -42,6 +44,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -51,9 +57,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inscopelabs.buildengine.R
+import com.inscopelabs.buildengine.core.security.AuthTier
 import com.inscopelabs.buildengine.domain.model.PlanStatus
 import com.inscopelabs.buildengine.domain.model.PlanValidation
 import com.inscopelabs.buildengine.domain.model.RenderCheck
+import com.inscopelabs.buildengine.domain.model.Task
 import com.inscopelabs.buildengine.ui.common.UiState
 import com.inscopelabs.buildengine.ui.components.ErrorBanner
 
@@ -136,6 +144,7 @@ fun PlanDetailScreen(
                         planId = planId,
                         onValidate = { viewModel.validatePlan(planId) },
                         onCheckRender = { viewModel.checkRender(planId) },
+                        onStartTask = { task, typedHead -> viewModel.startTask(task, typedHead) },
                     )
                 }
             }
@@ -149,6 +158,7 @@ private fun PlanDetailContent(
     planId: String,
     onValidate: () -> Unit,
     onCheckRender: () -> Unit,
+    onStartTask: (Task, String?) -> Unit,
 ) {
     val plan = data.plan
     val status = data.status
@@ -228,6 +238,17 @@ private fun PlanDetailContent(
         // Work-order creation is deferred to engine tooling (BD-1.3 Option B, PR3-027).
         item {
             WorkOrderDeferralCard()
+        }
+
+        // Single operator entry point for SET_IN_PROGRESS (PENDING -> IN_PROGRESS, ADR 0016 D-1).
+        item {
+            StartableTasksCard(
+                tasks = data.pendingTasks,
+                authTier = data.authTier,
+                startingTaskId = data.startingTaskId,
+                feedback = data.transitionFeedback,
+                onStartTask = onStartTask,
+            )
         }
 
         // Actions: Validate & Render Check
@@ -329,6 +350,178 @@ private fun WorkOrderDeferralCard() {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+@Composable
+private fun StartableTasksCard(
+    tasks: List<Task>,
+    authTier: AuthTier?,
+    startingTaskId: String?,
+    feedback: TaskTransitionFeedback?,
+    onStartTask: (Task, String?) -> Unit,
+) {
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("startable_tasks_card"),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.plan_start_tasks_heading),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = stringResource(R.string.plan_start_tasks_subtitle),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            if (feedback != null) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("start_task_feedback"),
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (feedback.accepted) {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.errorContainer
+                    },
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = "${feedback.taskTitle} (${feedback.taskId})",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = feedback.message,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        feedback.auditRef?.takeIf { it.isNotBlank() }?.let { audit ->
+                            Text(
+                                text = stringResource(R.string.publish_audit_ref, audit),
+                                style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (tasks.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.plan_no_pending_tasks),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("plan_no_pending_tasks_text"),
+                )
+            } else {
+                tasks.forEach { task ->
+                    var typedConfirmation by remember(task.id, task.headSha) { mutableStateOf("") }
+                    val expectedPrefix = task.headSha.take(7)
+                    val needsTypedHead = authTier == AuthTier.IN_APP_CONFIRM
+                    val typedMatches = !needsTypedHead ||
+                        (expectedPrefix.isNotEmpty() && expectedPrefix.equals(typedConfirmation.trim(), ignoreCase = true))
+                    val canStart = startingTaskId == null &&
+                        task.order.isNotBlank() &&
+                        task.branch.isNotBlank() &&
+                        task.headSha.isNotBlank() &&
+                        typedMatches
+
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("pending_task_item_${task.id}"),
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                text = task.title,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                text = "Task ${task.id} · Order: ${task.order.ifBlank { "missing" }}",
+                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = "Branch: ${task.branch.ifBlank { "—" }}",
+                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = "Head: ${task.headSha.ifBlank { "—" }}",
+                                style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+
+                            if (task.order.isBlank()) {
+                                Text(
+                                    text = stringResource(R.string.plan_start_task_order_missing),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+
+                            if (needsTypedHead) {
+                                OutlinedTextField(
+                                    value = typedConfirmation,
+                                    onValueChange = { typedConfirmation = it },
+                                    label = {
+                                        Text(stringResource(R.string.plan_start_task_typed_head, 7))
+                                    },
+                                    singleLine = true,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("start_task_typed_head_${task.id}"),
+                                )
+                            }
+
+                            Button(
+                                onClick = {
+                                    onStartTask(task, typedConfirmation.trim().takeIf { it.isNotEmpty() })
+                                },
+                                enabled = canStart,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp)
+                                    .testTag("start_task_button_${task.id}"),
+                            ) {
+                                if (startingTaskId == task.id) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                                Text(stringResource(R.string.action_start_task))
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
