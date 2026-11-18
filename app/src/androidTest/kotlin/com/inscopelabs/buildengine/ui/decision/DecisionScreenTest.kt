@@ -66,10 +66,9 @@ class DecisionScreenTest {
         composeRule.onNodeWithTag("decision_order_input").performScrollTo().performTextInput("order-7731")
         composeRule.onNodeWithTag("decision_branch_input").performScrollTo().performTextInput("task-10008-foo")
         composeRule.onNodeWithTag("decision_head_input").performScrollTo().performTextInput("a".repeat(40))
-        composeRule.onNodeWithTag("decision_attribution_input").performScrollTo().performTextInput("Architect")
-        composeRule.onNodeWithTag("decision_rationale_input").performScrollTo().performTextInput("Policy alignment")
-        composeRule.onNodeWithTag("decision_scope_input").performScrollTo().performTextInput("gateway")
-        composeRule.onNodeWithTag("decision_evidence_input").performScrollTo().performTextInput("Audit log #1")
+        // ADR 0014 D2: attribution, rationale, scope and evidence are no longer collected; the only
+        // free-text field is `notes`.
+        composeRule.onNodeWithTag("decision_notes_input").performScrollTo().performTextInput("Policy alignment")
 
         composeRule.onNodeWithTag("decision_confirm_button")
             .performScrollTo()
