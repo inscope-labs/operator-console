@@ -15,6 +15,10 @@ States: `todo`, `in-progress`, `blocked`, `done`, `deferred` (deferred rows also
 
 **2026-11-17 (PR for rows 10–12).** AI Studio had already pushed rows 10, 11 and 12 to `main` as `fb040fa`; they are ticked against that SHA. The commit has no `agent-reports/<UTC>-<slug>.md`, which the standing convention requires, so the report is still owed.
 
+**2026-11-18 (gateway Section 0, no PoC row).** `410a950` maps the upper-case wire op (`PUBLISH`, `SET_IN_PROGRESS`, `NEW_PLAN`…) to the gateway's internal names at the codec boundary only, and adds `gateway/tests/conformance/v-capability-vectors.test.ts` against `docs/fixtures/vectors`; the commit's checks, including `check`, were green. Rows 62, 63 and 64 are still `todo`.
+
+**2026-11-18 (AI Studio rows 13, 14, 16, 17, 18).** All five were pushed as `c186ee5`, which was red: `scripts/release-check.py` (the first CI step) failed on a stale allowlist entry for the removed `BASE_URL` default, so the unit tests never ran. The gate fix is its own PR; the rows turn `done` only after `android-ci` is green on `main`. Open question for the report: `ErrorMapper.GATEWAY_CODES` holds four codes that contract §4.1 does not list (`BRANCH_INVALID`, `EXPIRED`, `HEAD_DRIFT`, `NOT_ENROLLED`), and `GatewayErrorCatalogueParityTest` demands exact equality, so it is the likely next failure.
+
 **New finding, no PoC row.** The `manualpipeline` module still maps `TransitionKind.SET_DONE` to `OperationType.SET_DONE` and holds it back only with a local constant, `TransitionPreconditionValidator.SET_DONE_AWAITS_SEAL_ROUTE = true`, whose own KDoc says to flip it to `false` once BE-MP-12 lands. Contract revision 1.3 (ADR 0016 D-1) reserves `SET_DONE` and refuses it with `400 BAD_ENCODING`, before any seal question is reached, so that constant would mint a capability the contract reserves. This is the same shape as the `SET` defect closed in rows 3–7. It is in `app/**`, so it is the `[APP]` lane and it has no PoC row of its own; it is recorded as a finding in `docs/release/MANUAL-PIPELINE-READINESS-REGISTER.md` LIF-02 (owner: Feature Lead) and named as a follow-on in the Phase 3 register's PR3-026.
 
 | ID | Lane | Task | State | Evidence / note | Closed on |
@@ -31,12 +35,12 @@ States: `todo`, `in-progress`, `blocked`, `done`, `deferred` (deferred rows also
 | 10 | APP | OperationIntent fingerprint includes decide notes (F1; locate) | done | `fb040fa` — `notes` added to `OperationIntent` and to the fingerprint; test `bullet 2 DECIDE includes notes in OperationIntent so differing notes get distinct keys`; CI green run 44207403352 | 2026-11-17 |
 | 11 | APP | Idempotency-key collision returns Conflict (F2) | done | `fb040fa` — a local key collision with a different fingerprint returns `Conflict(IDEMPOTENCY_KEY_REUSED)`, sends nothing; test `bullet 3 local key reuse with different fingerprint returns Conflict, sends nothing, and preserves existing row`; CI green run 44207403352 | 2026-11-17 |
 | 12 | APP | Verify stored fingerprint before dispatch/recovery (F4) | done | `fb040fa` — decrypted intent is rebuilt and its fingerprint compared with the stored one (`JournalCryptoException`, fail closed) on the dispatch, lookup and recovery paths; tests `stored intentFingerprint mismatch fails closed to RecoveryRequired before dispatch and recovery` and `codec fails closed when stored intent fingerprint mismatches decrypted fields`; CI green run 44207403352 | 2026-11-17 |
-| 13 | APP | ErrorMapper: one source of gateway error codes (F3) | todo |  | |
-| 14 | APP | GatewayErrorCatalogueParityTest (new) | todo |  | |
+| 13 | APP | ErrorMapper: one source of gateway error codes (F3) | in-progress | `c186ee5` (AI Studio) pushed to `main`; its `android-ci` run was red because the release posture gate failed on a stale allowlist entry, so unit tests did not run; closes when the gate fix PR is merged and CI is green on `main` | |
+| 14 | APP | GatewayErrorCatalogueParityTest (new) | in-progress | `c186ee5` (AI Studio) pushed to `main`; its `android-ci` run was red because the release posture gate failed on a stale allowlist entry, so unit tests did not run; closes when the gate fix PR is merged and CI is green on `main` | |
 | 15 | APP | RevokeDeviceKeyUseCaseTest: replace TODO() fakes | done | `4ba2c90` — 0 `TODO(` remain in the file; CI green run 44194377929 | 2026-11-17 |
-| 16 | APP | SettingsViewModelTest deterministic (locate) | todo |  | |
-| 17 | APP | GatewayBaseUrlStore: no gateway.invalid default | todo |  | |
-| 18 | APP | GatewayEndpoints: remove gateway.invalid; update 2 tests | todo |  | |
+| 16 | APP | SettingsViewModelTest deterministic (locate) | in-progress | `c186ee5` (AI Studio) pushed to `main`; its `android-ci` run was red because the release posture gate failed on a stale allowlist entry, so unit tests did not run; closes when the gate fix PR is merged and CI is green on `main` | |
+| 17 | APP | GatewayBaseUrlStore: no gateway.invalid default | in-progress | `c186ee5` (AI Studio) pushed to `main`; its `android-ci` run was red because the release posture gate failed on a stale allowlist entry, so unit tests did not run; closes when the gate fix PR is merged and CI is green on `main` | |
+| 18 | APP | GatewayEndpoints: remove gateway.invalid; update 2 tests | in-progress | `c186ee5` (AI Studio) pushed to `main`; its `android-ci` run was red because the release posture gate failed on a stale allowlist entry, so unit tests did not run; closes when the gate fix PR is merged and CI is green on `main` | |
 | 19 | APP | HaltResumeScreen | todo |  | |
 | 20 | APP | HaltResumeViewModel (new) | todo |  | |
 | 21 | APP | AuditInspectionScreen | todo |  | |
