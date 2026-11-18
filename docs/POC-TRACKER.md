@@ -57,7 +57,7 @@ States: `todo`, `in-progress`, `blocked`, `done`, `deferred` (deferred rows also
 | 38 | APP | PoCHarnessContractTest (new) | todo |  | |
 | 39 | PROT | network_security_config: host + pin-set | blocked | needs EXT-6 | |
 | 40 | PROT | app/build.gradle.kts: version + applicationId | blocked | needs EXT-9 | |
-| 41 | PROT | version.properties (new) | todo |  | |
+| 41 | PROT | version.properties (new) | in-progress | PR #84; closes when merged with CI green | |
 | 42 | PROT | android-ci: assembleRelease + kspReleaseKotlin | todo |  | |
 | 43 | PROT | android-ci: emulator instrumented job | todo |  | |
 | 44 | PROT | scripts/release-check.py + CI step | done | `5dcbc2a` — the gate runs in `android-ci`; green on `b0e2b92c` (run 44196957274); 33 tracked outstanding findings, 0 failures; verified to fail on a new scaffold marker, a new placeholder host and a stale allowlist entry | 2026-11-17 (PR #82) |
@@ -75,8 +75,8 @@ States: `todo`, `in-progress`, `blocked`, `done`, `deferred` (deferred rows also
 | 56 | DOC | Contract: order route reserved (PR3-003) | done | PR #81 merged as `95a3465`; CI green run 44195246660 | 2026-11-17 |
 | 57 | DOC | PHASE-3-REMEDIATION-REGISTER rev 1.3 | done | `ca0b361` — §2.4 records the verified state of all 26 remediation tasks at `1f949ef`; PR3-026 closed for `SET_IN_PROGRESS` only (ADR 0016 D-1/D-2, Appendix D); CI green on `6a73d3e2` (run 44201395647) | 2026-11-17 (PR #83) |
 | 58 | DOC | MANUAL-PIPELINE-READINESS-REGISTER update | done | `2c0f5c4` — register re-verified at rev 1.2: LIF-02, LIF-07, LIF-08 and LIF-10 corrected and the section 2 blocker table refreshed; CI green on `6a73d3e2` (run 44201395647) | 2026-11-17 (PR #83) |
-| 59 | DOC | PMA-READINESS-REGISTER: GOV-02, link ADR 0018 | todo |  | |
-| 60 | DOC | DEVICE-TEST-CHECKLIST + ENVIRONMENTS (new) | todo |  | |
+| 59 | DOC | PMA-READINESS-REGISTER: GOV-02, link ADR 0018 | in-progress | PR #84; GOV-02 PASS against `b0e2b92`; ADR 0018 not written (task 51), so noted, not linked | |
+| 60 | DOC | DEVICE-TEST-CHECKLIST + ENVIRONMENTS (new) | in-progress | PR #84; staging/production hostnames left unrecorded until first deployment | |
 | 61 | DOC | PHASE-3-EVIDENCE: PoC run + ProGuard acceptance | todo |  | |
 | 62 | GW | plans.ts: POST /plans/:id/status | todo |  | |
 | 63 | GW | plan-status-transition.test.ts (new) | todo |  | |
