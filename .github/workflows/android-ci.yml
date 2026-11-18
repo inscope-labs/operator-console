@@ -1,4 +1,6 @@
-# CI for operator-console: JVM unit tests and a DEBUG build only. No release builds.
+# CI for operator-console: release posture check, JVM unit tests, a DEBUG build, and an unsigned RELEASE
+# compile (PoC task 42). Nothing here signs or publishes a release; the release APK is built to prove the
+# release variant (R8 shrinking, release DI graph) compiles, and is not uploaded.
 # This file is a protected path for the AI Studio agent; change it out-of-band.
 name: android-ci
 
@@ -71,6 +73,34 @@ jobs:
           if [ "$status" -ne 0 ]; then
             msg=$(grep -E -A8 "What went wrong|FAILED|^e: |error:" gradle-build.log | head -40 | sed ':a;N;$!ba;s/\n/%0A/g')
             echo "::error title=Gradle debug build failed::${msg}"
+          fi
+          exit "$status"
+
+      - name: Release KSP (dependency-injection graph)
+        # PoC task 42 / MP DI-03. Compiles the release DI graph on its own so a missing binding is reported
+        # as a KSP failure, not buried inside the full release build.
+        shell: bash
+        run: |
+          set +e
+          ./gradlew --no-daemon --console=plain --stacktrace :app:kspReleaseKotlin 2>&1 | tee gradle-ksp-release.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            msg=$(grep -E -A8 "What went wrong|FAILED|^e: |error:" gradle-ksp-release.log | head -40 | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error title=Gradle release KSP failed::${msg}"
+          fi
+          exit "$status"
+
+      - name: Release build (unsigned, not uploaded)
+        # PoC task 42 / MP BLD-01. The release type has no signing config, so this produces an unsigned APK
+        # after R8 shrinking. A ProGuard or resource-shrinking regression fails here, not on a device.
+        shell: bash
+        run: |
+          set +e
+          ./gradlew --no-daemon --console=plain --stacktrace :app:assembleRelease 2>&1 | tee gradle-release.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            msg=$(grep -E -A8 "What went wrong|FAILED|^e: |error:" gradle-release.log | head -40 | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error title=Gradle release build failed::${msg}"
           fi
           exit "$status"
 

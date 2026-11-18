@@ -1,3 +1,12 @@
+# Manual packaging of an installable DEBUG APK (PoC task 45 / T7-104).
+#
+# Split from android-ci.yml on purpose:
+#   android-ci.yml      the gate. Runs on every push and pull request: release posture check, JVM
+#                       unit tests, debug build, release KSP and an unsigned release compile.
+#   build-apk-debug.yml this file. Runs only on demand (workflow_dispatch) to produce an APK with the
+#                       version from version.properties and the launcher icons, plus a lint report.
+# Nothing here gates a merge. Lint findings fail this workflow so they are seen; they do not block
+# android-ci.
 name: Build Debug APK
 
 on:
@@ -147,7 +156,6 @@ jobs:
         run: ./gradlew --no-daemon testDebugUnitTest
 
       - name: Run Android Lint
-        continue-on-error: true
         run: ./gradlew --no-daemon lint
 
       - name: Upload Debug APK
