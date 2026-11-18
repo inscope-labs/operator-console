@@ -407,6 +407,10 @@ private fun DiagnosticsSection(
     exportText: () -> String,
 ) {
     val context = LocalContext.current
+    // Resolved at composable scope: lint (LocalContextGetResourceValueCall) rejects context.getString
+    // on LocalContext.current, which also would not track configuration changes.
+    val shareSubject = stringResource(R.string.settings_gateway_activity_share_subject)
+    val shareTitle = stringResource(R.string.settings_gateway_activity_share_title)
     SettingsCard(title = stringResource(R.string.settings_diagnostics_heading)) {
         Text(
             text = stringResource(R.string.settings_diagnostics_help),
@@ -452,11 +456,11 @@ private fun DiagnosticsSection(
                         val text = exportText()
                         val intent = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
-                            putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.settings_gateway_activity_share_subject))
+                            putExtra(Intent.EXTRA_SUBJECT, shareSubject)
                             putExtra(Intent.EXTRA_TEXT, text)
                         }
                         context.startActivity(
-                            Intent.createChooser(intent, context.getString(R.string.settings_gateway_activity_share_title)),
+                            Intent.createChooser(intent, shareTitle),
                         )
                     },
                     enabled = state.gatewayActivityEvents.isNotEmpty(),
