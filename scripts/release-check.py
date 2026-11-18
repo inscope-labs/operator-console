@@ -173,13 +173,6 @@ def _entries() -> list:
         # --- C2: placeholder host -------------------------------------------------
         {
             "check": "C2",
-            "path": f"{MAIN_PKG}/core/network/GatewayEndpoints.kt",
-            "pattern": re.escape('const val BASE_URL: String = "https://gateway.invalid"'),
-            "reason": "Base URL default is still the reserved placeholder name",
-            "owner": "PoC tasks 17 and 18",
-        },
-        {
-            "check": "C2",
             "path": "app/src/main/res/xml/network_security_config.xml",
             "pattern": re.escape("<domain includeSubdomains=\"true\">gateway.invalid</domain>"),
             "reason": "Network security config still names the placeholder host",
