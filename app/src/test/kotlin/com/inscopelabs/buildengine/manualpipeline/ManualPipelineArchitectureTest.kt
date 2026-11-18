@@ -217,4 +217,39 @@ class ManualPipelineArchitectureTest {
             violations.isEmpty(),
         )
     }
+
+    /**
+     * PoC task 35 / MP API-01, TST-08. The module's published surface is `manualpipeline.public`
+     * (`ManualPipelineEntry`, the nav graph, `ManualPipelineTaskAction`, the launch-recovery
+     * enqueue function). Host code that reaches any other manualpipeline package couples itself to
+     * the module's internals.
+     *
+     * Kotlin spells the package with backticks (`public` is a keyword), so they are stripped before
+     * comparing. Only `import` lines are inspected; a fully qualified name used without an import
+     * is not caught.
+     */
+    @Test
+    fun `host code imports only the manualpipeline public package`() {
+        val hostRoot: File = moduleDir.parentFile
+        val allowedPrefix = "com.inscopelabs.buildengine.manualpipeline.public."
+        val modulePrefix = "com.inscopelabs.buildengine.manualpipeline."
+
+        val hostFiles = hostRoot.walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .filter { !it.canonicalPath.startsWith(moduleDir.canonicalPath) }
+            .toList()
+        assertTrue("Found no host sources under $hostRoot; the test would pass vacuously", hostFiles.isNotEmpty())
+
+        val violations = hostFiles.flatMap { file ->
+            importsIn(file)
+                .map { it.replace("`", "") }
+                .filter { it.startsWith(modulePrefix) && !it.startsWith(allowedPrefix) }
+                .map { "${file.relativeTo(hostRoot).path.replace('\\', '/')} imports $it" }
+        }
+
+        assertTrue(
+            "Host code may import only ${allowedPrefix}* from the manualpipeline module:\n${violations.joinToString("\n")}",
+            violations.isEmpty(),
+        )
+    }
 }

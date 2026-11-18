@@ -57,19 +57,19 @@ States: `todo`, `in-progress`, `blocked`, `done`, `deferred` (deferred rows also
 | 32 | APP | StrongBoxSupportTest real assertions | todo |  | |
 | 33 | APP | OperationJournalDatabaseTest (new) | todo |  | |
 | 34 | APP | OperationRecoveryWorkerTest (new) | todo |  | |
-| 35 | APP | ManualPipelineArchitectureTest host-import rule | todo |  | |
-| 36 | APP | ArchitectureManifestTest (new) | todo |  | |
+| 35 | APP | ManualPipelineArchitectureTest host-import rule | in-progress | PR #89; rule dry-run over 203 host files finds no violation; done when merged with CI green | |
+| 36 | APP | ArchitectureManifestTest (new) | in-progress | PR #89; source manifest holds exactly 2 permissions; the merged manifest adds 6 (ratcheted, operator decision pending) | |
 | 37 | APP | ArchitectureTest Rule E ratchet (needs EXT-10) | blocked | waits on operator decision | |
 | 38 | APP | PoCHarnessContractTest (new) | todo |  | |
 | 39 | PROT | network_security_config: host + pin-set | blocked | needs EXT-6 | |
 | 40 | PROT | app/build.gradle.kts: version + applicationId | blocked | needs EXT-9 | |
 | 41 | PROT | version.properties (new) | in-progress | PR #84; closes when merged with CI green | |
-| 42 | PROT | android-ci: assembleRelease + kspReleaseKotlin | todo |  | |
+| 42 | PROT | android-ci: assembleRelease + kspReleaseKotlin | in-progress | PR #88 (lands on main); release KSP passes, release build needs the R8 dontwarn line | |
 | 43 | PROT | android-ci: emulator instrumented job | todo |  | |
 | 44 | PROT | scripts/release-check.py + CI step | done | `5dcbc2a` — the gate runs in `android-ci`; green on `b0e2b92c` (run 44196957274); 33 tracked outstanding findings, 0 failures; verified to fail on a new scaffold marker, a new placeholder host and a stale allowlist entry | 2026-11-17 (PR #82) |
-| 45 | PROT | build-apk-debug.yml consolidate | todo |  | |
+| 45 | PROT | build-apk-debug.yml consolidate | in-progress | PR #88; documents the split, drops continue-on-error on lint (manual workflow) | |
 | 46 | PROT | proguard-rules.pro: review 7fdd304 | blocked | needs operator acceptance | |
-| 47 | PROT | gateway-deploy.yml: real V1-V12 gate | todo |  | |
+| 47 | PROT | gateway-deploy.yml: real V1-V12 gate | in-progress | PR #89; deploy gated on test:unit and test:conformance; required-reviewer environment still to be set by the operator (repo has no environments) | |
 | 48 | DOC | Delete/point ADR 0007 duplicate; fix references | done | `6006359` — the duplicate is deleted and ADR 0013 is repointed at contract §1.4; green on `b0e2b92c` (run 44196957274) | 2026-11-17 (PR #82) |
 | 49 | DOC | ADR 0011 closed decisions (new) | blocked | needs operator answers | |
 | 50 | DOC | ADR 0017 manual-pipeline approval (new) | blocked | needs EXT-10 | |
