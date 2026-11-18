@@ -48,6 +48,9 @@ class DecisionScreenTest {
                 clock = clock,
             ),
             nonceSource = nonceSource,
+            // ADR 0014 D2 settled the contract, so production defaults to true. This test covers the
+            // blocked path (PR3-003 blocker banner, submit disabled), so it opts into it explicitly.
+            contractSchemaSettled = false,
         )
         val viewModel = DecisionViewModel(SavedStateHandle(mapOf("decisionId" to "D-01")), useCase)
 
