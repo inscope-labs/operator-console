@@ -2,7 +2,6 @@ package com.inscopelabs.buildengine.di
 
 import com.inscopelabs.buildengine.core.network.ErrorMapper
 import com.inscopelabs.buildengine.core.network.GatewayBaseUrlProvider
-import com.inscopelabs.buildengine.core.network.GatewayEndpoints
 import com.inscopelabs.buildengine.core.network.GatewayActivityLog
 import com.inscopelabs.buildengine.core.network.GatewayHttpClient
 import com.inscopelabs.buildengine.core.network.MtlsConfig
@@ -56,7 +55,7 @@ object NetworkModule {
         baseUrlStore: GatewayBaseUrlStore,
         certificatePinning: CertificatePinning,
     ): MtlsConfig {
-        val host = baseUrlStore.current().ifEmpty { GatewayEndpoints.BASE_URL }
+        val host = baseUrlStore.current()
         return MtlsConfig(
             host = host,
             pins = certificatePinning.pinsFor(host),

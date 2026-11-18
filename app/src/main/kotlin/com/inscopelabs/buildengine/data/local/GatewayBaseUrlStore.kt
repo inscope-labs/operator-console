@@ -16,7 +16,8 @@ import kotlinx.coroutines.runBlocking
 /**
  * The operator-configured gateway base URL.
  *
- * Default is **unset**. A scaffold placeholder (`gateway.invalid`) is never treated as
+ * Default is **unset** (`null` via [readOrNull] / [currentOrNull], empty string for
+ * non-null callers). Reserved `.invalid` placeholders are never treated as
  * configured. Operators set the real host in Settings without rebuilding; debug builds
  * may optionally seed a LAN default via BuildConfig without shipping production URLs
  * in release source.
@@ -31,10 +32,14 @@ class GatewayBaseUrlStore(
     private val key = stringPreferencesKey(PreferencesKeys.GATEWAY_BASE_URL)
     private val expectedEnvKey = stringPreferencesKey(PreferencesKeys.EXPECTED_ENVIRONMENT)
 
-    /** Emits the effective base URL (stored, else debug default, else empty). */
+    /** Emits the effective base URL (stored, else valid debug default, else empty). */
     val baseUrlFlow: Flow<String> = dataStore.data
         .catch { emit(androidx.datastore.preferences.core.emptyPreferences()) }
         .map { preferences -> resolve(preferences[key]) }
+
+    /** Emits the configured base URL, or `null` when unset / unconfigured. */
+    val baseUrlOrNullFlow: Flow<String?> = baseUrlFlow
+        .map { url -> url.takeIf { GatewayEndpoints.isConfigured(it) } }
 
     /** Emits the configured expected environment (test, staging, or production). Default is "test". */
     val expectedEnvironmentFlow: Flow<String> = dataStore.data
@@ -58,6 +63,11 @@ class GatewayBaseUrlStore(
         resolve(null)
     }
 
+    /**
+     * The effective base URL, or `null` when not configured.
+     */
+    fun currentOrNull(): String? = current().takeIf { GatewayEndpoints.isConfigured(it) }
+
     /** Suspend read of the effective base URL. */
     suspend fun read(): String = try {
         val stored = dataStore.data.first()[key]
@@ -65,6 +75,9 @@ class GatewayBaseUrlStore(
     } catch (_: IOException) {
         resolve(null)
     }
+
+    /** Suspend read of the configured base URL, or `null` when not configured. */
+    suspend fun readOrNull(): String? = read().takeIf { GatewayEndpoints.isConfigured(it) }
 
     /**
      * Persists [url] as the gateway base URL.
@@ -136,7 +149,9 @@ class GatewayBaseUrlStore(
         val candidate = stored?.trim()?.trimEnd('/').orEmpty()
         if (candidate.isNotEmpty()) return candidate
         val debug = debugDefault?.trim()?.trimEnd('/').orEmpty()
-        if (debug.isNotEmpty()) return debug
+        if (debug.isNotEmpty() && GatewayEndpoints.isConfigured(debug, isDebug = true)) {
+            return debug
+        }
         return ""
     }
 

@@ -1,6 +1,5 @@
 package com.inscopelabs.buildengine.data.repository
 
-import com.inscopelabs.buildengine.core.network.GatewayEndpoints
 import com.inscopelabs.buildengine.domain.model.ConnectionStatus
 import com.inscopelabs.buildengine.domain.model.GatewayHealthSnapshot
 import org.junit.Assert.assertEquals
@@ -13,7 +12,7 @@ class ConnectionStatusRepositoryImplTest {
     fun `not configured when base URL is placeholder`() {
         assertEquals(
             ConnectionStatus.NotConfigured,
-            deriveConnectionStatus(GatewayEndpoints.BASE_URL, null),
+            deriveConnectionStatus("https://test-placeholder.invalid", null),
         )
     }
 

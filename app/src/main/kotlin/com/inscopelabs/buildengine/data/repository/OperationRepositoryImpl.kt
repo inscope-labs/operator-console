@@ -1569,9 +1569,9 @@ class OperationRepositoryImpl(
         private const val HTTP_GATEWAY_TIMEOUT = 504
         private val TRANSIENT_HTTP_STATUSES = setOf(500, 502, 503, 504)
 
-        const val CODE_IDEMPOTENCY_KEY_INVALID = "IDEMPOTENCY_KEY_INVALID"
-        const val CODE_IDEMPOTENCY_KEY_REUSED = "IDEMPOTENCY_KEY_REUSED"
-        const val CODE_OPERATION_NOT_FOUND = "OPERATION_NOT_FOUND"
+        const val CODE_IDEMPOTENCY_KEY_INVALID = ErrorMapper.GATEWAY_IDEMPOTENCY_KEY_INVALID
+        const val CODE_IDEMPOTENCY_KEY_REUSED = ErrorMapper.GATEWAY_IDEMPOTENCY_KEY_REUSED
+        const val CODE_OPERATION_NOT_FOUND = ErrorMapper.GATEWAY_OPERATION_NOT_FOUND
         private const val CODE_NOT_CONFIGURED = "NOT_CONFIGURED"
         private const val CODE_REFUSED_UNKNOWN = "REFUSED"
         private const val CODE_CONFLICT_UNKNOWN = "CONFLICT"
@@ -1613,12 +1613,8 @@ class OperationRepositoryImpl(
             CODE_IDEMPOTENCY_KEY_REUSED,
         )
 
-        /** All contract §4.1 error codes (including Revision 1.1 BD-1.7 codes). */
-        val KNOWN_GATEWAY_CODES: Set<String> = ErrorMapper.GATEWAY_CODES + setOf(
-            CODE_IDEMPOTENCY_KEY_INVALID,
-            CODE_IDEMPOTENCY_KEY_REUSED,
-            CODE_OPERATION_NOT_FOUND,
-        )
+        /** All contract §4.1 error codes, sourced directly from [ErrorMapper.GATEWAY_CODES]. */
+        val KNOWN_GATEWAY_CODES: Set<String> = ErrorMapper.GATEWAY_CODES
 
         private val FULL_SHA_REGEX = Regex("^[0-9a-fA-F]{40}$")
         private val SHA256_HEX_REGEX = Regex("^[0-9a-fA-F]{64}$")

@@ -275,11 +275,13 @@ class ErrorMapper {
         const val GATEWAY_RECONCILE_REQUIRED: String = "RECONCILE_REQUIRED"
         const val GATEWAY_NETWORK: String = "NETWORK"
         const val GATEWAY_CONFIG_INVALID: String = "CONFIG_INVALID"
-        const val GATEWAY_NOT_FOUND: String = "NOT_FOUND"
         const val GATEWAY_ENROLL_CHALLENGE_INVALID: String = "ENROLL_CHALLENGE_INVALID"
         const val GATEWAY_ENROLL_ATTESTATION_INVALID: String = "ENROLL_ATTESTATION_INVALID"
         const val GATEWAY_AUTH_TIER_NOT_ALLOWED: String = "AUTH_TIER_NOT_ALLOWED"
         const val GATEWAY_NOT_IMPLEMENTED: String = "NOT_IMPLEMENTED"
+        const val GATEWAY_IDEMPOTENCY_KEY_INVALID: String = "IDEMPOTENCY_KEY_INVALID"
+        const val GATEWAY_IDEMPOTENCY_KEY_REUSED: String = "IDEMPOTENCY_KEY_REUSED"
+        const val GATEWAY_OPERATION_NOT_FOUND: String = "OPERATION_NOT_FOUND"
 
         /**
          * The gateway's code for each state.
@@ -314,6 +316,7 @@ class ErrorMapper {
             GATEWAY_BAD_ENCODING to GatewayFailureState.FORMAT,
             GATEWAY_UNKNOWN_REPO to GatewayFailureState.FORMAT,
             GATEWAY_ENROLL_CHALLENGE_INVALID to GatewayFailureState.FORMAT,
+            GATEWAY_IDEMPOTENCY_KEY_INVALID to GatewayFailureState.FORMAT,
             // Guard failures.
             GATEWAY_GUARD_FAILED to GatewayFailureState.GUARD_FAILED,
             GATEWAY_ENROLL_ATTESTATION_INVALID to GatewayFailureState.GUARD_FAILED,
@@ -327,9 +330,10 @@ class ErrorMapper {
             // Conflict & lifecycle.
             GATEWAY_SUBMISSION_IMMUTABLE to GatewayFailureState.CONFLICT,
             GATEWAY_RECONCILE_REQUIRED to GatewayFailureState.CONFLICT,
+            GATEWAY_IDEMPOTENCY_KEY_REUSED to GatewayFailureState.CONFLICT,
             // Not found & rate limit.
             GATEWAY_BRANCH_MISSING to GatewayFailureState.NOT_FOUND,
-            GATEWAY_NOT_FOUND to GatewayFailureState.NOT_FOUND,
+            GATEWAY_OPERATION_NOT_FOUND to GatewayFailureState.NOT_FOUND,
             GATEWAY_RATE_BUDGET_LOW to GatewayFailureState.RATE_LIMITED,
             // Environment & gateway errors.
             GATEWAY_ENVIRONMENT_MISMATCH to GatewayFailureState.ENVIRONMENT_MISMATCH,

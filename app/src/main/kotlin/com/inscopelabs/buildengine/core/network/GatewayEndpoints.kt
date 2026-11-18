@@ -8,9 +8,8 @@ package com.inscopelabs.buildengine.core.network
  * Every path the console can reach is named here, so that the set of reachable
  * endpoints is one file rather than strings scattered through the data layer.
  *
- * The base URL is an RFC 2606 reserved name on purpose: a scaffold must not be able
- * to reach a real host. Replace it with the deployed gateway URL, and keep it out of
- * source control if that host is environment-specific.
+ * There is no built-in default base URL: the operator configures the gateway host in
+ * Settings before connecting, and RFC 2606 `.invalid` placeholder hosts are refused.
  *
  * Paths are built from templates whose placeholders are percent-encoded. An
  * identifier that arrives from the gateway is not trusted to be a single path
@@ -18,8 +17,6 @@ package com.inscopelabs.buildengine.core.network
  * that was never on the list above.
  */
 object GatewayEndpoints {
-
-    const val BASE_URL: String = "https://gateway.invalid"
 
     /**
      * Hostnames that must never be dialled. RFC 2606 `.invalid` and empty mean
@@ -113,9 +110,10 @@ object GatewayEndpoints {
 
     /**
      * Whether [baseUrl] is a host the console is allowed to open a socket to.
-     * Placeholder / blank URLs are treated as not configured.
+     * Null, blank, and reserved `.invalid` placeholder URLs are treated as not configured.
      */
-    fun isConfigured(baseUrl: String = BASE_URL, isDebug: Boolean = true): Boolean {
+    fun isConfigured(baseUrl: String? = null, isDebug: Boolean = true): Boolean {
+        if (baseUrl.isNullOrBlank()) return false
         return validateUrl(baseUrl, isDebug = isDebug).isValid
     }
 
@@ -226,7 +224,7 @@ object GatewayEndpoints {
     /**
      * The absolute URL of [path] against [baseUrl].
      */
-    fun url(path: String, baseUrl: String = BASE_URL): String =
+    fun url(path: String, baseUrl: String): String =
         baseUrl.trimEnd('/') + path
 
     /**

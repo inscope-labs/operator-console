@@ -1,6 +1,7 @@
 package com.inscopelabs.buildengine.ui.settings
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import app.cash.turbine.ReceiveTurbine
 import app.cash.turbine.test
 import com.inscopelabs.buildengine.core.crypto.SecureRandomSource
 import com.inscopelabs.buildengine.core.network.ErrorMapper
@@ -22,7 +23,10 @@ import com.inscopelabs.buildengine.ui.common.UiState
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.runTest
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -55,6 +59,7 @@ class SettingsViewModelTest {
     private lateinit var healthSnapshotStore: HealthSnapshotStore
     private lateinit var gatewayRepository: GatewayRepository
     private lateinit var sessionRepository: SessionRepository
+    private lateinit var dataStoreScope: CoroutineScope
     private lateinit var activityLog: GatewayActivityLog
     private lateinit var clock: Clock
 
@@ -68,8 +73,12 @@ class SettingsViewModelTest {
         credentialPrefs = FakeSharedPreferences()
         credentialStore = OperatorCredentialStore(context, preferences = credentialPrefs)
 
+        dataStoreScope = CoroutineScope(SupervisorJob() + mainDispatcherRule.testDispatcher)
         val urlFile = File(temporaryFolder.root, "gateway_url.preferences_pb")
-        val dataStore = PreferenceDataStoreFactory.create(produceFile = { urlFile })
+        val dataStore = PreferenceDataStoreFactory.create(
+            scope = dataStoreScope,
+            produceFile = { urlFile },
+        )
         baseUrlStore = GatewayBaseUrlStore(dataStore)
         healthSnapshotStore = HealthSnapshotStore(dataStore)
 
@@ -88,6 +97,7 @@ class SettingsViewModelTest {
 
     @After
     fun tearDown() {
+        dataStoreScope.cancel()
         httpClient.close()
         server.shutdown()
     }
@@ -101,17 +111,23 @@ class SettingsViewModelTest {
         sessionRepository = sessionRepository,
         clock = clock,
         activityLog = activityLog,
+        ioDispatcher = mainDispatcherRule.testDispatcher,
     )
+
+    private suspend fun ReceiveTurbine<UiState<SettingsState>>.awaitInitialSuccess(): SettingsState {
+        var item = awaitItem()
+        while (item is UiState.Idle) {
+            item = awaitItem()
+        }
+        assertTrue("Expected UiState.Success, got $item", item is UiState.Success)
+        return (item as UiState.Success).data
+    }
 
     @Test
     fun `initial state starts with unconfigured gateway and absent credential`() = runTest {
         val viewModel = createViewModel()
         viewModel.uiState.test {
-            // First item may be Idle or Success from refresh
-            var item = awaitItem()
-            if (item is UiState.Idle) item = awaitItem()
-            assertTrue(item is UiState.Success)
-            val state = (item as UiState.Success).data
+            val state = awaitInitialSuccess()
             assertFalse(state.gatewayConfigured)
             assertFalse(state.credentialConfigured)
             assertNull(state.healthSnapshot)
@@ -124,7 +140,7 @@ class SettingsViewModelTest {
     fun `saveGatewayBaseUrl saves valid URL and sets configured`() = runTest {
         val viewModel = createViewModel()
         viewModel.uiState.test {
-            skipItems(1) // initial
+            awaitInitialSuccess()
             viewModel.saveGatewayBaseUrl("https://gateway.example.com")
 
             val updated = awaitItem()
@@ -143,7 +159,7 @@ class SettingsViewModelTest {
     fun `saveGatewayBaseUrl rejects credentials in URL`() = runTest {
         val viewModel = createViewModel()
         viewModel.uiState.test {
-            skipItems(1) // initial
+            awaitInitialSuccess()
             viewModel.saveGatewayBaseUrl("https://user:pass@gateway.example.com")
 
             val updated = awaitItem()
@@ -161,7 +177,7 @@ class SettingsViewModelTest {
     fun `saveGatewayBaseUrl rejects cleartext HTTP in release mode`() = runTest {
         val viewModel = createViewModel()
         viewModel.uiState.test {
-            skipItems(1) // initial
+            awaitInitialSuccess()
             viewModel.saveGatewayBaseUrl("http://10.0.2.2:8787", isDebug = false)
 
             val updated = awaitItem()
@@ -179,7 +195,7 @@ class SettingsViewModelTest {
     fun `saveGatewayBaseUrl allows local cleartext HTTP in debug mode`() = runTest {
         val viewModel = createViewModel()
         viewModel.uiState.test {
-            skipItems(1) // initial
+            awaitInitialSuccess()
             viewModel.saveGatewayBaseUrl("http://10.0.2.2:8787", isDebug = true)
 
             val updated = awaitItem()
@@ -197,22 +213,16 @@ class SettingsViewModelTest {
         baseUrlStore.save("https://gateway.example.com")
         val viewModel = createViewModel()
         viewModel.uiState.test {
+            awaitInitialSuccess()
             viewModel.clearGatewayBaseUrl()
 
-            var state: SettingsState? = null
-            while (true) {
-                val item = awaitItem()
-                if (item is UiState.Success && item.data.notice == SettingsNotice.GATEWAY_URL_CLEARED) {
-                    state = item.data
-                    break
-                }
-            }
-            assertNotNull(state)
-            val nonNullState = requireNotNull(state)
-            assertFalse(nonNullState.gatewayConfigured)
-            assertEquals("", nonNullState.gatewayBaseUrl)
-            assertNull(nonNullState.healthSnapshot)
-            assertEquals(SettingsNotice.GATEWAY_URL_CLEARED, nonNullState.notice)
+            val cleared = awaitItem()
+            assertTrue(cleared is UiState.Success)
+            val clearedState = (cleared as UiState.Success).data
+            assertFalse(clearedState.gatewayConfigured)
+            assertEquals("", clearedState.gatewayBaseUrl)
+            assertNull(clearedState.healthSnapshot)
+            assertEquals(SettingsNotice.GATEWAY_URL_CLEARED, clearedState.notice)
             cancelAndIgnoreRemainingEvents()
         }
         assertEquals("", baseUrlStore.read())
@@ -230,7 +240,7 @@ class SettingsViewModelTest {
 
         val viewModel = createViewModel()
         viewModel.uiState.test {
-            skipItems(1)
+            awaitInitialSuccess()
             viewModel.testConnection()
 
             // In-flight testing
@@ -263,7 +273,7 @@ class SettingsViewModelTest {
 
         val viewModel = createViewModel()
         viewModel.uiState.test {
-            skipItems(1)
+            awaitInitialSuccess()
             viewModel.testConnection()
 
             var state: SettingsState
@@ -286,7 +296,7 @@ class SettingsViewModelTest {
     fun `saveCredential and clearCredential update state`() = runTest {
         val viewModel = createViewModel()
         viewModel.uiState.test {
-            skipItems(1)
+            awaitInitialSuccess()
             viewModel.saveCredential("gw_op_valid_secret_key")
 
             val saved = awaitItem()
@@ -309,7 +319,7 @@ class SettingsViewModelTest {
     fun `saveCredential rejects repository token`() = runTest {
         val viewModel = createViewModel()
         viewModel.uiState.test {
-            skipItems(1)
+            awaitInitialSuccess()
             viewModel.saveCredential("ghp_" + "a".repeat(36))
 
             val rejected = awaitItem()
@@ -325,7 +335,7 @@ class SettingsViewModelTest {
     fun `startSession and endSession manage operator session`() = runTest {
         val viewModel = createViewModel()
         viewModel.uiState.test {
-            skipItems(1)
+            awaitInitialSuccess()
             viewModel.startSession()
 
             val started = awaitItem()
@@ -350,7 +360,7 @@ class SettingsViewModelTest {
     fun `switching expected environment switches credential slot and never reuses credentials`() = runTest {
         val viewModel = createViewModel()
         viewModel.uiState.test {
-            skipItems(1) // Initial state
+            awaitInitialSuccess()
 
             // 1. Switch to staging
             viewModel.saveExpectedEnvironment("staging")

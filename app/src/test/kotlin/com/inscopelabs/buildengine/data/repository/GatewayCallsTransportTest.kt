@@ -27,10 +27,14 @@ class GatewayCallsTransportTest {
     @Test
     fun unknownHostBecomesUnreachableFailure() = runBlocking {
         val result = callGateway(mapper) {
-            throw UnknownHostException("gateway.invalid")
+            throw UnknownHostException(TEST_UNREACHABLE_HOST)
         }
         assertTrue(result is AppResult.Failure)
         result as AppResult.Failure
         assertEquals(GatewayFailureState.UNREACHABLE.code, result.code)
+    }
+
+    private companion object {
+        const val TEST_UNREACHABLE_HOST = "unreachable.example.test"
     }
 }

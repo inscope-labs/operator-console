@@ -22,10 +22,12 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.IOException
 import java.security.GeneralSecurityException
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -76,7 +78,7 @@ enum class SettingsError {
 }
 
 @HiltViewModel
-class SettingsViewModel @Inject constructor(
+class SettingsViewModel internal constructor(
     @ApplicationContext private val appContext: Context,
     private val credentialStore: OperatorCredentialStore,
     private val gatewayBaseUrlStore: GatewayBaseUrlStore,
@@ -85,7 +87,30 @@ class SettingsViewModel @Inject constructor(
     private val sessionRepository: SessionRepository,
     private val clock: Clock,
     private val activityLog: GatewayActivityLog,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
+
+    @Inject
+    constructor(
+        @ApplicationContext appContext: Context,
+        credentialStore: OperatorCredentialStore,
+        gatewayBaseUrlStore: GatewayBaseUrlStore,
+        healthSnapshotStore: HealthSnapshotStore,
+        gatewayRepository: GatewayRepository,
+        sessionRepository: SessionRepository,
+        clock: Clock,
+        activityLog: GatewayActivityLog,
+    ) : this(
+        appContext = appContext,
+        credentialStore = credentialStore,
+        gatewayBaseUrlStore = gatewayBaseUrlStore,
+        healthSnapshotStore = healthSnapshotStore,
+        gatewayRepository = gatewayRepository,
+        sessionRepository = sessionRepository,
+        clock = clock,
+        activityLog = activityLog,
+        ioDispatcher = Dispatchers.IO,
+    )
 
     private val _uiState = MutableStateFlow<UiState<SettingsState>>(UiState.Idle)
     val uiState: StateFlow<UiState<SettingsState>> = _uiState.asStateFlow()
@@ -94,14 +119,14 @@ class SettingsViewModel @Inject constructor(
         activityLog.isEnabled = DiagnosticPreferences.isGatewayActivityLogEnabled(appContext)
         refresh()
         viewModelScope.launch {
-            activityLog.events.collect { events ->
+            activityLog.events.drop(1).collect { events ->
                 publish { it.copy(gatewayActivityEvents = events) }
             }
         }
     }
 
     fun refresh() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             val baseUrl = gatewayBaseUrlStore.read()
             val expectedEnv = gatewayBaseUrlStore.readExpectedEnvironment()
             val configured = credentialStore.read(expectedEnv) != null
@@ -129,7 +154,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun saveExpectedEnvironment(environment: String) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             try {
                 gatewayBaseUrlStore.saveExpectedEnvironment(environment)
                 val expectedEnv = gatewayBaseUrlStore.readExpectedEnvironment()
@@ -156,7 +181,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun saveGatewayBaseUrl(url: String, isDebug: Boolean = com.inscopelabs.buildengine.BuildConfig.DEBUG) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             val trimmed = url.trim().trimEnd('/')
             if (trimmed.isNotEmpty()) {
                 val validation = GatewayEndpoints.validateUrl(trimmed, isDebug = isDebug)
@@ -187,7 +212,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun clearGatewayBaseUrl() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             gatewayBaseUrlStore.clear()
             healthSnapshotStore.clear()
             val effective = gatewayBaseUrlStore.read()
@@ -215,7 +240,7 @@ class SettingsViewModel @Inject constructor(
      * claim connectivity it no longer has.
      */
     fun testConnection() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             publish { it.copy(healthTesting = true, healthError = null, notice = null, error = null) }
             when (val result = gatewayRepository.health()) {
                 is AppResult.Success -> {
@@ -262,7 +287,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun saveCredential(credential: String) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             try {
                 val currentEnv = gatewayBaseUrlStore.readExpectedEnvironment()
                 credentialStore.save(credential, currentEnv)
@@ -288,7 +313,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun clearCredential() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             try {
                 val currentEnv = gatewayBaseUrlStore.readExpectedEnvironment()
                 credentialStore.clear(currentEnv)
@@ -312,7 +337,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun startSession() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             val session = sessionRepository.start()
             publish {
                 it.copy(
@@ -325,7 +350,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun endSession() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             sessionRepository.end()
             publish {
                 it.copy(
@@ -339,7 +364,7 @@ class SettingsViewModel @Inject constructor(
 
 
     fun setGatewayActivityLogEnabled(enabled: Boolean) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             DiagnosticPreferences.setGatewayActivityLogEnabled(appContext, enabled)
             activityLog.isEnabled = enabled
             if (!enabled) {

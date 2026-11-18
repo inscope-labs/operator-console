@@ -78,4 +78,19 @@ class GatewayBaseUrlStoreTest {
         store.save("https://gateway.example.com/")
         assertEquals("https://gateway.example.com", store.read())
     }
+
+    @Test
+    fun `readOrNull and currentOrNull return null when unset`() = runTest {
+        val store = store()
+        assertEquals(null, store.readOrNull())
+        assertEquals(null, store.currentOrNull())
+    }
+
+    @Test
+    fun `placeholder debug default is ignored as unconfigured`() = runTest {
+        val store = store(debugDefault = "https://placeholder.invalid")
+        assertEquals("", store.read())
+        assertEquals(null, store.readOrNull())
+        assertFalse(GatewayEndpoints.isConfigured(store.read()))
+    }
 }

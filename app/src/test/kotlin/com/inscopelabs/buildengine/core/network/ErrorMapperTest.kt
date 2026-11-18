@@ -207,4 +207,28 @@ class ErrorMapperTest {
         assertEquals(GatewayFailureState.UNREACHABLE.code, failure.code)
         assertTrue(failure.message.contains("could not be resolved"))
     }
+
+    @Test
+    fun `idempotency and operation lookup codes map to contract failure states`() {
+        assertEquals(
+            GatewayFailureState.FORMAT,
+            mapper.stateFor(ErrorMapper.GATEWAY_IDEMPOTENCY_KEY_INVALID, 400),
+        )
+        assertEquals(
+            GatewayFailureState.CONFLICT,
+            mapper.stateFor(ErrorMapper.GATEWAY_IDEMPOTENCY_KEY_REUSED, 409),
+        )
+        assertEquals(
+            GatewayFailureState.NOT_FOUND,
+            mapper.stateFor(ErrorMapper.GATEWAY_OPERATION_NOT_FOUND, 404),
+        )
+    }
+
+    @Test
+    fun `OperationRepositoryImpl KNOWN_GATEWAY_CODES uses ErrorMapper GATEWAY_CODES directly`() {
+        assertEquals(
+            ErrorMapper.GATEWAY_CODES,
+            com.inscopelabs.buildengine.data.repository.OperationRepositoryImpl.KNOWN_GATEWAY_CODES,
+        )
+    }
 }

@@ -9,15 +9,20 @@ class GatewayEndpointsConfigTest {
     @Test
     fun defaultBaseUrlIsNotConfigured() {
         assertFalse(GatewayEndpoints.isConfigured())
-        assertFalse(GatewayEndpoints.isConfigured(GatewayEndpoints.BASE_URL))
+        assertFalse(GatewayEndpoints.isConfigured(null))
+        assertFalse(GatewayEndpoints.isConfigured(TEST_PLACEHOLDER_URL))
     }
 
     @Test
     fun blankAndInvalidMarkersAreNotConfigured() {
         assertFalse(GatewayEndpoints.isConfigured(""))
         assertFalse(GatewayEndpoints.isConfigured("   "))
-        assertFalse(GatewayEndpoints.isConfigured("https://gateway.invalid/"))
+        assertFalse(GatewayEndpoints.isConfigured("$TEST_PLACEHOLDER_URL/"))
         assertFalse(GatewayEndpoints.isConfigured("http://foo.invalid"))
+    }
+
+    private companion object {
+        const val TEST_PLACEHOLDER_URL = "https://test-placeholder.invalid"
     }
 
     @Test

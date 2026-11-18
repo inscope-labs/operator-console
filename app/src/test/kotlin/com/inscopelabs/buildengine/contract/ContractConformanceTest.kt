@@ -480,27 +480,6 @@ class ContractConformanceTest {
             ),
         )
 
-        val ERROR_CODE_RATCHET_BASELINE: List<ContractSchemaSupport.RatchetEntry> = listOf(
-            ContractSchemaSupport.RatchetEntry(
-                id = "errormap_missing:IDEMPOTENCY_KEY_INVALID",
-                justification = "Revision 1.1 BD-1.7 error code handled in OperationRepositoryImpl.KNOWN_GATEWAY_CODES but not yet added to ErrorMapper.GATEWAY_CODES (ErrorMapper maps it to UNKNOWN)",
-                reference = "PR3-003, contract §4.1, BD-1.7",
-            ),
-            ContractSchemaSupport.RatchetEntry(
-                id = "errormap_missing:IDEMPOTENCY_KEY_REUSED",
-                justification = "Revision 1.1 BD-1.7 error code handled in OperationRepositoryImpl.KNOWN_GATEWAY_CODES/CONFLICT_CODES but not yet added to ErrorMapper.GATEWAY_CODES",
-                reference = "PR3-003, contract §4.1, BD-1.7",
-            ),
-            ContractSchemaSupport.RatchetEntry(
-                id = "errormap_missing:OPERATION_NOT_FOUND",
-                justification = "Revision 1.1 BD-1.7 error code handled in OperationRepositoryImpl.KNOWN_GATEWAY_CODES but not yet added to ErrorMapper.GATEWAY_CODES",
-                reference = "PR3-003, contract §4.1, BD-1.7",
-            ),
-            ContractSchemaSupport.RatchetEntry(
-                id = "errormap_extra:NOT_FOUND",
-                justification = "ErrorMapper declares legacy GATEWAY_NOT_FOUND ('NOT_FOUND') which is absent from contract §4.1 Error Code Registry",
-                reference = "PR3-003, contract §4.1",
-            ),
-        )
+        val ERROR_CODE_RATCHET_BASELINE: List<ContractSchemaSupport.RatchetEntry> = emptyList()
     }
 }

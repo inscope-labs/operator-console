@@ -120,7 +120,7 @@ class FailureCategoryMapperTest {
     fun `a DNS failure maps to UNREACHABLE`() {
         assertEquals(
             FailureCategory.UNREACHABLE,
-            FailureCategoryMapper.fromThrowable(UnknownHostException("gateway.invalid")),
+            FailureCategoryMapper.fromThrowable(UnknownHostException("unreachable.example.test")),
         )
     }
 

@@ -24,9 +24,7 @@ import java.net.UnknownHostException
  */
 class GatewayHttpClient(
     private val client: HttpClient,
-    private val baseUrlProvider: GatewayBaseUrlProvider = GatewayBaseUrlProvider {
-        GatewayEndpoints.BASE_URL
-    },
+    private val baseUrlProvider: GatewayBaseUrlProvider = GatewayBaseUrlProvider { "" },
     private val credentials: OperatorCredentialProvider = OperatorCredentialProvider { null },
     private val activityLog: GatewayActivityLog? = null,
 ) {
