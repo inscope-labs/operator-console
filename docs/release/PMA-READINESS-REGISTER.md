@@ -14,10 +14,12 @@
 
 ## GOV — Governance
 
+> `docs/adr/0018-pma-decisions.md` (PoC task 51) is not written yet. GOV-01 and GOV-03 stay open until it exists and is linked here; it needs the operator's decisions (EXT-10).
+
 | ID | Readiness check | Acceptance evidence | Status | Owner | Depends on |
 |---|---|---|---|---|---|
 | GOV-01 | An ADR records the PMA decisions: draft schema, API contract, error model, size limits, authorisation model, identifier reservation, draft retention, and the distinction between a draft record, a repository plan and the `PlanDO` read projection. | Merged ADR. Observed: none exists (`docs/STATUS.md`, OPEN 1). | FINDING | Operator | — |
-| GOV-02 | `docs/STATUS.md` reflects the merged state of PR #76. | Observed at `2c450d2`: it still said “Not merged”. Corrected in the PR that installs this register. | UNVERIFIED | Operator | — |
+| GOV-02 | `docs/STATUS.md` reflects the merged state of PR #76. | At `b0e2b92` (`android-ci` green, run `44196957274`) `docs/STATUS.md` records PR #76 as merged and no longer says “Not merged” (PoC task 53). Originally observed at `2c450d2`, where it still said “Not merged”. | PASS | Operator | — |
 | GOV-03 | PMA is mapped to the controlling plan: its place relative to `RELEASE-PLAN.md` stages is recorded. | Stage mapping in the ADR. Observed: PMA arrived outside the staged plan, as the manual pipeline did. | FINDING | Operator | GOV-01 |
 
 ## DAT — Draft model and storage
