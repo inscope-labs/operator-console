@@ -147,3 +147,9 @@ dependencies {
 
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
+
+// PoC task 36 (MP BLD-04): ArchitectureManifestTest reads the merged debug manifest, which only
+// exists after processDebugManifest has run.
+tasks.matching { it.name == "testDebugUnitTest" }.configureEach {
+    dependsOn("processDebugManifest")
+}
