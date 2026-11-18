@@ -13,6 +13,8 @@ States: `todo`, `in-progress`, `blocked`, `done`, `deferred` (deferred rows also
 
 **2026-11-17 (PR #83).** Rows 55, 57 and 58 are closed: the release plan is at revision 1.3, the Phase 3 remediation register at revision 1.3 and the manual pipeline readiness register at revision 1.2. All three were written against a repository state that has since moved.
 
+**2026-11-17 (PR for rows 10–12).** AI Studio had already pushed rows 10, 11 and 12 to `main` as `fb040fa`; they are ticked against that SHA. The commit has no `agent-reports/<UTC>-<slug>.md`, which the standing convention requires, so the report is still owed.
+
 **New finding, no PoC row.** The `manualpipeline` module still maps `TransitionKind.SET_DONE` to `OperationType.SET_DONE` and holds it back only with a local constant, `TransitionPreconditionValidator.SET_DONE_AWAITS_SEAL_ROUTE = true`, whose own KDoc says to flip it to `false` once BE-MP-12 lands. Contract revision 1.3 (ADR 0016 D-1) reserves `SET_DONE` and refuses it with `400 BAD_ENCODING`, before any seal question is reached, so that constant would mint a capability the contract reserves. This is the same shape as the `SET` defect closed in rows 3–7. It is in `app/**`, so it is the `[APP]` lane and it has no PoC row of its own; it is recorded as a finding in `docs/release/MANUAL-PIPELINE-READINESS-REGISTER.md` LIF-02 (owner: Feature Lead) and named as a follow-on in the Phase 3 register's PR3-026.
 
 | ID | Lane | Task | State | Evidence / note | Closed on |
@@ -26,9 +28,9 @@ States: `todo`, `in-progress`, `blocked`, `done`, `deferred` (deferred rows also
 | 7 | APP | TransitionPreconditionValidator: drop local SET rule | done | `4ba2c90`; CI green run 44194377929 | 2026-11-17 |
 | 8 | APP | TaskSummaryDto: `order` required (verify mapper) | todo |  | |
 | 9 | APP | TaskSummaryDtoOrderTest (new) | todo |  | |
-| 10 | APP | OperationIntent fingerprint includes decide notes (F1; locate) | todo |  | |
-| 11 | APP | Idempotency-key collision returns Conflict (F2) | todo |  | |
-| 12 | APP | Verify stored fingerprint before dispatch/recovery (F4) | todo |  | |
+| 10 | APP | OperationIntent fingerprint includes decide notes (F1; locate) | done | `fb040fa` — `notes` added to `OperationIntent` and to the fingerprint; test `bullet 2 DECIDE includes notes in OperationIntent so differing notes get distinct keys`; CI green run 44207403352 | 2026-11-17 |
+| 11 | APP | Idempotency-key collision returns Conflict (F2) | done | `fb040fa` — a local key collision with a different fingerprint returns `Conflict(IDEMPOTENCY_KEY_REUSED)`, sends nothing; test `bullet 3 local key reuse with different fingerprint returns Conflict, sends nothing, and preserves existing row`; CI green run 44207403352 | 2026-11-17 |
+| 12 | APP | Verify stored fingerprint before dispatch/recovery (F4) | done | `fb040fa` — decrypted intent is rebuilt and its fingerprint compared with the stored one (`JournalCryptoException`, fail closed) on the dispatch, lookup and recovery paths; tests `stored intentFingerprint mismatch fails closed to RecoveryRequired before dispatch and recovery` and `codec fails closed when stored intent fingerprint mismatches decrypted fields`; CI green run 44207403352 | 2026-11-17 |
 | 13 | APP | ErrorMapper: one source of gateway error codes (F3) | todo |  | |
 | 14 | APP | GatewayErrorCatalogueParityTest (new) | todo |  | |
 | 15 | APP | RevokeDeviceKeyUseCaseTest: replace TODO() fakes | done | `4ba2c90` — 0 `TODO(` remain in the file; CI green run 44194377929 | 2026-11-17 |
