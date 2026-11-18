@@ -9,12 +9,16 @@
  *   <order>
  *   <plan>
  *   <task>
- *   <op>
+ *   <op>   — UPPER-CASE closed set from docs/capability-format.md
  *   <branch>
  *   <head>
  *   <nonce>
  *
  * Signature is appended after the message; it is not part of the message body.
+ *
+ * Internal OperationType values remain lower-case. Mapping between wire and
+ * internal forms occurs only at the encode / decode boundary. A lower-case or
+ * unknown wire op is refused as UNKNOWN_OP.
  */
 
 import {
@@ -25,6 +29,56 @@ import {
 } from './types';
 
 const FIELD_COUNT = 10;
+
+/** Wire-form (UPPER) → internal OperationType (lower). Closed set from docs/capability-format.md. */
+const WIRE_TO_INTERNAL: Readonly<Record<string, OperationType>> = {
+  PUBLISH: 'publish',
+  UPLOAD: 'upload',
+  RECONCILE: 'reconcile',
+  HALT: 'halt',
+  RESUME: 'resume',
+  DECIDE: 'decide',
+  ORDER: 'order',
+  SET: 'set',
+  NEW_PLAN: 'new',
+  SYNC: 'sync',
+  DOCTOR: 'doctor',
+  SET_IN_PROGRESS: 'set_in_progress',
+  SET_DONE: 'set_done',
+};
+
+/** Internal OperationType → wire-form (UPPER). */
+const INTERNAL_TO_WIRE: Readonly<Record<OperationType, string>> = {
+  publish: 'PUBLISH',
+  upload: 'UPLOAD',
+  reconcile: 'RECONCILE',
+  halt: 'HALT',
+  resume: 'RESUME',
+  decide: 'DECIDE',
+  order: 'ORDER',
+  set: 'SET',
+  new: 'NEW_PLAN',
+  sync: 'SYNC',
+  doctor: 'DOCTOR',
+  set_in_progress: 'SET_IN_PROGRESS',
+  set_done: 'SET_DONE',
+};
+
+function toWireOp(op: OperationType): string {
+  const wire = INTERNAL_TO_WIRE[op];
+  if (!wire) {
+    throw new Error(`UNKNOWN_OP: ${op}`);
+  }
+  return wire;
+}
+
+function fromWireOp(opRaw: string): OperationType {
+  const internal = WIRE_TO_INTERNAL[opRaw];
+  if (!internal || !isOperationType(internal)) {
+    throw new Error(`UNKNOWN_OP: ${opRaw}`);
+  }
+  return internal;
+}
 
 /** Encode a capability into the canonical LF-separated message (no signature). */
 export function encodeCapability(cap: OperatorCapability): string {
@@ -38,7 +92,7 @@ export function encodeCapability(cap: OperatorCapability): string {
     cap.order,
     cap.plan,
     cap.task,
-    cap.op,
+    toWireOp(cap.op),
     cap.branch,
     cap.head,
     cap.nonce,
@@ -76,9 +130,7 @@ export function decodeCapability(message: string): OperatorCapability {
   if (!Number.isInteger(exp) || exp <= 0) {
     throw new Error(`BAD_ENCODING: invalid exp`);
   }
-  if (!isOperationType(opRaw)) {
-    throw new Error(`UNKNOWN_OP: ${opRaw}`);
-  }
+  const op = fromWireOp(opRaw);
   // Task branches for write ops; engine branch for halt/resume (contract §3.11–3.12).
   if (branch !== 'engine' && !/^task-[A-Za-z0-9._-]+$/.test(branch)) {
     throw new Error(`BRANCH_INVALID: ${branch}`);
@@ -97,7 +149,7 @@ export function decodeCapability(message: string): OperatorCapability {
     order,
     plan,
     task,
-    op: opRaw as OperationType,
+    op,
     branch,
     head,
     nonce,

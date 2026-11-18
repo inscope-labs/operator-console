@@ -31,7 +31,7 @@ describe('encodeCapability', () => {
     expect(lines).toHaveLength(10);
     expect(lines[0]).toBe('ctxop-v1');
     expect(lines[1]).toBe('device_1');
-    expect(lines[6]).toBe('publish');
+    expect(lines[6]).toBe('PUBLISH');
     expect(lines[7]).toBe('task-42');
     expect(lines[8]).toBe('a'.repeat(40));
     expect(lines[9]).toBe('nonce-abc');

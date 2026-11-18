@@ -126,7 +126,7 @@ describe('Stage 2.4 capability catalogue coverage', () => {
       'o',
       'p',
       't',
-      'publish',
+      'PUBLISH',
       'main',
       'a'.repeat(40),
       'n1',

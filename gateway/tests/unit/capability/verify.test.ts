@@ -120,7 +120,7 @@ describe('verifyCapability — kid and signature', () => {
 
   it('rejects BAD_SIGNATURE when payload is tampered', async () => {
     const raw = await signedRaw(baseCap());
-    const tampered = raw.replace('publish', 'upload');
+    const tampered = raw.replace('PUBLISH', 'UPLOAD');
     const result = await verifyCapability(tampered, ctx());
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -169,7 +169,7 @@ describe('verifyCapability — branch scope', () => {
       cap.order,
       cap.plan,
       cap.task,
-      cap.op,
+      'PUBLISH',
       'main',
       cap.head,
       cap.nonce,
