@@ -156,14 +156,15 @@ jobs:
           api-level: 30
           arch: x86_64
           disable-animations: true
-          script: ./gradlew --no-daemon --console=plain --stacktrace :app:connectedDebugAndroidTest
+          script: bash scripts/ci-instrumented.sh
 
       - name: Summarise failed instrumented tests
         if: failure()
         shell: bash
         run: |
-          detail=$(grep -h -A6 "<failure message=" app/build/outputs/androidTest-results/connected/*/*.xml app/build/outputs/androidTest-results/connected/*.xml 2>/dev/null | cut -c1-1500 | head -40 | sed ':a;N;$!ba;s/\n/%0A/g')
+          detail=$(grep -rh -A6 "<failure message=" app/build/outputs/androidTest-results 2>/dev/null | cut -c1-1500 | head -40 | sed ':a;N;$!ba;s/\n/%0A/g' || true)
           if [ -n "$detail" ]; then echo "::error title=Failed instrumented test messages::${detail}"; fi
+          exit 0
 
       - name: Upload instrumented test reports
         if: always()
