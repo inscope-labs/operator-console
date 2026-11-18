@@ -57,7 +57,7 @@ class DecisionScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag("decision_contract_blocker").assertIsDisplayed()
+        composeRule.onNodeWithTag("decision_contract_blocker").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("decision_plan_input").performScrollTo().performTextInput("atlas")
         composeRule.onNodeWithTag("decision_task_input").performScrollTo().performTextInput("10008")
         composeRule.onNodeWithTag("decision_order_input").performScrollTo().performTextInput("order-7731")
