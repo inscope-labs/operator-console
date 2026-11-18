@@ -49,3 +49,9 @@
 # R8 from inlining constants that would bypass it.
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
+
+# Tink (pulled in by the encrypted journal / keystore code) references errorprone annotation classes
+# that exist only at compile time. R8 reports them as "missing classes" and fails the release build
+# (found by the android-ci release build, PoC task 42). They are annotations with no runtime effect;
+# this is the rule R8 itself generates in missing_rules.txt.
+-dontwarn com.google.errorprone.annotations.**
