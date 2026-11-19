@@ -137,6 +137,9 @@ describe('Stage 4.1 plan/task read paths', () => {
           branch: 'task-10008-refactor-parser',
           status: 'ready',
           headSha: 'b'.repeat(40),
+          // Contract section 3.6: a task the gateway holds no work-order
+          // identifier for is not listed as ready.
+          order: 'order-7731',
         },
       ],
     });
@@ -152,11 +155,13 @@ describe('Stage 4.1 plan/task read paths', () => {
       id: string;
       planId: string;
       status: string;
+      order: string;
     }>;
     expect(body).toHaveLength(1);
     expect(body[0].id).toBe('10008');
     expect(body[0].planId).toBe('atlas');
     expect(body[0].status).toBe('ready');
+    expect(body[0].order).toBe('order-7731');
   });
 
   it('requires operator token', async () => {

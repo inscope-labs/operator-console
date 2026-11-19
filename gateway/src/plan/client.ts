@@ -57,16 +57,21 @@ function getStub(env: Env): DurableObjectStub {
         const out: unknown[] = [];
         for (const p of memoryCatalogue()) {
           for (const t of p.tasks ?? []) {
-            if (t.status === 'ready' || t.status === 'unassigned') {
-              out.push({
-                id: t.id,
-                planId: p.id,
-                title: t.title,
-                branch: t.branch,
-                status: t.status === 'unassigned' ? 'ready' : t.status,
-                headSha: t.headSha,
-              });
-            }
+            if (t.status !== 'ready' && t.status !== 'unassigned') continue;
+            // Contract §3.6: a task the gateway holds no work-order identifier
+            // for is not listed as ready. The order is reported as held —
+            // never derived, defaulted or invented. Same rule as the Durable
+            // Object (src/durable-objects/plan-do.ts).
+            if (!t.order) continue;
+            out.push({
+              id: t.id,
+              planId: p.id,
+              title: t.title,
+              branch: t.branch,
+              status: t.status === 'unassigned' ? 'ready' : t.status,
+              headSha: t.headSha,
+              order: t.order,
+            });
           }
         }
         return new Response(JSON.stringify(out), {

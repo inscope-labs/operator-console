@@ -23,6 +23,13 @@ export interface PlanTaskRecord {
   branch?: string;
   status: 'ready' | 'in_progress' | 'blocked' | 'done' | 'unassigned';
   headSha?: string;
+  /**
+   * Work-order identifier under which the task was issued (contract §3.6).
+   * The gateway reports the value it holds and never derives, defaults or
+   * invents one. A task the gateway holds no work-order identifier for is not
+   * listed as ready.
+   */
+  order?: string;
 }
 
 export interface PlanRecord {
@@ -188,21 +195,26 @@ export class PlanDO implements DurableObject {
       branch?: string;
       status: string;
       headSha?: string;
+      order: string;
     }> = [];
     for (const id of ids) {
       const rec = await this.state.storage.get<PlanRecord>(planKey(id));
       if (!rec?.tasks) continue;
       for (const t of rec.tasks) {
-        if (t.status === 'ready' || t.status === 'unassigned') {
-          out.push({
-            id: t.id,
-            planId: rec.id,
-            title: t.title,
-            branch: t.branch,
-            status: t.status === 'unassigned' ? 'ready' : t.status,
-            headSha: t.headSha,
-          });
-        }
+        if (t.status !== 'ready' && t.status !== 'unassigned') continue;
+        // Contract §3.6: a task the gateway holds no work-order identifier for
+        // is not listed as ready. The order is reported as held — never
+        // derived, defaulted or invented.
+        if (!t.order) continue;
+        out.push({
+          id: t.id,
+          planId: rec.id,
+          title: t.title,
+          branch: t.branch,
+          status: t.status === 'unassigned' ? 'ready' : t.status,
+          headSha: t.headSha,
+          order: t.order,
+        });
       }
     }
     return json(out, 200);
