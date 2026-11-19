@@ -6,6 +6,8 @@ import com.inscopelabs.buildengine.core.network.GatewayHttpClient
 import com.inscopelabs.buildengine.core.network.GatewayHttpException
 import com.inscopelabs.buildengine.core.network.GatewayNotConfiguredException
 import com.inscopelabs.buildengine.core.network.GatewayProtocolException
+import com.inscopelabs.buildengine.core.network.dto.AdminEnrolmentsResponseDto
+import com.inscopelabs.buildengine.core.network.dto.AuditEntryDto
 import com.inscopelabs.buildengine.core.network.dto.BranchHeadDto
 import com.inscopelabs.buildengine.core.network.dto.DecideAckDto
 import com.inscopelabs.buildengine.core.network.dto.DecideRequestDto
@@ -152,6 +154,15 @@ class GatewayRepository(
 
     override suspend fun revokeKey(request: RevokeKeyRequestDto): RevokeKeyResponseDto =
         decode(httpClient.post(GatewayEndpoints.adminRevoke(), json.encodeToString(request)))
+
+    override suspend fun listEnrolments(): AdminEnrolmentsResponseDto =
+        decode(httpClient.get(GatewayEndpoints.adminEnrolments()))
+
+    override suspend fun listAudit(): List<AuditEntryDto> =
+        decode(httpClient.get(GatewayEndpoints.audit()))
+
+    override suspend fun resolveAudit(auditRef: String): AuditEntryDto =
+        decode(httpClient.get(GatewayEndpoints.auditRecord(auditRef)))
 
     /**
      * The gateway preflight — `GET /health`.

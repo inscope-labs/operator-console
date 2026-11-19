@@ -71,6 +71,9 @@ fun DashboardScreen(
     onNavigateToSettings: () -> Unit = {},
     onNavigateToPlans: () -> Unit = {},
     onNavigateToPreflight: () -> Unit = {},
+    onNavigateToHaltResume: () -> Unit = {},
+    onNavigateToAudit: () -> Unit = {},
+    onNavigateToDevices: () -> Unit = {},
     onNavigateToManualPipeline: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -134,6 +137,11 @@ fun DashboardScreen(
                             message = stringResource(R.string.data_not_loaded),
                             onRetry = { viewModel.refresh() },
                         )
+                        DashboardOperatorActionsCard(
+                            onNavigateToHaltResume = onNavigateToHaltResume,
+                            onNavigateToAudit = onNavigateToAudit,
+                            onNavigateToDevices = onNavigateToDevices,
+                        )
                         ManualPipelineEntry(onOpenManualPipeline = onNavigateToManualPipeline)
                         DashboardDiagnosticsCard(
                             state = diagnosticsState,
@@ -163,6 +171,11 @@ fun DashboardScreen(
                             message = currentState.message,
                             onRetry = { viewModel.refresh() },
                         )
+                        DashboardOperatorActionsCard(
+                            onNavigateToHaltResume = onNavigateToHaltResume,
+                            onNavigateToAudit = onNavigateToAudit,
+                            onNavigateToDevices = onNavigateToDevices,
+                        )
                         ManualPipelineEntry(onOpenManualPipeline = onNavigateToManualPipeline)
                         DashboardDiagnosticsCard(
                             state = diagnosticsState,
@@ -180,6 +193,9 @@ fun DashboardScreen(
                         onPlanClick = onNavigateToPlan,
                         onTaskClick = onNavigateToTask,
                         onViewAllPlans = onNavigateToPlans,
+                        onNavigateToHaltResume = onNavigateToHaltResume,
+                        onNavigateToAudit = onNavigateToAudit,
+                        onNavigateToDevices = onNavigateToDevices,
                         onOpenManualPipeline = onNavigateToManualPipeline,
                     )
                 }
@@ -197,6 +213,9 @@ private fun DashboardContent(
     onPlanClick: (String) -> Unit,
     onTaskClick: (String) -> Unit,
     onViewAllPlans: () -> Unit,
+    onNavigateToHaltResume: () -> Unit,
+    onNavigateToAudit: () -> Unit,
+    onNavigateToDevices: () -> Unit,
     onOpenManualPipeline: () -> Unit,
 ) {
     LazyColumn(
@@ -204,6 +223,13 @@ private fun DashboardContent(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        item {
+            DashboardOperatorActionsCard(
+                onNavigateToHaltResume = onNavigateToHaltResume,
+                onNavigateToAudit = onNavigateToAudit,
+                onNavigateToDevices = onNavigateToDevices,
+            )
+        }
         item {
             ManualPipelineEntry(onOpenManualPipeline = onOpenManualPipeline)
         }
@@ -395,6 +421,62 @@ private fun DashboardContent(
                 onSyncClick = onSyncClick,
                 onDoctorClick = onDoctorClick,
             )
+        }
+    }
+}
+
+@Composable
+private fun DashboardOperatorActionsCard(
+    onNavigateToHaltResume: () -> Unit,
+    onNavigateToAudit: () -> Unit,
+    onNavigateToDevices: () -> Unit,
+) {
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("dashboard_operator_actions_card"),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.dashboard_operator_controls_heading),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onClick = onNavigateToHaltResume,
+                    modifier = Modifier
+                        .weight(1f)
+                        .minimumInteractiveComponentSize()
+                        .testTag("dashboard_halt_resume_button"),
+                ) {
+                    Text(stringResource(R.string.action_halt_resume))
+                }
+                OutlinedButton(
+                    onClick = onNavigateToAudit,
+                    modifier = Modifier
+                        .weight(1f)
+                        .minimumInteractiveComponentSize()
+                        .testTag("dashboard_audit_button"),
+                ) {
+                    Text(stringResource(R.string.action_audit_records))
+                }
+                OutlinedButton(
+                    onClick = onNavigateToDevices,
+                    modifier = Modifier
+                        .weight(1f)
+                        .minimumInteractiveComponentSize()
+                        .testTag("dashboard_devices_button"),
+                ) {
+                    Text(stringResource(R.string.action_devices))
+                }
+            }
         }
     }
 }

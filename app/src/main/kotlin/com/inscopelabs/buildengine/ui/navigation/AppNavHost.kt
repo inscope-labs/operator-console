@@ -9,9 +9,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.inscopelabs.buildengine.ui.audit.AuditInspectionScreen
 import com.inscopelabs.buildengine.ui.dashboard.DashboardScreen
 import com.inscopelabs.buildengine.ui.decision.DecisionScreen
+import com.inscopelabs.buildengine.ui.device.DeviceManagementScreen
 import com.inscopelabs.buildengine.ui.enrollment.EnrollmentScreen
+import com.inscopelabs.buildengine.ui.operations.HaltResumeScreen
 import com.inscopelabs.buildengine.ui.plans.PlanDetailScreen
 import com.inscopelabs.buildengine.ui.plans.PlanAuthoringScreen
 import com.inscopelabs.buildengine.ui.plans.PlanListScreen
@@ -36,6 +39,9 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
                 onNavigateToPlans = { navController.navigate(Routes.PLANS) },
                 onNavigateToPreflight = { navController.navigate(Routes.PREFLIGHT) },
+                onNavigateToHaltResume = { navController.navigate(Routes.HALT_RESUME) },
+                onNavigateToAudit = { navController.navigate(Routes.AUDIT_INSPECTION) },
+                onNavigateToDevices = { navController.navigate(Routes.DEVICE_MANAGEMENT) },
                 onNavigateToManualPipeline = { navController.navigate(ManualPipelineNavRoutes.WORKSPACE) },
             )
         }
@@ -108,6 +114,8 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 onNavigateToPreflight = { navController.navigate(Routes.PREFLIGHT) },
+                onNavigateToDevices = { navController.navigate(Routes.DEVICE_MANAGEMENT) },
+                onNavigateToAudit = { navController.navigate(Routes.AUDIT_INSPECTION) },
             )
         }
         composable(Routes.PREFLIGHT) {
@@ -115,6 +123,23 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 onBack = { navController.popBackStack() },
                 onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
                 onNavigateToEnrollment = { navController.navigate(Routes.ENROLLMENT) },
+            )
+        }
+        composable(Routes.HALT_RESUME) {
+            HaltResumeScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable(Routes.AUDIT_INSPECTION) {
+            AuditInspectionScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable(Routes.DEVICE_MANAGEMENT) {
+            DeviceManagementScreen(
+                onNavigateToEnrollment = { navController.navigate(Routes.ENROLLMENT) },
+                onNavigateToAudit = { navController.navigate(Routes.AUDIT_INSPECTION) },
+                onBack = { navController.popBackStack() },
             )
         }
         manualPipelineNavGraph(navController = navController)

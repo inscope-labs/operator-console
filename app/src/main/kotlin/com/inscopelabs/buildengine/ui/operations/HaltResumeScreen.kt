@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
@@ -21,6 +22,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -29,7 +31,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,9 +42,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.inscopelabs.buildengine.R
 import com.inscopelabs.buildengine.core.security.AuthTier
 import com.inscopelabs.buildengine.domain.model.SecurityPosture
 import com.inscopelabs.buildengine.ui.common.UiState
@@ -104,67 +112,82 @@ data class HaltResumeData(
 )
 
 /**
- * Operator halt and resume.
- *
- * **Proposed baseline.** This is a pre-execution proposal produced against
- * `docs/PRE-EXECUTION-ONBOARDING.md`, not a completed stage. It has not been compiled,
- * has no test coverage, and is not wired into navigation, DI or any caller. The AI
- * Studio agent executes Stage 4.4, corrects this file against the real use cases, adds
- * the tests, and closes the stage only when CI is green on the pushed SHA (G-04).
- *
- * TODO(Stage 4.4 / T4-401): supply the ViewModel and the `HaltUseCase` / `ResumeUseCase`
- * wiring, confirm the engine head source, and add the state tests the gate requires.
+ * Operator halt and resume (Stage 4.4 / T4-401).
  *
  * ## What this screen authorises
  *
- * RELEASE-PLAN.md Stage 4.4 / T4-401: "halt and resume with explicit confirmation; halt
- * must be visible everywhere".
- *
  * Halt and resume are engine-scoped writes (contract §3.11–§3.12,
- * docs/schemas/halt.schema.json, docs/schemas/resume.schema.json). The scope is the
- * `engine` branch, never a task branch — the console must not offer to halt a plan, and
- * must not reuse a task-scoped capability to do it (I-07).
+ * `docs/schemas/halt.schema.json`, `docs/schemas/resume.schema.json`). The scope is the
+ * `engine` branch, never a task branch — the console never offers to halt a single plan
+ * or reuse a task-scoped capability to do it (I-07).
  *
  * ## Why the resume is gated on the recorded cause
  *
- * RELEASE-PLAN.md Stage 3.4 / T3-401: resume requires the recorded cause. The console
- * will not offer a resume while it does not know why the engine is stopped: a resume
- * that clears the halt marker without the cause being recorded is how an engine comes
- * back with nobody knowing why it stopped. When the cause is unknown the screen says so
- * and refuses.
- *
- * ## Why the screen holds state instead of taking a ViewModel
- *
- * The screen takes a [UiState] and plain callbacks rather than a ViewModel, so this file
- * stays self-contained against what is on `main` today and leaves one seam for the
- * stage: a `@HiltViewModel` exposing `StateFlow<UiState<HaltResumeData>>` that owns the
- * capability minting, the journal write and the dispatch.
- *
- * **The signature below is a proposal.** The stage owns the final shape.
+ * Resume requires the cause recorded in the local operation journal when the engine was
+ * halted (`OperationIntent.reason`). When the cause is unknown the screen says so and refuses
+ * to resume (PR3-024).
  *
  * ## Boundaries this screen keeps
  *
- * - It authorises nothing by itself. It shows what would be authorised and hands the
- *   operator's confirmation to the use case, which mints the capability and writes the
- *   journal intent before any dispatch (I-02, I-03).
+ * - It authorises nothing by itself. It passes the operator's confirmation to
+ *   [HaltResumeViewModel], which delegates exclusively to `HaltUseCase` / `ResumeUseCase`.
  * - It never shows a task-scoped scope for a halt or a resume.
- * - A halt that the gateway refused is shown as refused. The screen does not present a
- *   refusal as a halt.
+ * - A halt or resume refused by the gateway is shown as refused.
  */
+@Composable
+fun HaltResumeScreen(
+    modifier: Modifier = Modifier,
+    viewModel: HaltResumeViewModel = hiltViewModel(),
+    onBack: (() -> Unit)? = null,
+) {
+    val state by viewModel.uiState.collectAsState()
+    LaunchedEffect(Unit) {
+        if (viewModel.uiState.value is UiState.Idle) {
+            viewModel.load()
+        }
+    }
+    HaltResumeScreen(
+        state = state,
+        modifier = modifier,
+        onBack = onBack,
+        onRefresh = { viewModel.load() },
+        onHalt = { reason, typedHeadConfirmation ->
+            viewModel.halt(reason = reason, typedHeadConfirmation = typedHeadConfirmation)
+        },
+        onResume = { _, typedHeadConfirmation ->
+            viewModel.resume(typedHeadConfirmation = typedHeadConfirmation)
+        },
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HaltResumeScreen(
     state: UiState<HaltResumeData>,
     modifier: Modifier = Modifier,
+    onBack: (() -> Unit)? = null,
     onRefresh: () -> Unit = {},
-    onHalt: (reason: String) -> Unit = {},
-    onResume: (reason: String) -> Unit = {},
+    onHalt: (reason: String, typedHeadConfirmation: String?) -> Unit = { _, _ -> },
+    onResume: (reason: String, typedHeadConfirmation: String?) -> Unit = { _, _ -> },
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize().testTag("halt_resume_screen"),
         topBar = {
             TopAppBar(
                 title = { Text("Halt and resume") },
+                navigationIcon = {
+                    if (onBack != null) {
+                        IconButton(
+                            onClick = onBack,
+                            modifier = Modifier.testTag("halt_resume_back_button"),
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.action_back),
+                            )
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.onSurface,
@@ -231,7 +254,9 @@ private fun HaltIdleContent(
         )
         OutlinedButton(
             onClick = onRefresh,
-            modifier = Modifier.testTag("halt_resume_load_button"),
+            modifier = Modifier
+                .minimumInteractiveComponentSize()
+                .testTag("halt_resume_load_button"),
         ) {
             Text("Load engine state")
         }
@@ -243,8 +268,8 @@ private fun HaltResumeContent(
     data: HaltResumeData,
     modifier: Modifier = Modifier,
     onRefresh: () -> Unit,
-    onHalt: (String) -> Unit,
-    onResume: (reason: String) -> Unit,
+    onHalt: (reason: String, typedHeadConfirmation: String?) -> Unit,
+    onResume: (reason: String, typedHeadConfirmation: String?) -> Unit,
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize().testTag("halt_resume_content"),
@@ -319,7 +344,9 @@ private fun EngineStateCard(
                 )
                 OutlinedButton(
                     onClick = onRefresh,
-                    modifier = Modifier.testTag("engine_refresh_button"),
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .testTag("engine_refresh_button"),
                 ) {
                     Text("Refresh")
                 }
@@ -516,7 +543,7 @@ private fun EngineOutcomeCard(
 private fun HaltActionCard(
     data: HaltResumeData,
     modifier: Modifier = Modifier,
-    onHalt: (reason: String) -> Unit,
+    onHalt: (reason: String, typedHeadConfirmation: String?) -> Unit,
 ) {
     var reason by remember { mutableStateOf("") }
     var typedConfirmation by remember { mutableStateOf("") }
@@ -544,8 +571,15 @@ private fun HaltActionCard(
                 body = "This stops every plan in the repository until somebody resumes it. " +
                     "It is recorded in the audit trail with the reason below.",
                 confirmLabel = "Halt engine",
-                onConfirm = { onHalt(reason.trim()) },
-                onDismiss = {},
+                onConfirm = {
+                    val typed = typedConfirmation.trim()
+                        .takeIf { tier == AuthTier.IN_APP_CONFIRM && it.isNotEmpty() }
+                    onHalt(reason.trim(), typed)
+                },
+                onDismiss = {
+                    reason = ""
+                    typedConfirmation = ""
+                },
                 isConfirmEnabled = canConfirm,
                 modifier = Modifier.testTag("halt_confirmation"),
             ) {
@@ -595,7 +629,7 @@ private fun HaltActionCard(
 private fun ResumeActionCard(
     data: HaltResumeData,
     modifier: Modifier = Modifier,
-    onResume: (reason: String) -> Unit,
+    onResume: (reason: String, typedHeadConfirmation: String?) -> Unit,
 ) {
     var typedConfirmation by remember { mutableStateOf("") }
 
@@ -656,8 +690,12 @@ private fun ResumeActionCard(
                         "resumed."
                 },
                 confirmLabel = "Resume engine",
-                onConfirm = { onResume(engine.haltReason.trim()) },
-                onDismiss = {},
+                onConfirm = {
+                    val typed = typedConfirmation.trim()
+                        .takeIf { tier == AuthTier.IN_APP_CONFIRM && it.isNotEmpty() }
+                    onResume(engine.haltReason.trim(), typed)
+                },
+                onDismiss = { typedConfirmation = "" },
                 isConfirmEnabled = canConfirm,
                 modifier = Modifier.testTag("resume_confirmation"),
             ) {

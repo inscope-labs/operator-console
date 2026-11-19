@@ -1,5 +1,7 @@
 package com.inscopelabs.buildengine.data.remote
 
+import com.inscopelabs.buildengine.core.network.dto.AdminEnrolmentsResponseDto
+import com.inscopelabs.buildengine.core.network.dto.AuditEntryDto
 import com.inscopelabs.buildengine.core.network.dto.BranchHeadDto
 import com.inscopelabs.buildengine.core.network.dto.DecideAckDto
 import com.inscopelabs.buildengine.core.network.dto.DecideRequestDto
@@ -108,4 +110,13 @@ interface GatewayApi {
 
     /** `POST /admin/revoke` — device key revocation (§3.21, BD-1.10). */
     suspend fun revokeKey(request: RevokeKeyRequestDto): RevokeKeyResponseDto
+
+    /** `GET /admin/enrolments` — active device enrolments (Stage 4.3 admin surface). */
+    suspend fun listEnrolments(): AdminEnrolmentsResponseDto
+
+    /** `GET /audit` — recent audit journal entries (contract §3.20). */
+    suspend fun listAudit(): List<AuditEntryDto>
+
+    /** `GET /audit/{ref}` — single audit journal entry by reference (contract §3.20). */
+    suspend fun resolveAudit(auditRef: String): AuditEntryDto
 }

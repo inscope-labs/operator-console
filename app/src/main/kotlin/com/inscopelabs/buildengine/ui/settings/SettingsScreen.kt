@@ -47,6 +47,8 @@ import java.time.format.FormatStyle
 fun SettingsScreen(
     modifier: Modifier = Modifier,
     onNavigateToPreflight: () -> Unit = {},
+    onNavigateToDevices: () -> Unit = {},
+    onNavigateToAudit: () -> Unit = {},
 ) {
     val viewModel: SettingsViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsState()
@@ -93,6 +95,8 @@ fun SettingsScreen(
                 onTestConnection = { viewModel.testConnection() },
                 onSetExpectedEnvironment = { viewModel.saveExpectedEnvironment(it) },
                 onNavigateToPreflight = onNavigateToPreflight,
+                onNavigateToDevices = onNavigateToDevices,
+                onNavigateToAudit = onNavigateToAudit,
             )
             CredentialSection(
                 state = current,
@@ -145,6 +149,8 @@ private fun GatewaySection(
     onTestConnection: () -> Unit,
     onSetExpectedEnvironment: (String) -> Unit,
     onNavigateToPreflight: () -> Unit = {},
+    onNavigateToDevices: () -> Unit = {},
+    onNavigateToAudit: () -> Unit = {},
 ) {
     SettingsCard(title = stringResource(R.string.settings_gateway_heading)) {
         LabelAndValue(
@@ -250,6 +256,24 @@ private fun GatewaySection(
             modifier = Modifier.fillMaxWidth().testTag("settings_preflight_button"),
         ) {
             Text(stringResource(R.string.settings_run_preflight))
+        }
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            OutlinedButton(
+                onClick = onNavigateToDevices,
+                modifier = Modifier.weight(1f).testTag("settings_devices_button"),
+            ) {
+                Text(stringResource(R.string.action_devices))
+            }
+            OutlinedButton(
+                onClick = onNavigateToAudit,
+                modifier = Modifier.weight(1f).testTag("settings_audit_button"),
+            ) {
+                Text(stringResource(R.string.action_audit_records))
+            }
         }
 
         state.healthSnapshot?.let { snapshot ->

@@ -265,4 +265,10 @@
     <string name="plan_start_task_order_missing">Missing work-order ID; cannot mint capability.</string>
     <string name="plan_start_task_typed_head">Type first %1$d hex chars of head SHA to confirm</string>
     <string name="action_start_task">Start task</string>
+
+    <!-- Stage 4.4 / PoC Tasks 19-25 Operator Controls Navigation -->
+    <string name="dashboard_operator_controls_heading">Operator Controls</string>
+    <string name="action_halt_resume">Halt / Resume</string>
+    <string name="action_audit_records">Audit</string>
+    <string name="action_devices">Devices</string>
 </resources>

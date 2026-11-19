@@ -14,8 +14,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -23,6 +25,7 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -32,7 +35,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,9 +46,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.inscopelabs.buildengine.R
 import com.inscopelabs.buildengine.ui.common.UiState
 import com.inscopelabs.buildengine.ui.components.ErrorBanner
 
@@ -85,59 +94,53 @@ data class AuditRecord(
 data class AuditInspectionData(
     val records: List<AuditRecord> = emptyList(),
     val resolved: AuditRecord? = null,
+    val resolveError: String? = null,
+    val isResolving: Boolean = false,
 )
 
 /**
- * Inspection of audit records.
- *
- * **Proposed baseline.** This is a pre-execution proposal produced against
- * `docs/PRE-EXECUTION-ONBOARDING.md`, not a completed stage. It has not been compiled,
- * has no test coverage, and is not wired into navigation, DI or any caller. The AI
- * Studio agent executes Stage 4.4, corrects this file against the gateway's audit read
- * paths, adds the tests, and closes the stage only when CI is green on the pushed SHA
- * (G-04).
- *
- * TODO(Stage 4.4 / T4-401): supply the ViewModel and the `GET /audit` and
- * `GET /audit/{ref}` reads, confirm the response shape against the gateway (the contract
- * publishes no audit schema), and add the state tests the gate requires.
+ * Inspection of audit records (Stage 4.4 / T4-401).
  *
  * ## Where the records come from
  *
- * RELEASE-PLAN.md Stage 4.4 / T4-401: "show audit records and resolve an auditRef". The
- * contract defines exactly two audit reads — §3.20 `GET /audit` for the journal and
+ * The contract defines two audit reads — §3.20 `GET /audit` for the journal and
  * `GET /audit/{ref}` for one record. Both are bearer-authenticated reads and neither
- * needs a capability. This screen uses those two and nothing else (G-07).
- *
- * ## Why this file owns [AuditRecord]
- *
- * The audit journal is the natural home of the record type, and the decision history
- * (`ui/decision/DecisionHistoryScreen.kt`) reads the same journal, so it imports the
- * model from here rather than declaring a second, divergent copy. The stage owns the
- * final placement — if the model belongs in `domain/model/`, moving it is part of the
- * stage's work.
- *
- * ## Why the screen holds state instead of taking a ViewModel
- *
- * The screen takes a [UiState] and plain callbacks rather than a ViewModel, so this file
- * stays self-contained against what is on `main` today and leaves one seam for the
- * stage: a `@HiltViewModel` exposing `StateFlow<UiState<AuditInspectionData>>` and the
- * mapping from the gateway's responses to [AuditRecord].
- *
- * **The signature below is a proposal.** The stage owns the final shape.
+ * needs a capability. This screen uses those two through [AuditInspectionViewModel] (G-07).
  *
  * ## Boundaries this screen keeps
  *
- * - It is read-only. It revokes nothing and it resolves nothing by itself.
- * - It displays only what the journal holds. It does not render a capability, a
- *   signature or a nonce, because the journal does not contain them.
- * - A reference that does not resolve is reported as not found. It is never matched
- *   loosely against a record that merely looks similar.
+ * - It is read-only. It revokes nothing and resolves references strictly against the gateway.
+ * - All rendered values are redacted via `Redactor` in the ViewModel and never include
+ *   a capability, signature, or nonce (I-04).
+ * - A reference that does not resolve is reported as not found rather than matched loosely.
  */
+@Composable
+fun AuditInspectionScreen(
+    modifier: Modifier = Modifier,
+    viewModel: AuditInspectionViewModel = hiltViewModel(),
+    onBack: (() -> Unit)? = null,
+) {
+    val state by viewModel.uiState.collectAsState()
+    LaunchedEffect(Unit) {
+        if (viewModel.uiState.value is UiState.Idle) {
+            viewModel.load()
+        }
+    }
+    AuditInspectionScreen(
+        state = state,
+        modifier = modifier,
+        onBack = onBack,
+        onRefresh = { viewModel.load() },
+        onResolve = { auditRef -> viewModel.resolve(auditRef) },
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuditInspectionScreen(
     state: UiState<AuditInspectionData>,
     modifier: Modifier = Modifier,
+    onBack: (() -> Unit)? = null,
     onRefresh: () -> Unit = {},
     onResolve: (auditRef: String) -> Unit = {},
 ) {
@@ -146,6 +149,19 @@ fun AuditInspectionScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Audit records") },
+                navigationIcon = {
+                    if (onBack != null) {
+                        IconButton(
+                            onClick = onBack,
+                            modifier = Modifier.testTag("audit_inspection_back_button"),
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.action_back),
+                            )
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.onSurface,
@@ -211,7 +227,9 @@ private fun AuditIdleContent(
         )
         OutlinedButton(
             onClick = onRefresh,
-            modifier = Modifier.testTag("audit_inspection_load_button"),
+            modifier = Modifier
+                .minimumInteractiveComponentSize()
+                .testTag("audit_inspection_load_button"),
         ) {
             Text("Load journal")
         }
@@ -235,10 +253,58 @@ private fun AuditInspectionContent(
         item {
             ResolveReferenceCard(
                 referenceInput = referenceInput,
+                isResolving = data.isResolving,
                 onReferenceInputChange = { referenceInput = it },
                 onResolve = { value -> onResolve(value) },
                 onRefresh = onRefresh,
             )
+        }
+
+        if (data.isResolving) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().testTag("audit_resolve_loading"),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                    )
+                    Text(
+                        text = "Resolving auditRef against gateway…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+
+        data.resolveError?.takeIf { it.isNotBlank() }?.let { resolveError ->
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth().testTag("audit_resolve_error"),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Text(
+                            text = resolveError,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
         }
 
         data.resolved?.let { resolved ->
@@ -297,6 +363,7 @@ private fun AuditInspectionContent(
 @Composable
 private fun ResolveReferenceCard(
     referenceInput: String,
+    isResolving: Boolean,
     modifier: Modifier = Modifier,
     onReferenceInputChange: (String) -> Unit,
     onResolve: (String) -> Unit,
@@ -331,8 +398,10 @@ private fun ResolveReferenceCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
                     onClick = { onResolve(trimmed) },
-                    enabled = trimmed.isNotBlank(),
-                    modifier = Modifier.testTag("audit_resolve_button"),
+                    enabled = trimmed.isNotBlank() && !isResolving,
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .testTag("audit_resolve_button"),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Search,
@@ -344,7 +413,9 @@ private fun ResolveReferenceCard(
                 }
                 TextButton(
                     onClick = onRefresh,
-                    modifier = Modifier.testTag("audit_journal_refresh_button"),
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .testTag("audit_journal_refresh_button"),
                 ) {
                     Text("Reload journal")
                 }
@@ -443,7 +514,9 @@ private fun AuditRecordRow(
             if (record.auditRef.isNotBlank()) {
                 TextButton(
                     onClick = { onResolve(record.auditRef) },
-                    modifier = Modifier.testTag("audit_row_resolve_${record.auditRef}"),
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .testTag("audit_row_resolve_${record.auditRef}"),
                 ) {
                     Text("Inspect")
                 }

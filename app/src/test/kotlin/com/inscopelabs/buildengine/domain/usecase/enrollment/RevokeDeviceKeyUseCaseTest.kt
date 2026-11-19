@@ -1,6 +1,8 @@
 package com.inscopelabs.buildengine.domain.usecase.enrollment
 
 import com.inscopelabs.buildengine.core.network.GatewayHttpException
+import com.inscopelabs.buildengine.core.network.dto.AdminEnrolmentsResponseDto
+import com.inscopelabs.buildengine.core.network.dto.AuditEntryDto
 import com.inscopelabs.buildengine.core.network.dto.BranchHeadDto
 import com.inscopelabs.buildengine.core.network.dto.DecideAckDto
 import com.inscopelabs.buildengine.core.network.dto.DecideRequestDto
@@ -76,6 +78,9 @@ class RevokeDeviceKeyUseCaseTest {
             throwOnRevoke?.let { throw it }
             return revokedResponse
         }
+        override suspend fun listEnrolments(): AdminEnrolmentsResponseDto = error("not used in this test")
+        override suspend fun listAudit(): List<AuditEntryDto> = error("not used in this test")
+        override suspend fun resolveAudit(auditRef: String): AuditEntryDto = error("not used in this test")
     }
 
     private val deletedAliases = mutableListOf<String>()

@@ -135,6 +135,8 @@ object GatewayEndpoints {
     const val SYNC: String = "/sync"
     const val DOCTOR: String = "/doctor"
     const val OPERATION_LOOKUP: String = "/operations/{operationId}"
+    const val AUDIT: String = "/audit"
+    const val AUDIT_REF: String = "/audit/{ref}"
 
     const val ENROLL: String = "/enroll"
     const val ENROLL_ROTATE: String = "/enroll/rotate"
@@ -197,11 +199,20 @@ object GatewayEndpoints {
     /** `POST /enroll/challenge` — attestation challenge. */
     fun enrollChallenge(): String = ENROLL_CHALLENGE
 
+    /** `GET /admin/enrolments` — active device enrolments (admin surface, no public keys). */
+    fun adminEnrolments(): String = "/admin/enrolments"
+
     /** `POST /admin/revoke` — device key revocation (§3.21, BD-1.10). */
     fun adminRevoke(): String = ADMIN_REVOKE
 
     /** `GET /operations/{id}` — operation outcome lookup keyed by idempotency key (§3.19). */
     fun operationLookup(operationId: String): String = path(OPERATION_LOOKUP, "operationId" to operationId)
+
+    /** `GET /audit` — recent audit journal entries (contract §3.20). */
+    fun audit(): String = AUDIT
+
+    /** `GET /audit/{ref}` — single audit journal entry by reference (contract §3.20). */
+    fun auditRecord(auditRef: String): String = path(AUDIT_REF, "ref" to auditRef)
 
     /**
      * Fills the placeholders of [template] with [parameters].

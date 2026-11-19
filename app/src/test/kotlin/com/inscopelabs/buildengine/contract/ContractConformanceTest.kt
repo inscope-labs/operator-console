@@ -94,6 +94,8 @@ class ContractConformanceTest {
             "SYNC" to ("sync" to listOf("POST")),
             "DOCTOR" to ("doctor" to listOf("GET")),
             "OPERATION_LOOKUP" to ("operationLookup" to listOf("GET")),
+            "AUDIT" to ("audit" to listOf("GET")),
+            "AUDIT_REF" to ("auditRecord" to listOf("GET")),
             "ENROLL" to ("enroll" to listOf("POST")),
             "ENROLL_ROTATE" to ("enrollRotate" to listOf("POST")),
             "ENROLL_CHALLENGE" to ("enrollChallenge" to listOf("POST")),

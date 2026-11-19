@@ -16,6 +16,9 @@ object Routes {
     const val ENROLLMENT: String = "enrollment"
     const val SETTINGS: String = "settings"
     const val PREFLIGHT: String = "preflight"
+    const val HALT_RESUME: String = "halt_resume"
+    const val AUDIT_INSPECTION: String = "audit_inspection"
+    const val DEVICE_MANAGEMENT: String = "device_management"
     const val MANUAL_PIPELINE: String = "manual_pipeline"
     const val MANUAL_PIPELINE_TASK: String = "manual_pipeline/{taskId}"
 

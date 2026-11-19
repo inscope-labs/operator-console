@@ -16,6 +16,7 @@ import com.inscopelabs.buildengine.data.local.HealthSnapshotStore
 import com.inscopelabs.buildengine.data.remote.GatewayApi
 import com.inscopelabs.buildengine.domain.usecase.enrollment.EnrollDeviceUseCase
 import com.inscopelabs.buildengine.domain.usecase.enrollment.ReportDevicePostureUseCase
+import com.inscopelabs.buildengine.domain.usecase.enrollment.RevokeDeviceKeyUseCase
 import com.inscopelabs.buildengine.domain.usecase.enrollment.RotateDeviceKeyUseCase
 import com.inscopelabs.buildengine.domain.usecase.read.GetNextTasksUseCase
 import com.inscopelabs.buildengine.domain.usecase.read.GetPlansUseCase
@@ -227,6 +228,19 @@ object UseCaseModule {
         enrollmentStore: DeviceEnrollmentStore,
     ): RotateDeviceKeyUseCase =
         RotateDeviceKeyUseCase(deviceKeyManager, deviceAttestation, gatewayApi, enrollmentStore)
+
+    @Provides
+    @Singleton
+    fun provideRevokeDeviceKeyUseCase(
+        gatewayApi: GatewayApi,
+        enrollmentStore: DeviceEnrollmentStore,
+        deviceKeyManager: DeviceKeyManager,
+    ): RevokeDeviceKeyUseCase =
+        RevokeDeviceKeyUseCase(
+            gatewayApi = gatewayApi,
+            enrollmentStore = enrollmentStore,
+            deleteLocalKey = { alias -> deviceKeyManager.deleteDeviceKey(alias) },
+        )
 
     @Provides
     @Singleton

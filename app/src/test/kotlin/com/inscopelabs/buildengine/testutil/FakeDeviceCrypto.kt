@@ -2,6 +2,7 @@ package com.inscopelabs.buildengine.testutil
 
 import com.inscopelabs.buildengine.core.crypto.DeviceKeyManager
 import com.inscopelabs.buildengine.core.crypto.DeviceKeySpec
+import com.inscopelabs.buildengine.core.crypto.DeviceKeyStatus
 import com.inscopelabs.buildengine.core.crypto.KeyNeedsRotationException
 import com.inscopelabs.buildengine.core.crypto.NeedsReenrollmentException
 import com.inscopelabs.buildengine.core.security.DeviceAttestation
@@ -13,6 +14,22 @@ class FakeDeviceKeyManager : DeviceKeyManager() {
     val specs = mutableMapOf<String, DeviceKeySpec>()
     var lastSpec: DeviceKeySpec? = null
     var simulatedInvalidated: Boolean = false
+    var simulatedInvalidatedReason: String = "Simulated permanently invalidated key"
+
+    override fun checkDeviceKey(spec: DeviceKeySpec): DeviceKeyStatus {
+        if (simulatedInvalidated) {
+            return DeviceKeyStatus.NeedsReenrollment(simulatedInvalidatedReason)
+        }
+        val existing = specs[spec.alias]
+            ?: return DeviceKeyStatus.NeedsReenrollment("Device key '${spec.alias}' not found in Keystore")
+        if (existing.attestationChallenge == null) {
+            return DeviceKeyStatus.KeyNeedsRotation("Key '${spec.alias}' has no attestation challenge; rotation required")
+        }
+        if (existing.authTier != spec.authTier) {
+            return DeviceKeyStatus.KeyNeedsRotation("Key auth tier (${existing.authTier.wireValue}) does not match policy (${spec.authTier.wireValue})")
+        }
+        return DeviceKeyStatus.Valid(spec.alias)
+    }
 
     override fun ensureDeviceKey(spec: DeviceKeySpec): String {
         lastSpec = spec

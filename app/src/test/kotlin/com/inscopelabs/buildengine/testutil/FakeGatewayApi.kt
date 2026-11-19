@@ -1,5 +1,7 @@
 package com.inscopelabs.buildengine.testutil
 
+import com.inscopelabs.buildengine.core.network.dto.AdminEnrolmentsResponseDto
+import com.inscopelabs.buildengine.core.network.dto.AuditEntryDto
 import com.inscopelabs.buildengine.core.network.dto.BranchHeadDto
 import com.inscopelabs.buildengine.core.network.dto.DecideAckDto
 import com.inscopelabs.buildengine.core.network.dto.DecideRequestDto
@@ -133,8 +135,31 @@ class FakeGatewayApi : GatewayApi {
         )
     }
 
+    var listEnrolmentsResult: () -> AdminEnrolmentsResponseDto = {
+        AdminEnrolmentsResponseDto(enrolments = emptyList(), count = 0)
+    }
+
+    var listAuditResult: () -> List<AuditEntryDto> = { emptyList() }
+
+    var resolveAuditResult: (String) -> AuditEntryDto = { ref ->
+        AuditEntryDto(
+            auditRef = ref,
+            timestamp = "2026-10-30T16:00:00Z",
+            operation = "PUBLISH",
+            plan = "atlas",
+            task = "10008",
+            branch = "task-10008-refactor-parser",
+            headSha = "0".repeat(40),
+            kid = "k1",
+            authTier = "hardware_confirm",
+        )
+    }
+
     override suspend fun enroll(request: EnrollRequestDto): EnrollResponseDto = enrollResult(request)
     override suspend fun rotateKey(request: RotateKeyRequestDto): EnrollResponseDto = rotateKeyResult(request)
     override suspend fun enrollChallenge(): EnrollChallengeDto = enrollChallengeResult()
     override suspend fun lookupOperation(idempotencyKey: String): OperationLookupDto = lookupResult(idempotencyKey)
+    override suspend fun listEnrolments(): AdminEnrolmentsResponseDto = listEnrolmentsResult()
+    override suspend fun listAudit(): List<AuditEntryDto> = listAuditResult()
+    override suspend fun resolveAudit(auditRef: String): AuditEntryDto = resolveAuditResult(auditRef)
 }
