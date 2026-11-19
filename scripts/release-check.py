@@ -102,24 +102,10 @@ def _entries() -> list:
         # --- C1: scaffold markers in shipped sources -------------------------------
         {
             "check": "C1",
-            "path": f"{MAIN_PKG}/ui/audit/AuditInspectionScreen.kt",
-            "pattern": re.escape("TODO(Stage 4.4 / T4-401)"),
-            "reason": "Audit inspection screen has no ViewModel yet",
-            "owner": "PoC task 21",
-        },
-        {
-            "check": "C1",
             "path": f"{MAIN_PKG}/ui/decision/DecisionHistoryScreen.kt",
             "pattern": re.escape("TODO(Stage 4.4 / T4-401)"),
             "reason": "Decision history screen has no ViewModel yet",
             "owner": "Stage 4.4 / T4-401",
-        },
-        {
-            "check": "C1",
-            "path": f"{MAIN_PKG}/ui/device/DeviceManagementScreen.kt",
-            "pattern": re.escape("TODO(Stage 4.4 / T4-401)"),
-            "reason": "Device management screen has no ViewModel yet",
-            "owner": "PoC task 23",
         },
         {
             "check": "C1",
@@ -134,13 +120,6 @@ def _entries() -> list:
             "pattern": re.escape("TODO(Stage 5.3 / T5-301)"),
             "reason": "Lab ViewModel has no signer behind it yet",
             "owner": "Stage 5.3 / T5-301",
-        },
-        {
-            "check": "C1",
-            "path": f"{MAIN_PKG}/ui/operations/HaltResumeScreen.kt",
-            "pattern": re.escape("TODO(Stage 4.4 / T4-401)"),
-            "reason": "Halt/resume screen has no ViewModel yet",
-            "owner": "PoC task 19",
         },
         {
             "check": "C1",
