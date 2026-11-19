@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PlanDO } from '../../../src/durable-objects/plan-do';
+import {
+  resetPlanMemory,
+  putPlanRecord,
+  nextTasks,
+} from '../../../src/plan/client';
+import type { Env } from '../../../src/runtime';
 
 class MemoryStorage {
   private map = new Map<string, unknown>();
@@ -78,7 +84,7 @@ describe('PlanDO', () => {
     expect(conflict.status).toBe(409);
   });
 
-  it('returns next ready tasks', async () => {
+  it('returns next ready tasks with the work-order identifier they carry', async () => {
     await planDo.fetch(
       new Request('https://plan/plans/atlas', {
         method: 'PUT',
@@ -86,8 +92,20 @@ describe('PlanDO', () => {
           title: 'Atlas',
           status: 'in_progress',
           tasks: [
-            { id: '1', title: 'A', status: 'ready', branch: 'task-1-a' },
-            { id: '2', title: 'B', status: 'done', branch: 'task-2-b' },
+            {
+              id: '1',
+              title: 'A',
+              status: 'ready',
+              branch: 'task-1-a',
+              order: 'order-7731',
+            },
+            {
+              id: '2',
+              title: 'B',
+              status: 'done',
+              branch: 'task-2-b',
+              order: 'order-7732',
+            },
           ],
         }),
       })
@@ -95,8 +113,132 @@ describe('PlanDO', () => {
     const res = await planDo.fetch(
       new Request('https://plan/tasks/next')
     );
-    const body = (await res.json()) as Array<{ id: string }>;
+    const body = (await res.json()) as Array<{
+      id: string;
+      order: string;
+      status: string;
+    }>;
     expect(body.map((t) => t.id)).toEqual(['1']);
+    // Contract section 3.6: the order is reported as held.
+    expect(body[0].order).toBe('order-7731');
+    expect(body[0].status).toBe('ready');
+  });
+
+  it('omits a ready task whose work-order identifier is missing or empty', async () => {
+    await planDo.fetch(
+      new Request('https://plan/plans/atlas', {
+        method: 'PUT',
+        body: JSON.stringify({
+          title: 'Atlas',
+          status: 'in_progress',
+          tasks: [
+            {
+              id: 'no-order',
+              title: 'No order',
+              status: 'ready',
+              branch: 'task-no-order',
+            },
+            {
+              id: 'empty-order',
+              title: 'Empty order',
+              status: 'ready',
+              branch: 'task-empty-order',
+              order: '',
+            },
+            {
+              id: 'unassigned-no-order',
+              title: 'Unassigned, no order',
+              status: 'unassigned',
+              branch: 'task-unassigned',
+            },
+            {
+              id: 'with-order',
+              title: 'With order',
+              status: 'ready',
+              branch: 'task-with-order',
+              order: 'order-7731',
+            },
+          ],
+        }),
+      })
+    );
+    const res = await planDo.fetch(
+      new Request('https://plan/tasks/next')
+    );
+    const body = (await res.json()) as Array<{ id: string; order: string }>;
+    expect(body.map((t) => t.id)).toEqual(['with-order']);
+    expect(body[0].order).toBe('order-7731');
+  });
+
+  it('agrees with the in-memory plan client on what is listed', async () => {
+    const tasks = [
+      {
+        id: '1',
+        title: 'A',
+        status: 'ready',
+        branch: 'task-1-a',
+        order: 'order-7731',
+      },
+      {
+        id: '2',
+        title: 'B',
+        status: 'unassigned',
+        branch: 'task-2-b',
+        order: 'order-7732',
+      },
+      {
+        id: '3',
+        title: 'C',
+        status: 'ready',
+        branch: 'task-3-c',
+      },
+      {
+        id: '4',
+        title: 'D',
+        status: 'ready',
+        branch: 'task-4-d',
+        order: '',
+      },
+      {
+        id: '5',
+        title: 'E',
+        status: 'done',
+        branch: 'task-5-e',
+        order: 'order-7735',
+      },
+    ];
+
+    // Durable Object path
+    await planDo.fetch(
+      new Request('https://plan/plans/atlas', {
+        method: 'PUT',
+        body: JSON.stringify({
+          title: 'Atlas',
+          status: 'in_progress',
+          tasks,
+        }),
+      })
+    );
+    const doRes = await planDo.fetch(
+      new Request('https://plan/tasks/next')
+    );
+    const doBody = await doRes.json();
+
+    // In-memory path (the fallback used by tests and single-isolate runs)
+    resetPlanMemory();
+    const env = {} as Env;
+    await putPlanRecord(env, 'atlas', {
+      title: 'Atlas',
+      status: 'in_progress',
+      tasks,
+    } as never);
+    const memoryBody = await nextTasks(env);
+
+    expect(doBody).toEqual(memoryBody);
+    expect((doBody as Array<{ id: string }>).map((t) => t.id)).toEqual([
+      '1',
+      '2',
+    ]);
   });
 
   it('304 when If-None-Match matches etag', async () => {
