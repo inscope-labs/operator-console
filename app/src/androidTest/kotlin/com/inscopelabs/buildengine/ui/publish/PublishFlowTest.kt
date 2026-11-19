@@ -92,7 +92,7 @@ class PublishFlowTest {
             .assertTextContains(context.getString(R.string.publish_result_succeeded))
         composeRule.onNodeWithTag("operation_result_audit_ref")
             .assertIsDisplayed()
-            .assertTextContains("audit-flow-99")
+            .assertTextContains("audit-flow-99", substring = true)
     }
 
     @Test

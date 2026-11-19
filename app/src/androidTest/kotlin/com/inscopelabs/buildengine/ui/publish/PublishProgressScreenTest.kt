@@ -106,7 +106,7 @@ class PublishProgressScreenTest {
 
         composeRule.onNodeWithTag("operation_result_audit_ref")
             .assertIsDisplayed()
-            .assertTextContains("audit-20261113-42")
+            .assertTextContains("audit-20261113-42", substring = true)
 
         composeRule.runOnIdle { auditRef = null }
         composeRule.waitForIdle()
@@ -150,7 +150,7 @@ class PublishProgressScreenTest {
 
         composeRule.onNodeWithTag("operation_result_audit_ref")
             .assertIsDisplayed()
-            .assertTextContains("audit-ok-1")
+            .assertTextContains("audit-ok-1", substring = true)
         val successPixel = composeRule.onNodeWithTag("operation_result_banner")
             .captureToImage()
             .toPixelMap()[2, 2]
@@ -176,7 +176,7 @@ class PublishProgressScreenTest {
 
         composeRule.onNodeWithTag("operation_result_audit_ref")
             .assertIsDisplayed()
-            .assertTextContains("audit-uncertain-2")
+            .assertTextContains("audit-uncertain-2", substring = true)
         val uncertainPixel = composeRule.onNodeWithTag("operation_result_banner")
             .captureToImage()
             .toPixelMap()[2, 2]

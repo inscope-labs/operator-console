@@ -48,6 +48,9 @@ class DecisionScreenTest {
                 clock = clock,
             ),
             nonceSource = nonceSource,
+            // ADR 0014 D2 settled the contract, so production defaults to true. This test covers the
+            // blocked path (PR3-003 blocker banner, submit disabled), so it opts into it explicitly.
+            contractSchemaSettled = false,
         )
         val viewModel = DecisionViewModel(SavedStateHandle(mapOf("decisionId" to "D-01")), useCase)
 
@@ -57,16 +60,15 @@ class DecisionScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag("decision_contract_blocker").assertIsDisplayed()
+        composeRule.onNodeWithTag("decision_contract_blocker").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("decision_plan_input").performScrollTo().performTextInput("atlas")
         composeRule.onNodeWithTag("decision_task_input").performScrollTo().performTextInput("10008")
         composeRule.onNodeWithTag("decision_order_input").performScrollTo().performTextInput("order-7731")
         composeRule.onNodeWithTag("decision_branch_input").performScrollTo().performTextInput("task-10008-foo")
         composeRule.onNodeWithTag("decision_head_input").performScrollTo().performTextInput("a".repeat(40))
-        composeRule.onNodeWithTag("decision_attribution_input").performScrollTo().performTextInput("Architect")
-        composeRule.onNodeWithTag("decision_rationale_input").performScrollTo().performTextInput("Policy alignment")
-        composeRule.onNodeWithTag("decision_scope_input").performScrollTo().performTextInput("gateway")
-        composeRule.onNodeWithTag("decision_evidence_input").performScrollTo().performTextInput("Audit log #1")
+        // ADR 0014 D2: attribution, rationale, scope and evidence are no longer collected; the only
+        // free-text field is `notes`.
+        composeRule.onNodeWithTag("decision_notes_input").performScrollTo().performTextInput("Policy alignment")
 
         composeRule.onNodeWithTag("decision_confirm_button")
             .performScrollTo()
