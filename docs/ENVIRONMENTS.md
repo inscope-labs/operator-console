@@ -6,9 +6,20 @@ Authority: `docs/adr/0010-environments-hostnames-and-workflow.md`, `docs/operato
 
 | Environment | Where it runs | Gateway base URL | Transport | Lab mode | Status |
 |---|---|---|---|---|---|
-| `test` | Local only: a developer machine, reached from the Android emulator | `http://10.0.2.2:8787` (debug builds only, `BuildConfig.DEBUG_GATEWAY_BASE_URL`) | Cleartext allowed to `10.0.2.2`, `localhost`, `127.0.0.1` only (`app/src/debug/res/xml/network_security_config.xml`) | Allowed, and only against a gateway reporting `"environment": "test"` | Available for the PoC |
-| `staging` | Cloudflare Workers, Gateway A | Not yet recorded: fixed at first deployment (ADR 0010 decision 2) | TLS with SPKI pinning; pins are not captured yet (EXT-6, task 39) | Never | **Not deployed** |
-| `production` | Cloudflare Workers, Gateway A | Not yet recorded: fixed at first deployment (ADR 0010 decision 2) | TLS with SPKI pinning; pins are not captured yet (EXT-6, task 39) | Never | **Not deployed** |
+| `test` | Local (a developer machine reached from the Android emulator), or the Cloudflare Worker `ops-test` once EXT-5 is done | `http://10.0.2.2:8787` (debug builds only, `BuildConfig.DEBUG_GATEWAY_BASE_URL`) | Cleartext allowed to `10.0.2.2`, `localhost`, `127.0.0.1` only (`app/src/debug/res/xml/network_security_config.xml`) | Allowed, and only against a gateway reporting `"environment": "test"` | Available for the PoC |
+| `staging` | Cloudflare Workers, Gateway A, Worker `ops-stage` | Not yet recorded: fixed at first deployment (ADR 0010 decision 2) | TLS with SPKI pinning; pins are not captured yet (EXT-6, task 39) | Never | **Not deployed** |
+| `production` | Cloudflare Workers, Gateway A, Worker `ops-production` | Not yet recorded: fixed at first deployment (ADR 0010 decision 2) | TLS with SPKI pinning; pins are not captured yet (EXT-6, task 39) | Never | **Not deployed** |
+
+## Decided on 18 Nov 2026 (ADR 0011)
+
+- Worker names: `ops-test`, `ops-stage`, `ops-production`. `gateway/wrangler.toml.template` still has `name = "cbridge"`, so the
+  deploy must set the name per environment; not changed yet.
+- Hostnames stay unrecorded until first deployment; SPKI pins are captured then (task 39, EXT-6).
+- GitHub environments `staging` and `production`, with the operator as required reviewer on `production`, were requested now.
+  They do **not** exist yet: the token Claude uses cannot create environments (403), so the operator creates them in repository
+  settings. The `release` environment and the `v*` tag ruleset come before the first release.
+- `applicationId` stays `com.inscopelabs.buildengine` (debug builds add `.debug`).
+- The PoC runs on `test` only.
 
 ## Hostnames
 

@@ -128,27 +128,6 @@ def _entries() -> list:
             "reason": "Submission review screen has no ViewModel yet",
             "owner": "Stage 4.3 / T4-301",
         },
-        {
-            "check": "C1",
-            "path": f"{MAIN_PKG}/ui/theme/Color.kt",
-            "pattern": re.escape("SCAFFOLD PLACEHOLDER"),
-            "reason": "Theme colour tokens are placeholders",
-            "owner": "PoC task 27",
-        },
-        {
-            "check": "C1",
-            "path": f"{MAIN_PKG}/ui/theme/Theme.kt",
-            "pattern": re.escape("SCAFFOLD PLACEHOLDER"),
-            "reason": "Theme wiring is a placeholder",
-            "owner": "PoC task 29",
-        },
-        {
-            "check": "C1",
-            "path": f"{MAIN_PKG}/ui/theme/Type.kt",
-            "pattern": re.escape("SCAFFOLD PLACEHOLDER"),
-            "reason": "Typography tokens are placeholders",
-            "owner": "PoC task 28",
-        },
         # --- C2: placeholder host -------------------------------------------------
         {
             "check": "C2",
