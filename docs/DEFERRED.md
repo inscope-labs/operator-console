@@ -17,6 +17,7 @@ Status words follow `README.md`: **not started**, **scaffold**, **unsupported**.
 | Decision history view | not started | No ADR yet | `docs/STATUS.md`, Stage 4.4. |
 | Submission review | not started | No ADR yet | `docs/STATUS.md`, Stage 6.2. |
 | Persisted cache of gateway reads | not started | No ADR yet | The session is in memory by design (README, deliberate absences). |
+| Capability conformance document (`CAPABILITY-CONFORMANCE.md`, EXT-11) | not started | ADR 0011 O-5 | Deferred past the PoC; the vectors in `docs/fixtures/vectors` and `docs/capability-format.md` stand in. |
 
 When an item gains a deferring ADR, replace its "No ADR yet" cell with the path. When an item is built, delete its row in the
 same pull request.
