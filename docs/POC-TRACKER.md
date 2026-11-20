@@ -19,9 +19,11 @@ States: `todo`, `in-progress`, `blocked`, `done`, `deferred` (deferred rows also
 
 **2026-11-18 (AI Studio rows 13, 14, 16, 17, 18).** All five were pushed as `c186ee5`, which was red: `scripts/release-check.py` (the first CI step) failed on a stale allowlist entry for the removed `BASE_URL` default, so the unit tests never ran. The gate fix is its own PR; the rows turn `done` only after `android-ci` is green on `main`. Open question for the report: `ErrorMapper.GATEWAY_CODES` holds four codes that contract §4.1 does not list (`BRANCH_INVALID`, `EXPIRED`, `HEAD_DRIFT`, `NOT_ENROLLED`), and `GatewayErrorCatalogueParityTest` demands exact equality, so it is the likely next failure.
 
-**2026-11-18 (round 5).** Gateway PR 1 (capability strictness) is merged as #91 (`5306bd5`, merge `8ba48ca`); `Gateway CI` `check` is green there and now includes the conformance suite. Gateway PR 2 (rows 62, 63) and PR 3 (row 64) are not started. Emulator tests: the new `instrumented-tests` job exposed four stale UI tests that had never run in CI (audit-ref `assertTextContains` needed `substring = true`; `DecisionScreenTest` still expected the pre-ADR-0014 form and a default-blocked contract); they are fixed in PR #92.
+**2026-11-18 (round 5).** Gateway PR 1 (capability strictness) is merged as #91 (`5306bd5`, merge `8ba48ca`); `Gateway CI` `check` is green there and now includes the conformance suite. Gateway PR 2 and PR 3 merged as #93 and #94 (2026-11-19). Emulator tests: the new `instrumented-tests` job exposed four stale UI tests that had never run in CI (audit-ref `assertTextContains` needed `substring = true`; `DecisionScreenTest` still expected the pre-ADR-0014 form and a default-blocked contract); they are fixed in PR #92.
 
 **2026-11-18 (operator answers recorded).** ADR 0011, ADR 0017 and `docs/OPEN-OPERATOR-DECISIONS.md` are in PR #96. Of the 43 items, 26 were answered and 17 were not (C5 only in part, F6 answered "Today"); two answers conflict with existing documents (see ADR 0011 Flags).
+
+**2026-11-19 (correction).** AI Studio had already implemented the theme in `404df4f`, so rows 27 to 29 are not blocked on the operator question; the question E3 is now whether to accept those tokens. Main was red at that commit for the same stale-allowlist reason as `b5ed919`; PR #97 fixes it.
 
 **New finding, no PoC row.** The `manualpipeline` module still maps `TransitionKind.SET_DONE` to `OperationType.SET_DONE` and holds it back only with a local constant, `TransitionPreconditionValidator.SET_DONE_AWAITS_SEAL_ROUTE = true`, whose own KDoc says to flip it to `false` once BE-MP-12 lands. Contract revision 1.3 (ADR 0016 D-1) reserves `SET_DONE` and refuses it with `400 BAD_ENCODING`, before any seal question is reached, so that constant would mint a capability the contract reserves. This is the same shape as the `SET` defect closed in rows 3–7. It is in `app/**`, so it is the `[APP]` lane and it has no PoC row of its own; it is recorded as a finding in `docs/release/MANUAL-PIPELINE-READINESS-REGISTER.md` LIF-02 (owner: Feature Lead) and named as a follow-on in the Phase 3 register's PR3-026.
 
@@ -53,9 +55,9 @@ States: `todo`, `in-progress`, `blocked`, `done`, `deferred` (deferred rows also
 | 24 | APP | DeviceManagementViewModel (new) | todo |  | |
 | 25 | APP | AppNavHost routes for 19-24 | todo |  | |
 | 26 | APP | PlanDetailScreen: SET_IN_PROGRESS entry point | done | `f656395` (AI Studio); `android-ci` green | 2026-11-18 |
-| 27 | APP | Color.kt tokens | blocked | design tokens: operator question E3 open (who supplies palette and type) | |
-| 28 | APP | Type.kt typography | blocked | design tokens: operator question E3 open (who supplies palette and type) | |
-| 29 | APP | Theme.kt wiring | blocked | design tokens: operator question E3 open (who supplies palette and type) | |
+| 27 | APP | Color.kt tokens | in-progress | `404df4f` (AI Studio) implemented the tokens; `android-ci` was red on the release gate (stale allowlist entries), fixed in PR #97; done when #97 merges with CI green. Operator question E3 still asks whether to accept these tokens |  |
+| 28 | APP | Type.kt typography | in-progress | `404df4f` (AI Studio) implemented the tokens; `android-ci` was red on the release gate (stale allowlist entries), fixed in PR #97; done when #97 merges with CI green. Operator question E3 still asks whether to accept these tokens |  |
+| 29 | APP | Theme.kt wiring | in-progress | `404df4f` (AI Studio) implemented the tokens; `android-ci` was red on the release gate (stale allowlist entries), fixed in PR #97; done when #97 merges with CI green. Operator question E3 still asks whether to accept these tokens |  |
 | 30 | APP | DeviceKeyManagerTest real assertions | todo |  | |
 | 31 | APP | KeystoreSignerTest real assertions | in-progress | PR #92; `KeystoreSignerTest` sign/verify, tamper, kid, fail-closed; emulator job 28/28 green |  |
 | 32 | APP | StrongBoxSupportTest real assertions | in-progress | PR #92; `StrongBoxSupportTest` honest-posture assertions; emulator job 28/28 green |  |
@@ -88,9 +90,9 @@ States: `todo`, `in-progress`, `blocked`, `done`, `deferred` (deferred rows also
 | 59 | DOC | PMA-READINESS-REGISTER: GOV-02, link ADR 0018 | done | PR #84; GOV-02 PASS against `b0e2b92`; ADR 0018 still unwritten (task 51), noted not linked | 2026-11-18 |
 | 60 | DOC | DEVICE-TEST-CHECKLIST + ENVIRONMENTS (new) | done | PR #84; staging/production hostnames stay unrecorded until first deployment | 2026-11-18 |
 | 61 | DOC | PHASE-3-EVIDENCE: PoC run + ProGuard acceptance | todo |  | |
-| 62 | GW | plans.ts: POST /plans/:id/status | todo |  | |
-| 63 | GW | plan-status-transition.test.ts (new) | todo |  | |
-| 64 | GW | tasks.ts: emit `order` | todo |  | |
+| 62 | GW | plans.ts: POST /plans/:id/status | done | PR #93 (gateway agent); all nine checks of contract 3.17 present in order; `Gateway CI` `check` green on `b1b7e2d`; Claude read the code, did not run it | 2026-11-19 |
+| 63 | GW | plan-status-transition.test.ts (new) | done | PR #93; `plan-status-transition.test.ts`, 18 cases; `Gateway CI` `check` green on `b1b7e2d` | 2026-11-19 |
+| 64 | GW | tasks.ts: emit `order` | done | PR #94 (gateway agent); `order` emitted on the Durable Object and in-memory paths, tasks without it omitted; `tasks-next-order.test.ts`; `Gateway CI` `check` green on `b1b7e2d` | 2026-11-19 |
 | 65 | GW | operations.ts: verify lookup (verify) | todo |  | |
 | 66 | GW | wrangler.toml.template + docs | todo |  | |
 | EXT-1 | EXT | Revoke every PAT pasted in chat (incl. this session's) | todo | operator answered "Today" but the token was still valid when checked; not recorded as done | |

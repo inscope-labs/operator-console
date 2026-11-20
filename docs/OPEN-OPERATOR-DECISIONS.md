@@ -29,7 +29,7 @@ pull request that records its answer.
 | D6 | Confirm the three kinds of plan record (draft, repository plan, `PlanDO` projection). | Task 51 |
 | E1 | Where do Lab and the HMAC signer live: debug source set, deleted, or kept behind a flag? | Task 37, the 10-entry architecture baseline |
 | E2 | Permissions added by libraries at manifest merge: keep, strip `USE_FINGERPRINT` only, or strip all? | Manifest comment, `ArchitectureManifestTest` baseline |
-| E3 | Who supplies colour, typography and theme? | Tasks 27 to 29 |
+| E3 | Who supplies colour, typography and theme? AI Studio has already implemented tokens in `404df4f`; do you accept them, or supply your own? | Tasks 27 to 29 (done when PR #97 merges) |
 | E4 | Limit `PUT /plans/{id}` to `ENVIRONMENT=test`, leave it, or remove it later? | Gateway hardening |
 | E5 | Nonce order: amend the contract to match the gate, or change the gate to match the contract? | Contract §3.17 wording |
 | F1 | Name of the disposable test consumer repository; create it in `inscope-labs`? | EXT-2 |
